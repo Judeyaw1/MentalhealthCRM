@@ -1,0 +1,265 @@
+import { useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
+import { Header } from "@/components/layout/Header";
+import { Sidebar } from "@/components/layout/Sidebar";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Users, UserCheck, UserCog, Plus, Mail, Shield } from "lucide-react";
+import { isUnauthorizedError } from "@/lib/authUtils";
+import type { User } from "@shared/schema";
+
+export default function Staff() {
+  const { toast } = useToast();
+  const { isAuthenticated, isLoading: authLoading, user } = useAuth();
+
+  // Redirect to home if not authenticated
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      toast({
+        title: "Unauthorized",
+        description: "You are logged out. Logging in again...",
+        variant: "destructive",
+      });
+      setTimeout(() => {
+        window.location.href = "/api/login";
+      }, 500);
+      return;
+    }
+  }, [isAuthenticated, authLoading, toast]);
+
+  const { data: staff, isLoading: staffLoading } = useQuery({
+    queryKey: ["/api/staff"],
+    retry: false,
+  });
+
+  const getInitials = (firstName?: string, lastName?: string) => {
+    if (!firstName && !lastName) return "U";
+    return `${firstName?.charAt(0) || ""}${lastName?.charAt(0) || ""}`.toUpperCase();
+  };
+
+  const getRoleBadge = (role: string) => {
+    switch (role) {
+      case "admin":
+        return <Badge className="bg-purple-100 text-purple-800">Administrator</Badge>;
+      case "therapist":
+        return <Badge className="bg-blue-100 text-blue-800">Therapist</Badge>;
+      case "staff":
+        return <Badge variant="secondary">Staff</Badge>;
+      default:
+        return <Badge variant="outline">{role}</Badge>;
+    }
+  };
+
+  const formatDate = (date: string) => {
+    return new Date(date).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  };
+
+  if (authLoading || staffLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-500"></div>
+          <p className="mt-4 text-gray-600">Loading staff information...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Check if user has permission to view staff (admin only)
+  if (user?.role !== "admin") {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Header />
+        <div className="flex">
+          <Sidebar />
+          <main className="flex-1 overflow-y-auto">
+            <div className="p-6">
+              <Card className="max-w-md mx-auto mt-20">
+                <CardContent className="pt-6 text-center">
+                  <Shield className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h2 className="text-lg font-semibold text-gray-900 mb-2">Access Restricted</h2>
+                  <p className="text-gray-600">
+                    You don't have permission to view staff management. This section is only available to administrators.
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          </main>
+        </div>
+      </div>
+    );
+  }
+
+  const staffStats = {
+    total: staff?.length || 0,
+    therapists: staff?.filter((member: User) => member.role === "therapist").length || 0,
+    admins: staff?.filter((member: User) => member.role === "admin").length || 0,
+    staff: staff?.filter((member: User) => member.role === "staff").length || 0,
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <Header />
+      
+      <div className="flex">
+        <Sidebar />
+        
+        <main className="flex-1 overflow-y-auto">
+          <div className="p-6">
+            {/* Page Header */}
+            <div className="mb-8">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-2xl font-semibold text-gray-900">Staff Management</h1>
+                  <p className="text-gray-600 mt-1">
+                    Manage team members and their roles within the practice.
+                  </p>
+                </div>
+                <Button className="flex items-center space-x-2">
+                  <Plus className="h-4 w-4" />
+                  <span>Invite Staff Member</span>
+                </Button>
+              </div>
+            </div>
+
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Staff</CardTitle>
+                  <Users className="h-4 w-4 text-gray-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{staffStats.total}</div>
+                  <p className="text-xs text-gray-600">Active members</p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Therapists</CardTitle>
+                  <UserCheck className="h-4 w-4 text-gray-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{staffStats.therapists}</div>
+                  <p className="text-xs text-gray-600">Licensed professionals</p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Administrators</CardTitle>
+                  <UserCog className="h-4 w-4 text-gray-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{staffStats.admins}</div>
+                  <p className="text-xs text-gray-600">System administrators</p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Support Staff</CardTitle>
+                  <Users className="h-4 w-4 text-gray-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{staffStats.staff}</div>
+                  <p className="text-xs text-gray-600">Administrative staff</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Staff List */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Team Members</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {!staff || staff.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No Staff Members Found</h3>
+                    <p className="text-gray-600 mb-4">
+                      Start building your team by inviting staff members.
+                    </p>
+                    <Button>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Invite First Member
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {staff.map((member: User) => (
+                      <Card key={member.id} className="hover:shadow-md transition-shadow">
+                        <CardContent className="p-6">
+                          <div className="flex items-center space-x-4 mb-4">
+                            <Avatar className="h-12 w-12">
+                              <AvatarImage src={member.profileImageUrl || undefined} />
+                              <AvatarFallback className="bg-primary-100 text-primary-600">
+                                {getInitials(member.firstName, member.lastName)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 min-w-0">
+                              <h3 className="text-lg font-medium text-gray-900 truncate">
+                                {member.firstName} {member.lastName}
+                              </h3>
+                              <div className="mt-1">
+                                {getRoleBadge(member.role)}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="space-y-3">
+                            {member.email && (
+                              <div className="flex items-center space-x-2 text-sm text-gray-600">
+                                <Mail className="h-4 w-4" />
+                                <span className="truncate">{member.email}</span>
+                              </div>
+                            )}
+
+                            <div className="text-sm text-gray-600">
+                              <span className="font-medium">Joined:</span>{" "}
+                              {member.createdAt ? formatDate(member.createdAt) : "Unknown"}
+                            </div>
+
+                            {member.updatedAt && member.updatedAt !== member.createdAt && (
+                              <div className="text-sm text-gray-600">
+                                <span className="font-medium">Last updated:</span>{" "}
+                                {formatDate(member.updatedAt)}
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="mt-4 pt-4 border-t border-gray-200">
+                            <div className="flex space-x-2">
+                              <Button variant="outline" size="sm" className="flex-1">
+                                Edit
+                              </Button>
+                              {member.role !== "admin" && (
+                                <Button variant="outline" size="sm" className="flex-1">
+                                  Remove
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+}
