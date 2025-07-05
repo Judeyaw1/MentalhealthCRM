@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Download, Plus } from "lucide-react";
 import { Link } from "wouter";
 import { isUnauthorizedError } from "@/lib/authUtils";
+import type { DashboardStats } from "@/components/dashboard/StatsCards";
 
 export default function Dashboard() {
   const { toast } = useToast();
@@ -32,19 +33,33 @@ export default function Dashboard() {
     }
   }, [isAuthenticated, isLoading, toast]);
 
-  const { data: stats, isLoading: statsLoading } = useQuery({
+  const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
     queryKey: ["/api/dashboard/stats"],
     retry: false,
+    refetchInterval: 10000,
   });
+
+  const statsData: DashboardStats = stats ?? {
+    totalPatients: 0,
+    todayAppointments: 0,
+    activeTreatments: 0,
+    monthlyRevenue: 0,
+    monthlyAppointments: 0,
+    completedAppointments: 0,
+    upcomingAppointments: 0,
+    appointmentsNeedingReview: 0,
+  };
 
   const { data: recentPatients, isLoading: patientsLoading } = useQuery({
     queryKey: ["/api/dashboard/recent-patients"],
     retry: false,
+    refetchInterval: 10000,
   });
 
   const { data: todayAppointments, isLoading: appointmentsLoading } = useQuery({
     queryKey: ["/api/dashboard/today-appointments"],
     retry: false,
+    refetchInterval: 10000,
   });
 
   if (isLoading) {
@@ -64,8 +79,8 @@ export default function Dashboard() {
       
       <div className="flex">
         <Sidebar 
-          patientCount={stats?.totalPatients || 0}
-          todayAppointments={stats?.todayAppointments || 0}
+          patientCount={statsData.totalPatients}
+          todayAppointments={statsData.todayAppointments}
         />
         
         <main className="flex-1 overflow-y-auto">
@@ -96,19 +111,22 @@ export default function Dashboard() {
 
             {/* Stats Cards */}
             <div className="mb-8">
-              <StatsCards stats={stats || { totalPatients: 0, todayAppointments: 0, activeTreatments: 0, monthlyRevenue: 0 }} isLoading={statsLoading} />
+              <StatsCards 
+                stats={statsData}
+                isLoading={statsLoading}
+              />
             </div>
 
             {/* Main Content Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
               {/* Recent Patients */}
               <div className="lg:col-span-2">
-                <RecentPatients patients={recentPatients || []} isLoading={patientsLoading} />
+                <RecentPatients patients={Array.isArray(recentPatients) ? recentPatients : []} isLoading={patientsLoading} />
               </div>
 
               {/* Today's Schedule */}
               <div>
-                <TodaySchedule appointments={todayAppointments || []} isLoading={appointmentsLoading} />
+                <TodaySchedule appointments={Array.isArray(todayAppointments) ? todayAppointments : []} isLoading={appointmentsLoading} />
               </div>
             </div>
 

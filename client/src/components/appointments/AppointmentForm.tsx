@@ -70,7 +70,7 @@ export function AppointmentForm({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Patient *</FormLabel>
-                    <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value.toString()}>
+                    <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString() || ''}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select patient" />
@@ -216,6 +216,7 @@ export function AppointmentForm({
                   <FormControl>
                     <Textarea 
                       {...field} 
+                      value={field.value || ""}
                       placeholder="Any additional notes about this appointment..."
                       rows={3}
                     />

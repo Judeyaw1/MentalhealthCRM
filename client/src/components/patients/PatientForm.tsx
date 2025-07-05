@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { z } from "zod";
 
 interface PatientFormProps {
   initialData?: Partial<InsertPatient>;
@@ -16,18 +17,42 @@ interface PatientFormProps {
   submitLabel?: string;
 }
 
+// Define a form schema that accepts dateOfBirth as a string
+const patientFormSchema = insertPatientSchema.extend({
+  dateOfBirth: z.string().refine(
+    (val) => !isNaN(new Date(val).getTime()),
+    { message: "Invalid date" }
+  ),
+});
+
+type PatientFormValues = {
+  firstName: string;
+  lastName: string;
+  dateOfBirth: string;
+  gender?: string;
+  email?: string;
+  phone?: string;
+  emergencyContact?: string;
+  address?: string;
+  insurance?: string;
+  reasonForVisit?: string;
+  status?: string;
+  hipaaConsent?: boolean;
+  assignedTherapistId?: string;
+};
+
 export function PatientForm({ 
   initialData, 
   onSubmit, 
   isLoading = false,
   submitLabel = "Create Patient Record"
 }: PatientFormProps) {
-  const form = useForm<InsertPatient>({
-    resolver: zodResolver(insertPatientSchema),
+  const form = useForm<PatientFormValues>({
+    resolver: zodResolver(patientFormSchema),
     defaultValues: {
       firstName: initialData?.firstName || "",
       lastName: initialData?.lastName || "",
-      dateOfBirth: initialData?.dateOfBirth || "",
+      dateOfBirth: initialData?.dateOfBirth ? new Date(initialData.dateOfBirth).toISOString().split('T')[0] : "",
       gender: initialData?.gender || "",
       email: initialData?.email || "",
       phone: initialData?.phone || "",
@@ -41,8 +66,13 @@ export function PatientForm({
     },
   });
 
-  const handleSubmit = (data: InsertPatient) => {
-    onSubmit(data);
+  const handleSubmit = (data: PatientFormValues) => {
+    // Convert dateOfBirth string to Date object
+    const processedData: InsertPatient = {
+      ...data,
+      dateOfBirth: new Date(data.dateOfBirth),
+    };
+    onSubmit(processedData);
   };
 
   return (
@@ -61,7 +91,7 @@ export function PatientForm({
                   <FormItem>
                     <FormLabel>First Name *</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="Enter first name" />
+                      <Input {...field} placeholder="Enter first name" value={field.value ?? ""} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -75,7 +105,7 @@ export function PatientForm({
                   <FormItem>
                     <FormLabel>Last Name *</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="Enter last name" />
+                      <Input {...field} placeholder="Enter last name" value={field.value ?? ""} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -91,7 +121,7 @@ export function PatientForm({
                   <FormItem>
                     <FormLabel>Date of Birth *</FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} />
+                      <Input type="date" {...field} value={field.value ?? ""} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -137,7 +167,7 @@ export function PatientForm({
                 <FormItem>
                   <FormLabel>Email Address</FormLabel>
                   <FormControl>
-                    <Input type="email" {...field} placeholder="Enter email address" />
+                    <Input type="email" {...field} placeholder="Enter email address" value={field.value ?? ""} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -152,7 +182,7 @@ export function PatientForm({
                   <FormItem>
                     <FormLabel>Phone Number</FormLabel>
                     <FormControl>
-                      <Input type="tel" {...field} placeholder="Enter phone number" />
+                      <Input type="tel" {...field} placeholder="Enter phone number" value={field.value ?? ""} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -166,7 +196,7 @@ export function PatientForm({
                   <FormItem>
                     <FormLabel>Emergency Contact</FormLabel>
                     <FormControl>
-                      <Input type="tel" {...field} placeholder="Enter emergency contact" />
+                      <Input type="tel" {...field} placeholder="Enter emergency contact" value={field.value ?? ""} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -181,7 +211,7 @@ export function PatientForm({
                 <FormItem>
                   <FormLabel>Address</FormLabel>
                   <FormControl>
-                    <Textarea {...field} placeholder="Enter full address" rows={3} />
+                    <Textarea {...field} placeholder="Enter full address" rows={3} value={field.value ?? ""} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -202,7 +232,7 @@ export function PatientForm({
                 <FormItem>
                   <FormLabel>Insurance Provider</FormLabel>
                   <FormControl>
-                    <Input {...field} placeholder="Enter insurance provider" />
+                    <Input {...field} placeholder="Enter insurance provider" value={field.value ?? ""} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -220,6 +250,7 @@ export function PatientForm({
                       {...field} 
                       placeholder="Please describe the primary concerns or reasons for seeking mental health services..."
                       rows={4}
+                      value={field.value ?? ""}
                     />
                   </FormControl>
                   <FormMessage />

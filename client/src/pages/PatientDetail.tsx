@@ -20,7 +20,8 @@ import {
   CreditCard,
   FileText,
   Clock,
-  User
+  User,
+  ArrowLeft
 } from "lucide-react";
 import { Link } from "wouter";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -29,7 +30,7 @@ import type { PatientWithTherapist, AppointmentWithDetails, TreatmentRecordWithD
 
 export default function PatientDetail() {
   const params = useParams();
-  const patientId = parseInt(params.id as string);
+  const patientId = params.id as string;
   const { toast } = useToast();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const queryClient = useQueryClient();
@@ -52,20 +53,20 @@ export default function PatientDetail() {
   const { data: patient, isLoading: patientLoading } = useQuery({
     queryKey: [`/api/patients/${patientId}`],
     retry: false,
-    enabled: !isNaN(patientId),
-  });
+    enabled: !!patientId,
+  }) as { data: any, isLoading: boolean };
 
   const { data: appointments, isLoading: appointmentsLoading } = useQuery({
     queryKey: ["/api/appointments", { patientId }],
     retry: false,
-    enabled: !isNaN(patientId),
-  });
+    enabled: !!patientId,
+  }) as { data: any[], isLoading: boolean };
 
   const { data: records, isLoading: recordsLoading } = useQuery({
     queryKey: [`/api/patients/${patientId}/records`],
     retry: false,
-    enabled: !isNaN(patientId),
-  });
+    enabled: !!patientId,
+  }) as { data: any[], isLoading: boolean };
 
   const updateStatusMutation = useMutation({
     mutationFn: async (status: string) => {
@@ -189,6 +190,16 @@ export default function PatientDetail() {
         
         <main className="flex-1 overflow-y-auto">
           <div className="p-6">
+            {/* Return Arrow */}
+            <div className="mb-4">
+              <Link href="/patients">
+                <Button variant="ghost" size="sm" className="flex items-center gap-2 text-gray-600 hover:text-gray-900">
+                  <ArrowLeft className="h-4 w-4" />
+                  Back to Patients
+                </Button>
+              </Link>
+            </div>
+
             {/* Patient Header */}
             <div className="mb-8">
               <div className="flex items-start justify-between">
@@ -204,7 +215,7 @@ export default function PatientDetail() {
                       {patient.firstName} {patient.lastName}
                     </h1>
                     <p className="text-gray-600 mt-1">
-                      Patient ID: #P-{patient.id.toString().padStart(4, '0')}
+                      Patient ID: {patient._id}
                     </p>
                     <div className="flex items-center space-x-4 mt-2">
                       {getStatusBadge(patient.status)}

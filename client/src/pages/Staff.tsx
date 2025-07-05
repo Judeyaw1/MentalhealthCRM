@@ -8,9 +8,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Users, UserCheck, UserCog, Plus, Mail, Shield } from "lucide-react";
+import { Users, UserCheck, UserCog, Plus, Mail, Shield, ArrowLeft } from "lucide-react";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import type { User } from "@shared/schema";
+import { InviteStaffForm } from "@/components/staff/InviteStaffForm";
+import { EditStaffForm } from "@/components/staff/EditStaffForm";
+import { RemoveStaffForm } from "@/components/staff/RemoveStaffForm";
+import { ResetPasswordForm } from "@/components/staff/ResetPasswordForm";
 
 export default function Staff() {
   const { toast } = useToast();
@@ -31,12 +35,12 @@ export default function Staff() {
     }
   }, [isAuthenticated, authLoading, toast]);
 
-  const { data: staff, isLoading: staffLoading } = useQuery({
+  const { data: staff, isLoading: staffLoading } = useQuery<User[]>({
     queryKey: ["/api/staff"],
     retry: false,
   });
 
-  const getInitials = (firstName?: string, lastName?: string) => {
+  const getInitials = (firstName?: string | null, lastName?: string | null) => {
     if (!firstName && !lastName) return "U";
     return `${firstName?.charAt(0) || ""}${lastName?.charAt(0) || ""}`.toUpperCase();
   };
@@ -54,8 +58,9 @@ export default function Staff() {
     }
   };
 
-  const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString("en-US", {
+  const formatDate = (date: Date | string) => {
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    return dateObj.toLocaleDateString("en-US", {
       year: "numeric",
       month: "short",
       day: "numeric",
@@ -74,7 +79,7 @@ export default function Staff() {
   }
 
   // Check if user has permission to view staff (admin only)
-  if (user?.role !== "admin") {
+  if (user && (user as any).role !== "admin") {
     return (
       <div className="min-h-screen bg-gray-50">
         <Header />
@@ -117,16 +122,23 @@ export default function Staff() {
             {/* Page Header */}
             <div className="mb-8">
               <div className="flex items-center justify-between">
-                <div>
-                  <h1 className="text-2xl font-semibold text-gray-900">Staff Management</h1>
-                  <p className="text-gray-600 mt-1">
-                    Manage team members and their roles within the practice.
-                  </p>
+                <div className="flex items-center gap-2 mb-2">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => window.location.href = "/"}
+                    className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                  </Button>
+                  <div>
+                    <h1 className="text-2xl font-semibold text-gray-900">Staff Management</h1>
+                    <p className="text-gray-600 mt-1">
+                      Manage team members and their roles within the practice.
+                    </p>
+                  </div>
                 </div>
-                <Button className="flex items-center space-x-2">
-                  <Plus className="h-4 w-4" />
-                  <span>Invite Staff Member</span>
-                </Button>
+                <InviteStaffForm />
               </div>
             </div>
 
@@ -190,10 +202,7 @@ export default function Staff() {
                     <p className="text-gray-600 mb-4">
                       Start building your team by inviting staff members.
                     </p>
-                    <Button>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Invite First Member
-                    </Button>
+                    <InviteStaffForm />
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -239,14 +248,13 @@ export default function Staff() {
                           </div>
 
                           <div className="mt-4 pt-4 border-t border-gray-200">
-                            <div className="flex space-x-2">
-                              <Button variant="outline" size="sm" className="flex-1">
-                                Edit
-                              </Button>
+                            <div className="flex flex-col space-y-2">
+                              <div className="flex space-x-2">
+                                <EditStaffForm staffMember={member} />
+                                <ResetPasswordForm staffMember={member} />
+                              </div>
                               {member.role !== "admin" && (
-                                <Button variant="outline" size="sm" className="flex-1">
-                                  Remove
-                                </Button>
+                                <RemoveStaffForm staffMember={member} />
                               )}
                             </div>
                           </div>

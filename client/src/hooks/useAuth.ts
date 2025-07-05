@@ -1,14 +1,63 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useToast } from "./use-toast";
 
 export function useAuth() {
-  const { data: user, isLoading } = useQuery({
-    queryKey: ["/api/auth/user"],
-    retry: false,
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  
+  // Simple authentication check without network requests
+  const isAuthenticated = localStorage.getItem("isLoggedIn") === "true";
+  const user = isAuthenticated ? JSON.parse(localStorage.getItem("user") || "null") : null;
+  const forcePasswordChange = localStorage.getItem("forcePasswordChange") === "true";
+  
+  const logoutMutation = useMutation({
+    mutationFn: async () => {
+      // Make logout request to clear server session
+      try {
+        await fetch("/api/logout", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
+      } catch (error) {
+        // Ignore errors, just clear local state
+      }
+      return { success: true };
+    },
+    onSuccess: () => {
+      // Clear local storage
+      localStorage.removeItem("isLoggedIn");
+      localStorage.removeItem("user");
+      
+      // Clear any cached data
+      queryClient.clear();
+      toast({
+        title: "Logged out",
+        description: "You have been logged out successfully.",
+      });
+      // Redirect to login page
+      window.location.href = "/login";
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to log out. Please try again.",
+        variant: "destructive",
+      });
+    },
   });
+
+  const logout = () => {
+    logoutMutation.mutate();
+  };
 
   return {
     user,
-    isLoading,
-    isAuthenticated: !!user,
+    isLoading: false,
+    isAuthenticated,
+    forcePasswordChange,
+    logout,
+    error: null,
   };
 }

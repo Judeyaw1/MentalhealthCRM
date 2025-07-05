@@ -47,12 +47,12 @@ export default function Landing() {
                 <Brain className="text-white h-6 w-6" />
               </div>
               <div>
-                <h1 className="text-xl font-semibold text-gray-900">MindCare CRM</h1>
-                <p className="text-sm text-gray-500">Mental Health Practice Management</p>
+                              <h1 className="text-xl font-semibold text-gray-900">NewLife CRM</h1>
+              <p className="text-sm text-gray-500">Mental Health Practice Management</p>
               </div>
             </div>
             
-            <Button onClick={() => window.location.href = "/api/login"}>
+            <Button onClick={() => window.location.href = "/login"}>
               Sign In
             </Button>
           </div>
@@ -73,7 +73,7 @@ export default function Landing() {
           <Button 
             size="lg" 
             className="text-lg px-8 py-3"
-            onClick={() => window.location.href = "/api/login"}
+            onClick={() => window.location.href = "/login"}
           >
             Get Started Today
           </Button>
@@ -121,13 +121,13 @@ export default function Landing() {
             Ready to Transform Your Practice?
           </h2>
           <p className="text-lg text-gray-600 mb-8">
-            Join thousands of mental health professionals who trust MindCare CRM 
+            Join thousands of mental health professionals who trust NewLife CRM 
             to manage their practice efficiently and securely.
           </p>
           <Button 
             size="lg" 
             className="text-lg px-8 py-3"
-            onClick={() => window.location.href = "/api/login"}
+            onClick={() => window.location.href = "/login"}
           >
             Start Your Free Trial
           </Button>
@@ -142,10 +142,10 @@ export default function Landing() {
               <div className="w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
                 <Brain className="text-white h-4 w-4" />
               </div>
-              <span className="text-lg font-semibold">MindCare CRM</span>
+              <span className="text-lg font-semibold">NewLife CRM</span>
             </div>
             <p className="text-gray-400">
-              © 2024 MindCare CRM. HIPAA Compliant Mental Health Practice Management.
+              © 2024 NewLife CRM. HIPAA Compliant Mental Health Practice Management.
             </p>
           </div>
         </div>

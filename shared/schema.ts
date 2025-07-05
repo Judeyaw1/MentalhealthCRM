@@ -1,103 +1,98 @@
 import {
-  pgTable,
+  sqliteTable,
   text,
-  varchar,
-  timestamp,
-  jsonb,
-  index,
-  serial,
   integer,
-  date,
-  boolean,
-  decimal,
-} from "drizzle-orm/pg-core";
+  real,
+  blob,
+} from "drizzle-orm/sqlite-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
 
 // Session storage table (required for Replit Auth)
-export const sessions = pgTable(
+export const sessions = sqliteTable(
   "sessions",
   {
-    sid: varchar("sid").primaryKey(),
-    sess: jsonb("sess").notNull(),
-    expire: timestamp("expire").notNull(),
+    sid: text("sid").primaryKey(),
+    sess: blob("sess").notNull(),
+    expire: integer("expire", { mode: 'timestamp' }).notNull(),
   },
-  (table) => [index("IDX_session_expire").on(table.expire)],
 );
 
 // User storage table (required for Replit Auth)
-export const users = pgTable("users", {
-  id: varchar("id").primaryKey().notNull(),
-  email: varchar("email").unique(),
-  firstName: varchar("first_name"),
-  lastName: varchar("last_name"),
-  profileImageUrl: varchar("profile_image_url"),
-  role: varchar("role").notNull().default("staff"), // admin, therapist, staff
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+export const users = sqliteTable("users", {
+  id: text("id").primaryKey().notNull(),
+  email: text("email").unique(),
+  firstName: text("first_name"),
+  lastName: text("last_name"),
+  profileImageUrl: text("profile_image_url"),
+  role: text("role").notNull().default("staff"), // admin, therapist, staff
+  password: text("password"), // For password management
+  forcePasswordChange: integer("force_password_change", { mode: 'boolean' }).default(false), // Force password change on next login
+  createdAt: integer("created_at", { mode: 'timestamp' }).defaultNow(),
+  updatedAt: integer("updated_at", { mode: 'timestamp' }).defaultNow(),
 });
 
 // Patients table
-export const patients = pgTable("patients", {
-  id: serial("id").primaryKey(),
-  firstName: varchar("first_name").notNull(),
-  lastName: varchar("last_name").notNull(),
-  dateOfBirth: date("date_of_birth").notNull(),
-  gender: varchar("gender"),
-  email: varchar("email"),
-  phone: varchar("phone"),
-  emergencyContact: varchar("emergency_contact"),
+export const patients = sqliteTable("patients", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  dateOfBirth: integer("date_of_birth", { mode: 'timestamp' }).notNull(),
+  gender: text("gender"),
+  email: text("email"),
+  phone: text("phone"),
+  emergencyContact: text("emergency_contact"),
   address: text("address"),
-  insurance: varchar("insurance"),
+  insurance: text("insurance"),
   reasonForVisit: text("reason_for_visit"),
-  status: varchar("status").notNull().default("active"), // active, inactive, discharged
-  hipaaConsent: boolean("hipaa_consent").notNull().default(false),
-  assignedTherapistId: varchar("assigned_therapist_id"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+  status: text("status").notNull().default("active"), // active, inactive, discharged
+  hipaaConsent: integer("hipaa_consent", { mode: 'boolean' }).notNull().default(false),
+  assignedTherapistId: text("assigned_therapist_id"),
+  createdAt: integer("created_at", { mode: 'timestamp' }).defaultNow(),
+  updatedAt: integer("updated_at", { mode: 'timestamp' }).defaultNow(),
 });
 
 // Appointments table
-export const appointments = pgTable("appointments", {
-  id: serial("id").primaryKey(),
+export const appointments = sqliteTable("appointments", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   patientId: integer("patient_id").notNull(),
-  therapistId: varchar("therapist_id").notNull(),
-  appointmentDate: timestamp("appointment_date").notNull(),
+  therapistId: text("therapist_id").notNull(),
+  appointmentDate: integer("appointment_date", { mode: 'timestamp' }).notNull(),
   duration: integer("duration").notNull().default(60), // minutes
-  type: varchar("type").notNull(), // therapy, consultation, group, intake
-  status: varchar("status").notNull().default("scheduled"), // scheduled, completed, cancelled, no-show
+  type: text("type").notNull(), // therapy, consultation, group, intake
+  status: text("status").notNull().default("scheduled"), // scheduled, completed, cancelled, no-show
   notes: text("notes"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+  createdAt: integer("created_at", { mode: 'timestamp' }).defaultNow(),
+  updatedAt: integer("updated_at", { mode: 'timestamp' }).defaultNow(),
 });
 
 // Treatment records table
-export const treatmentRecords = pgTable("treatment_records", {
-  id: serial("id").primaryKey(),
+export const treatmentRecords = sqliteTable("treatment_records", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   patientId: integer("patient_id").notNull(),
-  therapistId: varchar("therapist_id").notNull(),
+  therapistId: text("therapist_id").notNull(),
   appointmentId: integer("appointment_id"),
-  sessionDate: timestamp("session_date").notNull(),
-  sessionType: varchar("session_type").notNull(),
+  sessionDate: integer("session_date", { mode: 'timestamp' }).notNull(),
+  sessionType: text("session_type").notNull(),
   notes: text("notes").notNull(),
   goals: text("goals"),
   interventions: text("interventions"),
   progress: text("progress"),
   planForNextSession: text("plan_for_next_session"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+  createdAt: integer("created_at", { mode: 'timestamp' }).defaultNow(),
+  updatedAt: integer("updated_at", { mode: 'timestamp' }).defaultNow(),
 });
 
 // Audit logs table for HIPAA compliance
-export const auditLogs = pgTable("audit_logs", {
-  id: serial("id").primaryKey(),
-  userId: varchar("user_id").notNull(),
-  action: varchar("action").notNull(), // view, create, update, delete
-  resourceType: varchar("resource_type").notNull(), // patient, appointment, record
-  resourceId: varchar("resource_id").notNull(),
-  details: jsonb("details"),
-  timestamp: timestamp("timestamp").defaultNow(),
+export const auditLogs = sqliteTable("audit_logs", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: text("user_id").notNull(),
+  action: text("action").notNull(), // view, create, update, delete
+  resourceType: text("resource_type").notNull(), // patient, appointment, record
+  resourceId: text("resource_id").notNull(),
+  details: text("details"), // JSON as text for SQLite
+  timestamp: integer("timestamp", { mode: 'timestamp' }).defaultNow(),
 });
 
 // Define relations
@@ -157,10 +152,22 @@ export const insertUserSchema = createInsertSchema(users).omit({
   updatedAt: true,
 });
 
-export const insertPatientSchema = createInsertSchema(patients).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
+export const insertPatientSchema = z.object({
+  firstName: z.string(),
+  lastName: z.string(),
+  dateOfBirth: z.union([z.date(), z.number()]).transform((val) => 
+    typeof val === 'number' ? new Date(val) : val
+  ),
+  gender: z.string().optional(),
+  email: z.string().optional(),
+  phone: z.string().optional(),
+  emergencyContact: z.string().optional(),
+  address: z.string().optional(),
+  insurance: z.string().optional(),
+  reasonForVisit: z.string().optional(),
+  status: z.string().optional(),
+  hipaaConsent: z.boolean().optional(),
+  assignedTherapistId: z.string().optional(),
 });
 
 export const insertAppointmentSchema = createInsertSchema(appointments).omit({

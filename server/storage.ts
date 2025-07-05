@@ -1,453 +1,209 @@
-import {
-  users,
-  patients,
-  appointments,
-  treatmentRecords,
-  auditLogs,
-  type User,
-  type UpsertUser,
-  type Patient,
-  type InsertPatient,
-  type PatientWithTherapist,
-  type Appointment,
-  type InsertAppointment,
-  type AppointmentWithDetails,
-  type TreatmentRecord,
-  type InsertTreatmentRecord,
-  type TreatmentRecordWithDetails,
-  type AuditLog,
-  type InsertAuditLog,
-} from "@shared/schema";
-import { db } from "./db";
-import { eq, desc, asc, like, and, gte, lte, count, sql } from "drizzle-orm";
+import { Patient as PatientModel } from './models/Patient';
+import { Appointment } from './models/Appointment';
+import { User } from './models/User';
 
-export interface IStorage {
-  // User operations (required for Replit Auth)
-  getUser(id: string): Promise<User | undefined>;
-  upsertUser(user: UpsertUser): Promise<User>;
-
+// Simplified MongoDB-only storage for now
+export class DatabaseStorage {
   // Patient operations
-  getPatients(
-    limit?: number,
-    offset?: number,
-    search?: string,
-    status?: string
-  ): Promise<{ patients: PatientWithTherapist[]; total: number }>;
-  getPatient(id: number): Promise<PatientWithTherapist | undefined>;
-  createPatient(patient: InsertPatient): Promise<Patient>;
-  updatePatient(id: number, patient: Partial<InsertPatient>): Promise<Patient>;
-  getPatientsByTherapist(therapistId: string): Promise<PatientWithTherapist[]>;
-
-  // Appointment operations
-  getAppointments(
-    therapistId?: string,
-    patientId?: number,
-    startDate?: Date,
-    endDate?: Date
-  ): Promise<AppointmentWithDetails[]>;
-  getAppointment(id: number): Promise<AppointmentWithDetails | undefined>;
-  createAppointment(appointment: InsertAppointment): Promise<Appointment>;
-  updateAppointment(id: number, appointment: Partial<InsertAppointment>): Promise<Appointment>;
-  getTodayAppointments(therapistId?: string): Promise<AppointmentWithDetails[]>;
-
-  // Treatment record operations
-  getTreatmentRecords(patientId: number): Promise<TreatmentRecordWithDetails[]>;
-  getTreatmentRecord(id: number): Promise<TreatmentRecordWithDetails | undefined>;
-  createTreatmentRecord(record: InsertTreatmentRecord): Promise<TreatmentRecord>;
-  updateTreatmentRecord(id: number, record: Partial<InsertTreatmentRecord>): Promise<TreatmentRecord>;
-
-  // Dashboard statistics
-  getDashboardStats(therapistId?: string): Promise<{
-    totalPatients: number;
-    todayAppointments: number;
-    activeTreatments: number;
-    monthlyRevenue: number;
-  }>;
-
-  // Audit logging
-  createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
-  getAuditLogs(resourceId?: string, userId?: string): Promise<AuditLog[]>;
-
-  // Staff operations
-  getStaff(): Promise<User[]>;
-  getTherapists(): Promise<User[]>;
-}
-
-export class DatabaseStorage implements IStorage {
-  // User operations (required for Replit Auth)
-  async getUser(id: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user;
-  }
-
-  async upsertUser(userData: UpsertUser): Promise<User> {
-    const [user] = await db
-      .insert(users)
-      .values(userData)
-      .onConflictDoUpdate({
-        target: users.id,
-        set: {
-          ...userData,
-          updatedAt: new Date(),
-        },
-      })
-      .returning();
-    return user;
-  }
-
-  // Patient operations
-  async getPatients(
-    limit = 50,
-    offset = 0,
-    search?: string,
-    status?: string
-  ): Promise<{ patients: PatientWithTherapist[]; total: number }> {
-    let whereConditions = [];
-    
+  async getPatients(limit = 50, offset = 0, search?: string, status?: string) {
+    const query: any = {};
     if (search) {
-      whereConditions.push(
-        sql`(${patients.firstName} ILIKE ${`%${search}%`} OR ${patients.lastName} ILIKE ${`%${search}%`} OR ${patients.email} ILIKE ${`%${search}%`})`
-      );
+      query.$or = [
+        { firstName: new RegExp(search, 'i') },
+        { lastName: new RegExp(search, 'i') },
+        { email: new RegExp(search, 'i') },
+      ];
     }
-    
     if (status) {
-      whereConditions.push(eq(patients.status, status));
+      query.status = status;
     }
-
-    const whereClause = whereConditions.length > 0 ? and(...whereConditions) : undefined;
-
-    const [patientsResult, totalResult] = await Promise.all([
-      db
-        .select({
-          patient: patients,
-          therapist: users,
-        })
-        .from(patients)
-        .leftJoin(users, eq(patients.assignedTherapistId, users.id))
-        .where(whereClause)
-        .orderBy(desc(patients.createdAt))
-        .limit(limit)
-        .offset(offset),
-      
-      db
-        .select({ count: count() })
-        .from(patients)
-        .where(whereClause)
-    ]);
-
-    const patientsWithTherapist = patientsResult.map(row => ({
-      ...row.patient,
-      assignedTherapist: row.therapist || undefined,
+    const total = await PatientModel.countDocuments(query);
+    const patients = await PatientModel.find(query)
+      .sort({ createdAt: -1 })
+      .skip(offset)
+      .limit(limit)
+      .lean();
+    const patientsWithId = patients.map((p: any) => ({
+      ...p,
+      id: p._id.toString(),
+      assignedTherapist: undefined,
     }));
+    return { patients: patientsWithId, total };
+  }
 
+  async getPatient(id: string) {
+    const p = await PatientModel.findById(id).lean();
+    if (!p) return undefined;
     return {
-      patients: patientsWithTherapist,
-      total: totalResult[0].count,
+      ...p,
+      id: p._id.toString(),
+      assignedTherapist: undefined,
     };
   }
 
-  async getPatient(id: number): Promise<PatientWithTherapist | undefined> {
-    const [result] = await db
-      .select({
-        patient: patients,
-        therapist: users,
-      })
-      .from(patients)
-      .leftJoin(users, eq(patients.assignedTherapistId, users.id))
-      .where(eq(patients.id, id));
-
-    if (!result) return undefined;
-
+  async createPatient(patient: any) {
+    const newPatient = new PatientModel(patient);
+    await newPatient.save();
+    const p = newPatient.toObject();
     return {
-      ...result.patient,
-      assignedTherapist: result.therapist || undefined,
+      ...p,
+      id: p._id.toString(),
+      assignedTherapist: undefined,
     };
   }
 
-  async createPatient(patient: InsertPatient): Promise<Patient> {
-    const [newPatient] = await db
-      .insert(patients)
-      .values(patient)
-      .returning();
-    return newPatient;
-  }
-
-  async updatePatient(id: number, patient: Partial<InsertPatient>): Promise<Patient> {
-    const [updatedPatient] = await db
-      .update(patients)
-      .set({ ...patient, updatedAt: new Date() })
-      .where(eq(patients.id, id))
-      .returning();
-    return updatedPatient;
-  }
-
-  async getPatientsByTherapist(therapistId: string): Promise<PatientWithTherapist[]> {
-    const result = await db
-      .select({
-        patient: patients,
-        therapist: users,
-      })
-      .from(patients)
-      .leftJoin(users, eq(patients.assignedTherapistId, users.id))
-      .where(eq(patients.assignedTherapistId, therapistId));
-
-    return result.map(row => ({
-      ...row.patient,
-      assignedTherapist: row.therapist || undefined,
-    }));
-  }
-
-  // Appointment operations
-  async getAppointments(
-    therapistId?: string,
-    patientId?: number,
-    startDate?: Date,
-    endDate?: Date
-  ): Promise<AppointmentWithDetails[]> {
-    let whereConditions = [];
-    
-    if (therapistId) {
-      whereConditions.push(eq(appointments.therapistId, therapistId));
-    }
-    
-    if (patientId) {
-      whereConditions.push(eq(appointments.patientId, patientId));
-    }
-    
-    if (startDate) {
-      whereConditions.push(gte(appointments.appointmentDate, startDate));
-    }
-    
-    if (endDate) {
-      whereConditions.push(lte(appointments.appointmentDate, endDate));
-    }
-
-    const whereClause = whereConditions.length > 0 ? and(...whereConditions) : undefined;
-
-    const result = await db
-      .select({
-        appointment: appointments,
-        patient: patients,
-        therapist: users,
-      })
-      .from(appointments)
-      .innerJoin(patients, eq(appointments.patientId, patients.id))
-      .innerJoin(users, eq(appointments.therapistId, users.id))
-      .where(whereClause)
-      .orderBy(asc(appointments.appointmentDate));
-
-    return result.map(row => ({
-      ...row.appointment,
-      patient: row.patient,
-      therapist: row.therapist,
-    }));
-  }
-
-  async getAppointment(id: number): Promise<AppointmentWithDetails | undefined> {
-    const [result] = await db
-      .select({
-        appointment: appointments,
-        patient: patients,
-        therapist: users,
-      })
-      .from(appointments)
-      .innerJoin(patients, eq(appointments.patientId, patients.id))
-      .innerJoin(users, eq(appointments.therapistId, users.id))
-      .where(eq(appointments.id, id));
-
-    if (!result) return undefined;
-
+  async updatePatient(id: string, patient: any) {
+    const updatedPatient = await PatientModel.findByIdAndUpdate(id, patient, { new: true }).lean();
+    if (!updatedPatient) return undefined;
     return {
-      ...result.appointment,
-      patient: result.patient,
-      therapist: result.therapist,
+      ...updatedPatient,
+      id: updatedPatient._id.toString(),
+      assignedTherapist: undefined,
     };
   }
 
-  async createAppointment(appointment: InsertAppointment): Promise<Appointment> {
-    const [newAppointment] = await db
-      .insert(appointments)
-      .values(appointment)
-      .returning();
-    return newAppointment;
+  // Mock methods for compatibility (return empty data for now)
+  async getUser(id: string) {
+    const user = await User.findById(id).lean();
+    if (!user) return undefined;
+    return {
+      ...user,
+      id: user._id.toString(),
+    };
   }
 
-  async updateAppointment(id: number, appointment: Partial<InsertAppointment>): Promise<Appointment> {
-    const [updatedAppointment] = await db
-      .update(appointments)
-      .set({ ...appointment, updatedAt: new Date() })
-      .where(eq(appointments.id, id))
-      .returning();
-    return updatedAppointment;
+  async getUserByEmail(email: string) {
+    const user = await User.findOne({ email }).lean();
+    if (!user) return undefined;
+    return {
+      ...user,
+      id: user._id.toString(),
+    };
   }
 
-  async getTodayAppointments(therapistId?: string): Promise<AppointmentWithDetails[]> {
+  async createUser(userData: any) {
+    const user = new User(userData);
+    await user.save();
+    const userObj = user.toObject();
+    return {
+      ...userObj,
+      id: userObj._id.toString(),
+    };
+  }
+
+  // Removed upsertUser as it's no longer needed
+
+  async getPatientsByTherapist(therapistId: string) {
+    return [];
+  }
+
+  // Appointments
+  async getAppointments() {
+    return Appointment.find().lean();
+  }
+
+  async getAppointment(id: string) {
+    return Appointment.findById(id).lean();
+  }
+
+  async createAppointment(data: any) {
+    const appointment = new Appointment(data);
+    await appointment.save();
+    return appointment.toObject();
+  }
+
+  async updateAppointment(id: string, updates: any) {
+    return Appointment.findByIdAndUpdate(id, updates, { new: true }).lean();
+  }
+
+  async getTodayAppointments() {
     const today = new Date();
     const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
-
-    return this.getAppointments(therapistId, undefined, startOfDay, endOfDay);
-  }
-
-  // Treatment record operations
-  async getTreatmentRecords(patientId: number): Promise<TreatmentRecordWithDetails[]> {
-    const result = await db
-      .select({
-        record: treatmentRecords,
-        patient: patients,
-        therapist: users,
-        appointment: appointments,
-      })
-      .from(treatmentRecords)
-      .innerJoin(patients, eq(treatmentRecords.patientId, patients.id))
-      .innerJoin(users, eq(treatmentRecords.therapistId, users.id))
-      .leftJoin(appointments, eq(treatmentRecords.appointmentId, appointments.id))
-      .where(eq(treatmentRecords.patientId, patientId))
-      .orderBy(desc(treatmentRecords.sessionDate));
-
-    return result.map(row => ({
-      ...row.record,
-      patient: row.patient,
-      therapist: row.therapist,
-      appointment: row.appointment || undefined,
+    const appointments = await Appointment.find({
+      appointmentDate: { $gte: startOfDay, $lt: endOfDay }
+    }).populate('patientId', 'firstName lastName').populate('therapistId', 'firstName lastName').lean();
+    
+    return appointments.map((apt: any) => ({
+      ...apt,
+      id: apt._id.toString(),
+      patient: apt.patientId,
+      therapist: apt.therapistId,
     }));
   }
 
-  async getTreatmentRecord(id: number): Promise<TreatmentRecordWithDetails | undefined> {
-    const [result] = await db
-      .select({
-        record: treatmentRecords,
-        patient: patients,
-        therapist: users,
-        appointment: appointments,
-      })
-      .from(treatmentRecords)
-      .innerJoin(patients, eq(treatmentRecords.patientId, patients.id))
-      .innerJoin(users, eq(treatmentRecords.therapistId, users.id))
-      .leftJoin(appointments, eq(treatmentRecords.appointmentId, appointments.id))
-      .where(eq(treatmentRecords.id, id));
+  async getTreatmentRecords(patientId: number) {
+    return [];
+  }
 
-    if (!result) return undefined;
+  async getTreatmentRecord(id: number) {
+    return undefined;
+  }
 
+  async getAllTreatmentRecords() {
+    return { records: [], total: 0 };
+  }
+
+  async createTreatmentRecord(record: any) {
+    return { ...record, id: 1 };
+  }
+
+  async updateTreatmentRecord(id: number, record: any) {
+    return { ...record, id };
+  }
+
+  async deleteTreatmentRecord(id: number) {
+    // No-op
+  }
+
+  async getDashboardStats() {
     return {
-      ...result.record,
-      patient: result.patient,
-      therapist: result.therapist,
-      appointment: result.appointment || undefined,
+      totalPatients: 0,
+      todayAppointments: 0,
+      activeTreatments: 0,
+      monthlyRevenue: 0,
+      monthlyAppointments: 0,
+      completedAppointments: 0,
+      upcomingAppointments: 0,
+      appointmentsNeedingReview: 0,
     };
   }
 
-  async createTreatmentRecord(record: InsertTreatmentRecord): Promise<TreatmentRecord> {
-    const [newRecord] = await db
-      .insert(treatmentRecords)
-      .values(record)
-      .returning();
-    return newRecord;
+  async createAuditLog(log: any) {
+    return { ...log, id: 1 };
   }
 
-  async updateTreatmentRecord(id: number, record: Partial<InsertTreatmentRecord>): Promise<TreatmentRecord> {
-    const [updatedRecord] = await db
-      .update(treatmentRecords)
-      .set({ ...record, updatedAt: new Date() })
-      .where(eq(treatmentRecords.id, id))
-      .returning();
-    return updatedRecord;
+  async getAuditLogs() {
+    return [];
   }
 
-  // Dashboard statistics
-  async getDashboardStats(therapistId?: string): Promise<{
-    totalPatients: number;
-    todayAppointments: number;
-    activeTreatments: number;
-    monthlyRevenue: number;
-  }> {
-    const today = new Date();
-    const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
-    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  async getStaff() {
+    const staff = await User.find().lean();
+    return staff.map(user => ({
+      ...user,
+      id: user._id.toString(),
+    }));
+  }
 
-    let patientWhere = therapistId ? eq(patients.assignedTherapistId, therapistId) : undefined;
-    let appointmentWhere = [
-      gte(appointments.appointmentDate, startOfDay),
-      lte(appointments.appointmentDate, endOfDay),
-    ];
-    if (therapistId) {
-      appointmentWhere.push(eq(appointments.therapistId, therapistId));
-    }
+  async getTherapists() {
+    const therapists = await User.find({ role: 'therapist' }).lean();
+    return therapists.map(user => ({
+      ...user,
+      id: user._id.toString(),
+    }));
+  }
 
-    let treatmentWhere = therapistId ? eq(treatmentRecords.therapistId, therapistId) : undefined;
-
-    const [totalPatientsResult, todayAppointmentsResult, activeTreatmentsResult] = await Promise.all([
-      db
-        .select({ count: count() })
-        .from(patients)
-        .where(patientWhere),
-      
-      db
-        .select({ count: count() })
-        .from(appointments)
-        .where(and(...appointmentWhere)),
-      
-      db
-        .select({ count: count() })
-        .from(treatmentRecords)
-        .where(treatmentWhere),
-    ]);
-
-    // Mock monthly revenue calculation (would need billing data in real system)
-    const monthlyRevenue = 18750; // This should be calculated from actual billing data
-
+  async updateUser(id: string, userData: any) {
+    const updatedUser = await User.findByIdAndUpdate(id, userData, { new: true }).lean();
+    if (!updatedUser) return undefined;
     return {
-      totalPatients: totalPatientsResult[0].count,
-      todayAppointments: todayAppointmentsResult[0].count,
-      activeTreatments: activeTreatmentsResult[0].count,
-      monthlyRevenue,
+      ...updatedUser,
+      id: updatedUser._id.toString(),
     };
   }
 
-  // Audit logging
-  async createAuditLog(log: InsertAuditLog): Promise<AuditLog> {
-    const [newLog] = await db
-      .insert(auditLogs)
-      .values(log)
-      .returning();
-    return newLog;
-  }
-
-  async getAuditLogs(resourceId?: string, userId?: string): Promise<AuditLog[]> {
-    let whereConditions = [];
-    
-    if (resourceId) {
-      whereConditions.push(eq(auditLogs.resourceId, resourceId));
-    }
-    
-    if (userId) {
-      whereConditions.push(eq(auditLogs.userId, userId));
-    }
-
-    const whereClause = whereConditions.length > 0 ? and(...whereConditions) : undefined;
-
-    return await db
-      .select()
-      .from(auditLogs)
-      .where(whereClause)
-      .orderBy(desc(auditLogs.timestamp));
-  }
-
-  // Staff operations
-  async getStaff(): Promise<User[]> {
-    return await db
-      .select()
-      .from(users)
-      .orderBy(asc(users.firstName));
-  }
-
-  async getTherapists(): Promise<User[]> {
-    return await db
-      .select()
-      .from(users)
-      .where(eq(users.role, "therapist"))
-      .orderBy(asc(users.firstName));
+  async deleteUser(id: string) {
+    await User.findByIdAndDelete(id);
   }
 }
 

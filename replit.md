@@ -1,8 +1,8 @@
-# MindCare CRM - Mental Health Practice Management System
+# NewLife CRM - Mental Health Practice Management System
 
 ## Overview
 
-MindCare CRM is a comprehensive mental health practice management system designed specifically for therapists, clinicians, and mental health practices. The application provides secure patient management, appointment scheduling, treatment documentation, and practice analytics while maintaining HIPAA compliance standards.
+NewLife CRM is a comprehensive mental health practice management system designed specifically for therapists, clinicians, and mental health practices. The application provides secure patient management, appointment scheduling, treatment documentation, and practice analytics while maintaining HIPAA compliance standards.
 
 ## System Architecture
 

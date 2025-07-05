@@ -1,11 +1,15 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Users, Calendar, Heart, DollarSign, ArrowUp, Clock } from "lucide-react";
 
-interface DashboardStats {
+export interface DashboardStats {
   totalPatients: number;
   todayAppointments: number;
   activeTreatments: number;
   monthlyRevenue: number;
+  monthlyAppointments: number;
+  completedAppointments: number;
+  upcomingAppointments: number;
+  appointmentsNeedingReview: number;
 }
 
 interface StatsCardsProps {
@@ -39,7 +43,7 @@ export function StatsCards({ stats, isLoading }: StatsCardsProps) {
     {
       title: "Total Patients",
       value: stats.totalPatients,
-      change: "+12 this month",
+      change: `+${stats.monthlyAppointments} this month`,
       changeType: "positive" as const,
       icon: Users,
       iconBg: "bg-primary-50",
@@ -48,7 +52,7 @@ export function StatsCards({ stats, isLoading }: StatsCardsProps) {
     {
       title: "Today's Appointments",
       value: stats.todayAppointments,
-      change: "8 completed, 4 upcoming",
+      change: `${stats.completedAppointments} completed, ${stats.upcomingAppointments} upcoming`,
       changeType: "neutral" as const,
       icon: Calendar,
       iconBg: "bg-success-100",
@@ -57,7 +61,7 @@ export function StatsCards({ stats, isLoading }: StatsCardsProps) {
     {
       title: "Active Treatments",
       value: stats.activeTreatments,
-      change: "5 need review",
+      change: `${stats.appointmentsNeedingReview} need review`,
       changeType: "warning" as const,
       icon: Heart,
       iconBg: "bg-warning-100",

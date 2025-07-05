@@ -6,9 +6,16 @@ import { useToast } from "@/hooks/use-toast";
 import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TreatmentRecordForm } from "@/components/records/TreatmentRecordForm";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft } from "lucide-react";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
 import type { InsertTreatmentRecord } from "@shared/schema";
+
+// Type for form submission with timestamp
+type TreatmentRecordFormData = Omit<InsertTreatmentRecord, 'sessionDate'> & {
+  sessionDate: number;
+};
 
 export default function NewRecord() {
   const { toast } = useToast();
@@ -35,17 +42,17 @@ export default function NewRecord() {
     }
   }, [isAuthenticated, authLoading, toast]);
 
-  const { data: patients } = useQuery({
+  const { data: patients } = useQuery<{ patients: { id: number; firstName: string; lastName: string }[]; total: number }>({
     queryKey: ["/api/patients", { limit: 1000 }],
     retry: false,
   });
 
   const createRecordMutation = useMutation({
-    mutationFn: async (recordData: InsertTreatmentRecord) => {
+    mutationFn: async (recordData: TreatmentRecordFormData) => {
       const response = await apiRequest("POST", "/api/records", recordData);
-      return response.json();
+      return response.json() as Promise<any>;
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/records"] });
       if (preselectedPatientId) {
         queryClient.invalidateQueries({ queryKey: [`/api/patients/${preselectedPatientId}/records`] });
@@ -99,6 +106,19 @@ export default function NewRecord() {
         
         <main className="flex-1 overflow-y-auto">
           <div className="p-6">
+            {/* Return Arrow */}
+            <div className="mb-4">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => setLocation("/records")}
+                className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back to Records
+              </Button>
+            </div>
+
             {/* Page Header */}
             <div className="mb-8">
               <h1 className="text-2xl font-semibold text-gray-900">New Treatment Record</h1>
