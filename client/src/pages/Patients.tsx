@@ -47,25 +47,30 @@ import {
   Grid3X3,
   Table,
   Trash2,
-  ArrowLeft
+  ArrowLeft,
+  CheckCircle,
+  XCircle
 } from "lucide-react";
 import { Link } from "wouter";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
 import type { PatientWithTherapist } from "@shared/schema";
+import { RecentPatients } from "@/components/dashboard/RecentPatients";
 
 export default function Patients() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, user } = useAuth();
+  const isFrontDesk = user?.role === "frontdesk";
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [therapistFilter, setTherapistFilter] = useState("");
   const [viewMode, setViewMode] = useState<"dashboard" | "list" | "grid">("dashboard");
-  const [selectedPatients, setSelectedPatients] = useState<number[]>([]);
+  const [selectedPatients, setSelectedPatients] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
   const [exportLoading, setExportLoading] = useState(false);
+  const [showRecentPatients, setShowRecentPatients] = useState(true);
   const pageSize = 20;
 
   // Redirect to home if not authenticated
@@ -82,6 +87,18 @@ export default function Patients() {
       return;
     }
   }, [isAuthenticated, authLoading, toast]);
+
+  useEffect(() => {
+    if (localStorage.getItem('showAllPatients') === 'true') {
+      setShowRecentPatients(false);
+      setViewMode('list');
+      setSearchQuery("");
+      setStatusFilter("");
+      setTherapistFilter("");
+      setCurrentPage(1);
+      localStorage.removeItem('showAllPatients');
+    }
+  }, []);
 
   const { data: patientsData, isLoading, refetch } = useQuery<{ patients: PatientWithTherapist[]; total: number }>({
     queryKey: ["/api/patients", { 
@@ -106,7 +123,7 @@ export default function Patients() {
 
   // Export mutation
   const exportMutation = useMutation({
-    mutationFn: async ({ format, patientIds }: { format: string; patientIds?: number[] }) => {
+    mutationFn: async ({ format, patientIds }: { format: string; patientIds?: string[] }) => {
       const response = await fetch(`/api/patients/export`, {
         method: 'POST',
         headers: {
@@ -176,7 +193,7 @@ export default function Patients() {
     return age;
   };
 
-  const handleSelectPatient = (patientId: number, checked: boolean) => {
+  const handleSelectPatient = (patientId: string, checked: boolean) => {
     if (checked) {
       setSelectedPatients([...selectedPatients, patientId]);
     } else {
@@ -186,13 +203,13 @@ export default function Patients() {
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedPatients(patientsData?.patients.map(p => p.id) || []);
+      setSelectedPatients(patientsData?.patients.map(p => p.id.toString()) || []);
     } else {
       setSelectedPatients([]);
     }
   };
 
-  const handleExport = async (format: string, patientIds?: number[]) => {
+  const handleExport = async (format: string, patientIds?: string[]) => {
     setExportLoading(true);
     try {
       await exportMutation.mutateAsync({ format, patientIds });
@@ -244,14 +261,70 @@ export default function Patients() {
     });
   };
 
+  const handleDeletePatient = async (patientId: string) => {
+    if (!confirm("Are you sure you want to delete this patient? This action cannot be undone.")) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/patients/${patientId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        
+        // Check if the error contains details about what needs to be deleted
+        if (errorData.message && errorData.message.includes('appointment(s)') || errorData.message.includes('treatment record(s)')) {
+          const message = errorData.message;
+          
+          // Show a more detailed confirmation dialog
+          const shouldProceed = confirm(
+            `${message}\n\n` +
+            `To delete this patient, you need to:\n` +
+            `1. Delete all their appointments first\n` +
+            `2. Delete all their treatment records first\n\n` +
+            `Would you like to view the patient's details to manage their appointments and records?`
+          );
+          
+          if (shouldProceed) {
+            // Navigate to patient detail page
+            window.location.href = `/patients/${patientId}`;
+          }
+          return;
+        }
+        
+        throw new Error(errorData.message || 'Failed to delete patient');
+      }
+
+      toast({
+        title: "Success",
+        description: "Patient deleted successfully.",
+      });
+
+      // Refresh the patients list
+      refetch();
+    } catch (error) {
+      console.error('Error deleting patient:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to delete patient. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const columns = [
     {
       key: "select",
       label: "",
       render: (_: any, row: PatientWithTherapist) => (
         <Checkbox
-          checked={selectedPatients.includes(row.id)}
-          onCheckedChange={(checked) => handleSelectPatient(row.id, checked as boolean)}
+          checked={selectedPatients.includes(row.id as any)}
+          onCheckedChange={(checked) => handleSelectPatient(row.id as any, checked as boolean)}
         />
       ),
     },
@@ -270,7 +343,7 @@ export default function Patients() {
               {row.firstName} {row.lastName}
             </div>
             <div className="text-sm text-gray-500">
-              ID: #P-{row.id.toString().padStart(4, '0')} • {getAge(row.dateOfBirth)} years
+              ID: {row.id} • {getAge(row.dateOfBirth)} years
             </div>
           </div>
         </div>
@@ -374,12 +447,17 @@ export default function Patients() {
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                  <Phone className="h-4 w-4" />
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                  onClick={() => handleDeletePatient(row.id as any)}
+                >
+                  <Trash2 className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                <p>Call patient</p>
+                <p>Delete patient</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
@@ -400,15 +478,15 @@ export default function Patients() {
               </TooltipProvider>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => handleExport('csv', [row.id])}>
+              <DropdownMenuItem onClick={() => handleExport('csv', [row.id as any])}>
                 <FileText className="h-4 w-4 mr-2" />
                 Export as CSV
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExport('excel', [row.id])}>
+              <DropdownMenuItem onClick={() => handleExport('excel', [row.id as any])}>
                 <FileSpreadsheet className="h-4 w-4 mr-2" />
                 Export as Excel
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExport('pdf', [row.id])}>
+              <DropdownMenuItem onClick={() => handleExport('pdf', [row.id as any])}>
                 <FileDown className="h-4 w-4 mr-2" />
                 Export as PDF
               </DropdownMenuItem>
@@ -485,8 +563,8 @@ export default function Patients() {
               </AvatarFallback>
             </Avatar>
             <Checkbox
-              checked={selectedPatients.includes(patient.id)}
-              onCheckedChange={(checked) => handleSelectPatient(patient.id, checked as boolean)}
+              checked={selectedPatients.includes(patient.id as any)}
+              onCheckedChange={(checked) => handleSelectPatient(patient.id as any, checked as boolean)}
             />
           </div>
           
@@ -494,8 +572,7 @@ export default function Patients() {
             <h3 className="font-semibold text-gray-900">
               {patient.firstName} {patient.lastName}
             </h3>
-            <p className="text-sm text-gray-500">ID: #P-{patient.id.toString().padStart(4, '0')}</p>
-            <p className="text-sm text-gray-500">{getAge(patient.dateOfBirth)} years old</p>
+            <p className="text-sm text-gray-500">ID: {patient.id} • {getAge(patient.dateOfBirth)} years old</p>
             
             <div className="space-y-1">
               {patient.email && (
@@ -532,6 +609,11 @@ export default function Patients() {
       ))}
     </div>
   );
+
+  console.log('User:', user, 'Role:', user?.role, 'isFrontDesk:', isFrontDesk);
+  console.log('ViewMode:', viewMode);
+  console.log('Patients data:', patientsData?.patients?.length || 0, 'patients');
+  console.log('RecentPatients should show:', isFrontDesk && viewMode === "dashboard");
 
   if (authLoading) {
     return (
@@ -572,82 +654,40 @@ export default function Patients() {
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center space-x-4">
-                  {/* View Mode Toggle */}
-                  <div className="flex items-center bg-white rounded-lg border border-gray-200 p-1">
-                    <Button
-                      variant={viewMode === "dashboard" ? "default" : "ghost"}
-                      size="sm"
-                      onClick={() => setViewMode("dashboard")}
-                      className="flex items-center space-x-2"
-                    >
-                      <LayoutDashboard className="h-4 w-4" />
-                      <span>Dashboard</span>
-                    </Button>
-                    <Button
-                      variant={viewMode === "list" ? "default" : "ghost"}
-                      size="sm"
-                      onClick={() => setViewMode("list")}
-                      className="flex items-center space-x-2"
-                    >
-                      <Table className="h-4 w-4" />
-                      <span>List</span>
-                    </Button>
-                    <Button
-                      variant={viewMode === "grid" ? "default" : "ghost"}
-                      size="sm"
-                      onClick={() => setViewMode("grid")}
-                      className="flex items-center space-x-2"
-                    >
-                      <Grid3X3 className="h-4 w-4" />
-                      <span>Grid</span>
-                    </Button>
-                  </div>
-                  
-                  {/* Export All Button */}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" className="flex items-center space-x-2">
-                        <Download className="h-4 w-4" />
-                        <span>Export All</span>
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => handleExport('csv')}>
-                        <FileText className="h-4 w-4 mr-2" />
-                        Export as CSV
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleExport('excel')}>
-                        <FileSpreadsheet className="h-4 w-4 mr-2" />
-                        Export as Excel
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleExport('pdf')}>
-                        <FileDown className="h-4 w-4 mr-2" />
-                        Export as PDF
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                  
-                  <Button variant="outline" onClick={handleRefresh} disabled={isLoading}>
-                    <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-                  </Button>
-                  
-                  <Link href="/patients/new">
-                    <Button className="flex items-center space-x-2">
-                      <Plus className="h-4 w-4" />
-                      <span>New Patient</span>
-                    </Button>
-                  </Link>
-                </div>
+                {/* Right side header controls restored here if needed */}
               </div>
             </div>
 
             {/* Content */}
             {viewMode === "dashboard" ? (
-              <PatientDashboard 
-                patientCount={dashboardStats?.totalPatients || 0}
-                todayAppointments={dashboardStats?.todayAppointments || 0}
-              />
+              <div className="space-y-6">
+                <PatientDashboard 
+                  patientCount={dashboardStats?.totalPatients || 0}
+                  todayAppointments={dashboardStats?.todayAppointments || 0}
+                />
+                
+                {/* Recent Patients for Front Desk */}
+                {isFrontDesk && showRecentPatients && (
+                  <div className="mb-6">
+                    <RecentPatients 
+                      patients={patientsData?.patients.slice(0, 5) || []} 
+                      isLoading={isLoading}
+                      onViewAll={() => {
+                        setSearchQuery("");
+                        setStatusFilter("");
+                        setTherapistFilter("");
+                        setCurrentPage(1);
+                        setViewMode("list");
+                        setShowRecentPatients(false);
+                        setTimeout(() => {
+                          const el = document.getElementById("patients-list-section");
+                          if (el) el.scrollIntoView({ behavior: "smooth" });
+                        }, 100);
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
             ) : (
               <div className="space-y-6">
                 {/* Bulk Actions */}
@@ -672,10 +712,10 @@ export default function Patients() {
                             <Button
                               variant="outline"
                               size="sm"
-                              disabled={exportLoading}
+                              onClick={() => handleBulkAction("export-csv")}
                               className="flex items-center space-x-2"
                             >
-                              <Download className="h-4 w-4" />
+                              <FileText className="h-4 w-4" />
                               <span>Export Selected</span>
                             </Button>
                           </DropdownMenuTrigger>
@@ -718,32 +758,54 @@ export default function Patients() {
                 )}
 
                 {/* Data Display */}
-                {viewMode === "list" ? (
-                  <DataTable
-                    data={patientsData?.patients || []}
-                    columns={columns}
-                    totalItems={patientsData?.total || 0}
-                    currentPage={currentPage}
-                    pageSize={pageSize}
-                    onPageChange={handlePageChange}
-                    onSearch={handleSearch}
-                    onFilter={handleFilter}
-                    searchPlaceholder="Search patients by name, email, or phone..."
-                    filters={filters}
-                    isLoading={isLoading}
-                    onSelectAll={handleSelectAll}
-                    selectAllChecked={selectedPatients.length === (patientsData?.patients?.length || 0) && selectedPatients.length > 0}
-                    onRefresh={handleRefresh}
-                    onExport={() => handleExport('csv')}
-                    onBulkAction={handleBulkAction}
-                    selectedCount={selectedPatients.length}
-                    viewMode={viewMode}
-                    onViewModeChange={setViewMode}
-                    showQuickActions={true}
-                  />
-                ) : (
-                  <PatientGrid />
-                )}
+                <div id="patients-list-section">
+                  {isFrontDesk && showRecentPatients && (
+                    <div className="mb-6">
+                      <RecentPatients 
+                        patients={patientsData?.patients.slice(0, 5) || []} 
+                        isLoading={isLoading}
+                        onViewAll={() => {
+                          setSearchQuery("");
+                          setStatusFilter("");
+                          setTherapistFilter("");
+                          setCurrentPage(1);
+                          setViewMode("list");
+                          setShowRecentPatients(false);
+                          setTimeout(() => {
+                            const el = document.getElementById("patients-list-section");
+                            if (el) el.scrollIntoView({ behavior: "smooth" });
+                          }, 100);
+                        }}
+                      />
+                    </div>
+                  )}
+                  {viewMode === "list" ? (
+                    <DataTable
+                      data={patientsData?.patients || []}
+                      columns={columns}
+                      totalItems={patientsData?.total || 0}
+                      currentPage={currentPage}
+                      pageSize={pageSize}
+                      onPageChange={handlePageChange}
+                      onSearch={handleSearch}
+                      onFilter={handleFilter}
+                      searchPlaceholder="Search patients by name, email, or phone..."
+                      filters={filters}
+                      isLoading={isLoading}
+                      onSelectAll={handleSelectAll}
+                      selectAllChecked={selectedPatients.length === (patientsData?.patients?.length || 0) && selectedPatients.length > 0}
+                      onRefresh={handleRefresh}
+                      onExport={() => handleExport('csv')}
+                      onBulkAction={handleBulkAction}
+                      selectedCount={selectedPatients.length}
+                      viewMode={viewMode}
+                      onViewModeChange={setViewMode}
+                      showQuickActions={true}
+                    />
+                  ) : (
+                    <PatientGrid />
+                  )}
+                </div>
 
                 {/* Quick Stats */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

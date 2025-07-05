@@ -10,9 +10,11 @@ import {
   TrendingUp, 
   Shield, 
   UserCog, 
-  Settings 
+  Settings,
+  AlertCircle
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
 
 interface SidebarProps {
   patientCount?: number;
@@ -21,6 +23,10 @@ interface SidebarProps {
 
 export function Sidebar({ patientCount = 0, todayAppointments = 0 }: SidebarProps) {
   const [location] = useLocation();
+  const { user } = useAuth();
+
+  // Only show Dashboard and Patients for frontdesk
+  const isFrontDesk = user?.role === "frontdesk";
 
   const navigation = [
     {
@@ -47,60 +53,81 @@ export function Sidebar({ patientCount = 0, todayAppointments = 0 }: SidebarProp
           badge: todayAppointments > 0 ? todayAppointments.toString() : undefined,
           badgeVariant: "destructive" as const,
         },
-        {
-          name: "Medical Records",
-          href: "/records",
-          icon: FileText,
-          current: location.startsWith("/records"),
-        },
-        {
-          name: "Billing & Insurance",
-          href: "/billing",
-          icon: DollarSign,
-          current: location.startsWith("/billing"),
-        },
+        // Show Inquiries for frontdesk users
+        ...(isFrontDesk
+          ? [
+              {
+                name: "Inquiries",
+                href: "/inquiries",
+                icon: AlertCircle,
+                current: location.startsWith("/inquiries"),
+              },
+            ]
+          : []),
+        // Only show these if not frontdesk
+        ...(!isFrontDesk
+          ? [
+              {
+                name: "Medical Records",
+                href: "/records",
+                icon: FileText,
+                current: location.startsWith("/records"),
+              },
+              {
+                name: "Billing & Insurance",
+                href: "/billing",
+                icon: DollarSign,
+                current: location.startsWith("/billing"),
+              },
+            ]
+          : []),
       ],
     },
-    {
-      name: "Reports & Analytics",
-      items: [
-        {
-          name: "Patient Statistics",
-          href: "/reports",
-          icon: BarChart3,
-          current: location.startsWith("/reports"),
-        },
-        {
-          name: "Treatment Outcomes",
-          href: "/outcomes",
-          icon: TrendingUp,
-          current: location.startsWith("/outcomes"),
-        },
-        {
-          name: "Audit Logs",
-          href: "/audit",
-          icon: Shield,
-          current: location.startsWith("/audit"),
-        },
-      ],
-    },
-    {
-      name: "Administration",
-      items: [
-        {
-          name: "Staff Management",
-          href: "/staff",
-          icon: UserCog,
-          current: location.startsWith("/staff"),
-        },
-        {
-          name: "Settings",
-          href: "/settings",
-          icon: Settings,
-          current: location.startsWith("/settings"),
-        },
-      ],
-    },
+    // Only show these sections if not frontdesk
+    ...(!isFrontDesk
+      ? [
+          {
+            name: "Reports & Analytics",
+            items: [
+              {
+                name: "Patient Statistics",
+                href: "/reports",
+                icon: BarChart3,
+                current: location.startsWith("/reports"),
+              },
+              {
+                name: "Treatment Outcomes",
+                href: "/outcomes",
+                icon: TrendingUp,
+                current: location.startsWith("/outcomes"),
+              },
+              {
+                name: "Audit Logs",
+                href: "/audit",
+                icon: Shield,
+                current: location.startsWith("/audit"),
+              },
+            ],
+          },
+          {
+            name: "Administration",
+            items: [
+              {
+                name: "Staff Management",
+                href: "/staff",
+                icon: UserCog,
+                current: location.startsWith("/staff"),
+              },
+              {
+                name: "Settings",
+                href: "/settings",
+                icon: Settings,
+                current: location.startsWith("/settings"),
+              },
+            ],
+          },
+        ]
+      : []),
   ];
 
   return (

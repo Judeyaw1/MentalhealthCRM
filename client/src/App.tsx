@@ -17,6 +17,8 @@ import NewPatient from "@/pages/NewPatient";
 import EditPatient from "@/pages/EditPatient";
 import Appointments from "@/pages/Appointments";
 import NewAppointment from "@/pages/NewAppointment";
+import AppointmentDetail from "@/pages/AppointmentDetail";
+import EditAppointment from "@/pages/EditAppointment";
 import Records from "@/pages/Records";
 import NewRecord from "@/pages/NewRecord";
 import Staff from "@/pages/Staff";
@@ -55,6 +57,8 @@ function Router() {
             <Route path="/patients/:id/edit" component={EditPatient} />
             <Route path="/appointments" component={Appointments} />
             <Route path="/appointments/new" component={NewAppointment} />
+            <Route path="/appointments/:id" component={AppointmentDetail} />
+            <Route path="/appointments/:id/edit" component={EditAppointment} />
             <Route path="/records" component={Records} />
             <Route path="/records/new" component={NewRecord} />
             <Route path="/staff" component={Staff} />

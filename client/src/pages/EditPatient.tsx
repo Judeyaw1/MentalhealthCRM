@@ -16,7 +16,7 @@ import type { InsertPatient } from "@shared/schema";
 
 export default function EditPatient() {
   const params = useParams();
-  const patientId = parseInt(params.id as string);
+  const patientId = params.id as string;
   const { toast } = useToast();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [, setLocation] = useLocation();
@@ -40,7 +40,7 @@ export default function EditPatient() {
   const { data: patient, isLoading: patientLoading } = useQuery({
     queryKey: [`/api/patients/${patientId}`],
     retry: false,
-    enabled: !isNaN(patientId),
+    enabled: !!patientId,
   });
 
   const updatePatientMutation = useMutation({

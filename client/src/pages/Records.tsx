@@ -471,7 +471,9 @@ export default function Records() {
                               </div>
                               <div className="flex items-center space-x-2">
                                 <Badge variant="outline" className="text-xs">
-                                  {record.therapist.firstName} {record.therapist.lastName}
+                                  {record.therapist
+                                    ? `${record.therapist.firstName} ${record.therapist.lastName}`
+                                    : "Unknown Therapist"}
                                 </Badge>
                                 
                                 <DropdownMenu>

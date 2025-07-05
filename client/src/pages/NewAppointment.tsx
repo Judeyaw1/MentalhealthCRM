@@ -11,7 +11,17 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
-import type { InsertAppointment } from "@shared/schema";
+
+// Type for MongoDB appointments
+type InsertAppointment = {
+  patientId: string;
+  therapistId: string;
+  appointmentDate: Date;
+  duration: number;
+  type: string;
+  status: string;
+  notes?: string;
+};
 
 export default function NewAppointment() {
   const { toast } = useToast();
@@ -54,9 +64,25 @@ export default function NewAppointment() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/today-appointments"] });
+      // Invalidate all appointment-related queries to ensure fresh data
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/appointments"],
+        exact: false 
+      });
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/dashboard/stats"],
+        exact: false 
+      });
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/dashboard/today-appointments"],
+        exact: false 
+      });
+      
+      // Also remove any cached appointment data to force fresh fetch
+      queryClient.removeQueries({ 
+        queryKey: ["/api/appointments"],
+        exact: false 
+      });
       
       toast({
         title: "Success",
@@ -133,7 +159,7 @@ export default function NewAppointment() {
             <div className="max-w-4xl">
               <AppointmentForm
                 initialData={{
-                  patientId: preselectedPatientId ? parseInt(preselectedPatientId) : 0,
+                  patientId: preselectedPatientId || "",
                   therapistId: defaultTherapistId,
                   appointmentDate: new Date(),
                   duration: 60,

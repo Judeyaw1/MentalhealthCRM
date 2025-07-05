@@ -1,12 +1,27 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertAppointmentSchema, type InsertAppointment } from "@shared/schema";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+// Custom schema for MongoDB appointments
+const insertAppointmentSchema = z.object({
+  patientId: z.string().min(1, "Patient ID is required"),
+  therapistId: z.string().min(1, "Therapist ID is required"),
+  appointmentDate: z.union([z.date(), z.string()]).transform((val) => 
+    typeof val === 'string' ? new Date(val) : val
+  ),
+  duration: z.number().default(60),
+  type: z.string().min(1, "Appointment type is required"),
+  status: z.string().default("scheduled"),
+  notes: z.string().optional(),
+});
+
+type InsertAppointment = z.infer<typeof insertAppointmentSchema>;
 
 interface AppointmentFormProps {
   initialData?: Partial<InsertAppointment>;
@@ -28,7 +43,7 @@ export function AppointmentForm({
   const form = useForm<InsertAppointment>({
     resolver: zodResolver(insertAppointmentSchema),
     defaultValues: {
-      patientId: initialData?.patientId || 0,
+      patientId: initialData?.patientId?.toString() || "",
       therapistId: initialData?.therapistId || "",
       appointmentDate: initialData?.appointmentDate || new Date(),
       duration: initialData?.duration || 60,
@@ -70,7 +85,7 @@ export function AppointmentForm({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Patient *</FormLabel>
-                    <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString() || ''}>
+                    <Select onValueChange={field.onChange} value={field.value?.toString() || ''}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select patient" />
@@ -85,6 +100,16 @@ export function AppointmentForm({
                       </SelectContent>
                     </Select>
                     <FormMessage />
+                    {field.value && !isNaN(Number(field.value)) && patients.some(p => p.id === Number(field.value)) && (
+                      <a
+                        href={`/patients/${field.value}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary-600 hover:underline text-sm ml-2"
+                      >
+                        View Patient
+                      </a>
+                    )}
                   </FormItem>
                 )}
               />

@@ -1,11 +1,6 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertTreatmentRecordSchema, type InsertTreatmentRecord } from "@shared/schema";
-
-// Type for form submission with timestamp
-type TreatmentRecordFormData = Omit<InsertTreatmentRecord, 'sessionDate'> & {
-  sessionDate: number;
-};
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -30,11 +25,34 @@ import {
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 
+// Custom schema for MongoDB treatment records (matches backend)
+const insertTreatmentRecordSchema = z.object({
+  patientId: z.string().min(1, "Patient ID is required"),
+  therapistId: z.string().min(1, "Therapist ID is required"),
+  sessionDate: z.union([z.date(), z.string()]).transform((val) => 
+    typeof val === 'string' ? new Date(val) : val
+  ),
+  sessionType: z.string().min(1, "Session type is required"),
+  notes: z.string().optional(),
+  goals: z.string().optional(),
+  interventions: z.string().optional(),
+  progress: z.string().optional(),
+  planForNextSession: z.string().optional(),
+});
+
+type InsertTreatmentRecord = z.infer<typeof insertTreatmentRecordSchema>;
+
+// Type for form submission with timestamp
+type TreatmentRecordFormData = Omit<InsertTreatmentRecord, 'sessionDate'> & {
+  sessionDate: number;
+};
+
 interface TreatmentRecordFormProps {
   initialData?: Partial<InsertTreatmentRecord>;
   onSubmit: (data: TreatmentRecordFormData) => void;
   isLoading?: boolean;
   patients?: { id: number; firstName: string; lastName: string }[];
+  therapists?: { id: string; firstName: string; lastName: string }[];
 }
 
 const SESSION_TEMPLATES = {
@@ -65,7 +83,8 @@ export function TreatmentRecordForm({
   initialData, 
   onSubmit, 
   isLoading = false,
-  patients = []
+  patients = [],
+  therapists = []
 }: TreatmentRecordFormProps) {
   const { toast } = useToast();
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -85,8 +104,6 @@ export function TreatmentRecordForm({
       planForNextSession: initialData?.planForNextSession || "",
     },
   });
-
-
 
   const watchedSessionType = form.watch("sessionType");
   const watchedValues = form.watch();
@@ -159,6 +176,7 @@ export function TreatmentRecordForm({
       ...data,
       sessionDate: new Date(data.sessionDate).getTime()
     };
+    console.log('Treatment record form submission data:', submissionData);
     onSubmit(submissionData);
   };
 
@@ -283,7 +301,7 @@ export function TreatmentRecordForm({
                       <User className="h-4 w-4" />
                       <span>Patient *</span>
                     </FormLabel>
-                    <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString() || ''}>
+                    <Select onValueChange={field.onChange} value={field.value?.toString() || ''}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select patient" />
@@ -298,10 +316,50 @@ export function TreatmentRecordForm({
                       </SelectContent>
                     </Select>
                     <FormMessage />
+                    {field.value && patients.some(p => p.id.toString() === field.value) && (
+                      <a
+                        href={`/patients/${field.value}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary-600 hover:underline text-sm ml-2"
+                      >
+                        View Patient
+                      </a>
+                    )}
                   </FormItem>
                 )}
               />
               
+              <FormField
+                control={form.control}
+                name="therapistId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center space-x-1">
+                      <User className="h-4 w-4" />
+                      <span>Therapist *</span>
+                    </FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value?.toString() || ''}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select therapist" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {therapists.map((therapist) => (
+                          <SelectItem key={therapist.id} value={therapist.id.toString()}>
+                            {therapist.firstName} {therapist.lastName}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="sessionType"

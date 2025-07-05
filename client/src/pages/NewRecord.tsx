@@ -10,7 +10,19 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
-import type { InsertTreatmentRecord } from "@shared/schema";
+
+// Type for MongoDB treatment records
+type InsertTreatmentRecord = {
+  patientId: string;
+  therapistId: string;
+  sessionDate: Date;
+  sessionType: string;
+  notes?: string;
+  goals?: string;
+  interventions?: string;
+  progress?: string;
+  planForNextSession?: string;
+};
 
 // Type for form submission with timestamp
 type TreatmentRecordFormData = Omit<InsertTreatmentRecord, 'sessionDate'> & {
@@ -44,6 +56,11 @@ export default function NewRecord() {
 
   const { data: patients } = useQuery<{ patients: { id: number; firstName: string; lastName: string }[]; total: number }>({
     queryKey: ["/api/patients", { limit: 1000 }],
+    retry: false,
+  });
+
+  const { data: therapists } = useQuery<{ id: string; firstName: string; lastName: string }[]>({
+    queryKey: ["/api/therapists"],
     retry: false,
   });
 
@@ -131,7 +148,7 @@ export default function NewRecord() {
             <div className="max-w-4xl">
               <TreatmentRecordForm
                 initialData={{
-                  patientId: preselectedPatientId ? parseInt(preselectedPatientId) : 0,
+                  patientId: preselectedPatientId ? preselectedPatientId : "",
                   therapistId: user?.id || "",
                   sessionDate: new Date(),
                   sessionType: "therapy",
@@ -144,6 +161,7 @@ export default function NewRecord() {
                 onSubmit={(data) => createRecordMutation.mutate(data)}
                 isLoading={createRecordMutation.isPending}
                 patients={patients?.patients || []}
+                therapists={therapists || []}
               />
             </div>
           </div>

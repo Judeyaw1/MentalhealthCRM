@@ -21,7 +21,8 @@ import {
   FileText,
   Clock,
   User,
-  ArrowLeft
+  ArrowLeft,
+  Trash2
 } from "lucide-react";
 import { Link } from "wouter";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -94,6 +95,34 @@ export default function PatientDetail() {
       toast({
         title: "Error",
         description: "Failed to update patient status.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Add delete mutation for appointments
+  const deleteAppointmentMutation = useMutation({
+    mutationFn: async (appointmentId: string) => {
+      const response = await fetch(`/api/appointments/${appointmentId}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) {
+        throw new Error('Failed to delete appointment');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Appointment deleted successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/appointments", { patientId }] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/today-appointments"] });
+    },
+    onError: (err) => {
+      toast({
+        title: "Error",
+        description: "Failed to delete appointment",
         variant: "destructive",
       });
     },
@@ -438,6 +467,25 @@ export default function PatientDetail() {
                             <Badge variant={appointment.status === "completed" ? "default" : "secondary"}>
                               {appointment.status}
                             </Badge>
+                            {/* Delete button */}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600"
+                              title="Delete Appointment"
+                              onClick={() => {
+                                if (window.confirm('Are you sure you want to delete this appointment? This action cannot be undone.')) {
+                                  deleteAppointmentMutation.mutate(appointment.id);
+                                }
+                              }}
+                              disabled={deleteAppointmentMutation.isPending}
+                            >
+                              {deleteAppointmentMutation.isPending ? (
+                                <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                              ) : (
+                                <Trash2 className="h-4 w-4" />
+                              )}
+                            </Button>
                           </div>
                         ))}
                       </div>
@@ -487,7 +535,9 @@ export default function PatientDetail() {
                               <div>
                                 <h4 className="font-medium text-gray-900">{record.sessionType}</h4>
                                 <p className="text-sm text-gray-600">
-                                  {formatDateTime(record.sessionDate)} • by {record.therapist.firstName} {record.therapist.lastName}
+                                  {formatDateTime(record.sessionDate)} • by {record.therapist
+                                    ? `${record.therapist.firstName} ${record.therapist.lastName}`
+                                    : "Unknown Therapist"}
                                 </p>
                               </div>
                               <Clock className="h-4 w-4 text-gray-400" />

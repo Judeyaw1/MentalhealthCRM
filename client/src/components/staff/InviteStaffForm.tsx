@@ -26,6 +26,7 @@ interface InviteData {
 const roleOptions = [
   { value: "therapist", label: "Therapist", description: "Licensed mental health professional", icon: UserCheck },
   { value: "staff", label: "Staff Member", description: "Administrative support staff", icon: Users },
+  { value: "frontdesk", label: "Front Desk", description: "Receptionist/front desk user (can add/search/assign patients)", icon: User },
   { value: "admin", label: "Administrator", description: "System administrator with full access", icon: Shield },
 ];
 

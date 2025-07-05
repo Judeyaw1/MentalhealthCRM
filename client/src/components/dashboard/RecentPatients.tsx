@@ -9,9 +9,15 @@ import type { PatientWithTherapist } from "@shared/schema";
 interface RecentPatientsProps {
   patients: PatientWithTherapist[];
   isLoading?: boolean;
+  onViewAll?: () => void;
 }
 
-export function RecentPatients({ patients, isLoading }: RecentPatientsProps) {
+export function RecentPatients({ patients, isLoading, onViewAll }: RecentPatientsProps) {
+  console.log('RecentPatients render:', { patients: patients.length, isLoading, hasOnViewAll: !!onViewAll });
+  if (onViewAll) {
+    console.log('Rendering button, onViewAll:', !!onViewAll);
+  }
+
   if (isLoading) {
     return (
       <Card>
@@ -61,11 +67,23 @@ export function RecentPatients({ patients, isLoading }: RecentPatientsProps) {
       <CardHeader>
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-gray-900">Recent Patients</h2>
-          <Link href="/patients">
-            <Button variant="ghost" size="sm" className="text-primary-500 hover:text-primary-600">
+          {console.log('Rendering button, onViewAll:', !!onViewAll)}
+          {onViewAll ? (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="text-primary-500 hover:text-primary-600"
+              onClick={onViewAll}
+            >
               View All
             </Button>
-          </Link>
+          ) : (
+            <Link href="/patients">
+              <Button variant="ghost" size="sm" className="text-primary-500 hover:text-primary-600">
+                View All
+              </Button>
+            </Link>
+          )}
         </div>
       </CardHeader>
       
@@ -94,48 +112,51 @@ export function RecentPatients({ patients, isLoading }: RecentPatientsProps) {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {patients.map((patient) => (
-                  <tr key={patient.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <Avatar className="h-10 w-10">
-                          <AvatarFallback className="bg-primary-100 text-primary-600">
-                            {getInitials(patient.firstName, patient.lastName)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">
-                            {patient.firstName} {patient.lastName}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            ID: #P-{patient.id.toString().padStart(4, '0')}
+                {patients.map((patient) => {
+                  console.log('Patient ID in RecentPatients:', patient.id, typeof patient.id, 'Full patient:', patient);
+                  return (
+                    <tr key={patient.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <Avatar className="h-10 w-10">
+                            <AvatarFallback className="bg-primary-100 text-primary-600">
+                              {getInitials(patient.firstName, patient.lastName)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="ml-4">
+                            <div className="text-sm font-medium text-gray-900">
+                              {patient.firstName} {patient.lastName}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              ID: {patient.id}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {patient.updatedAt 
-                        ? new Date(patient.updatedAt).toLocaleDateString()
-                        : "Never"
-                      }
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap">
-                      {getStatusBadge(patient.status)}
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                      <Link href={`/patients/${patient.id}`}>
-                        <Button variant="ghost" size="sm">
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                      </Link>
-                      <Link href={`/patients/${patient.id}/edit`}>
-                        <Button variant="ghost" size="sm">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {patient.updatedAt 
+                          ? new Date(patient.updatedAt).toLocaleDateString()
+                          : "Never"
+                        }
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        {getStatusBadge(patient.status)}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                        <Link href={`/patients/${patient.id}`}>
+                          <Button variant="ghost" size="sm">
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </Link>
+                        <Link href={`/patients/${patient.id}/edit`} onClick={() => console.log('Edit link clicked, URL:', `/patients/${patient.id}/edit`)}>
+                          <Button variant="ghost" size="sm">
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

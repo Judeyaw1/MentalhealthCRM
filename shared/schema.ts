@@ -26,7 +26,7 @@ export const users = sqliteTable("users", {
   firstName: text("first_name"),
   lastName: text("last_name"),
   profileImageUrl: text("profile_image_url"),
-  role: text("role").notNull().default("staff"), // admin, therapist, staff
+  role: text("role").notNull().default("staff"), // admin, therapist, staff, frontdesk
   password: text("password"), // For password management
   forcePasswordChange: integer("force_password_change", { mode: 'boolean' }).default(false), // Force password change on next login
   createdAt: integer("created_at", { mode: 'timestamp' }).defaultNow(),
@@ -35,7 +35,7 @@ export const users = sqliteTable("users", {
 
 // Patients table
 export const patients = sqliteTable("patients", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+  id: text("id").primaryKey().notNull(),
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
   dateOfBirth: integer("date_of_birth", { mode: 'timestamp' }).notNull(),
@@ -55,8 +55,8 @@ export const patients = sqliteTable("patients", {
 
 // Appointments table
 export const appointments = sqliteTable("appointments", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  patientId: integer("patient_id").notNull(),
+  id: text("id").primaryKey().notNull(),
+  patientId: text("patient_id").notNull(),
   therapistId: text("therapist_id").notNull(),
   appointmentDate: integer("appointment_date", { mode: 'timestamp' }).notNull(),
   duration: integer("duration").notNull().default(60), // minutes
@@ -69,10 +69,10 @@ export const appointments = sqliteTable("appointments", {
 
 // Treatment records table
 export const treatmentRecords = sqliteTable("treatment_records", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  patientId: integer("patient_id").notNull(),
+  id: text("id").primaryKey().notNull(),
+  patientId: text("patient_id").notNull(),
   therapistId: text("therapist_id").notNull(),
-  appointmentId: integer("appointment_id"),
+  appointmentId: text("appointment_id"),
   sessionDate: integer("session_date", { mode: 'timestamp' }).notNull(),
   sessionType: text("session_type").notNull(),
   notes: text("notes").notNull(),
@@ -86,7 +86,7 @@ export const treatmentRecords = sqliteTable("treatment_records", {
 
 // Audit logs table for HIPAA compliance
 export const auditLogs = sqliteTable("audit_logs", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+  id: text("id").primaryKey().notNull(),
   userId: text("user_id").notNull(),
   action: text("action").notNull(), // view, create, update, delete
   resourceType: text("resource_type").notNull(), // patient, appointment, record
@@ -148,6 +148,7 @@ export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
 
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
+  id: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -155,9 +156,14 @@ export const insertUserSchema = createInsertSchema(users).omit({
 export const insertPatientSchema = z.object({
   firstName: z.string(),
   lastName: z.string(),
-  dateOfBirth: z.union([z.date(), z.number()]).transform((val) => 
-    typeof val === 'number' ? new Date(val) : val
-  ),
+  dateOfBirth: z.union([z.date(), z.number(), z.string()]).transform((val) => {
+    if (typeof val === 'string') {
+      return new Date(val);
+    } else if (typeof val === 'number') {
+      return new Date(val);
+    }
+    return val;
+  }),
   gender: z.string().optional(),
   email: z.string().optional(),
   phone: z.string().optional(),

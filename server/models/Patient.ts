@@ -1,21 +1,117 @@
 import mongoose from 'mongoose';
 
-const PatientSchema = new mongoose.Schema({
-  firstName: { type: String, required: true },
-  lastName: { type: String, required: true },
-  dateOfBirth: { type: Date, required: true },
-  gender: { type: String, enum: ['male', 'female', 'other'], required: true },
-  email: { type: String, required: true },
-  phone: { type: String },
-  emergencyContact: { type: String },
-  address: { type: String },
-  insurance: { type: String },
-  reasonForVisit: { type: String },
-  status: { type: String, default: 'active' },
-  hipaaConsent: { type: Boolean, default: false },
-  assignedTherapistId: { type: String },
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now },
+// Inquiry schema for front desk tracking
+const inquirySchema = new mongoose.Schema({
+  inquiryType: {
+    type: String,
+    enum: ['new_patient', 'follow_up', 'referral', 'general', 'emergency'],
+    required: true
+  },
+  status: {
+    type: String,
+    enum: ['pending', 'in_progress', 'completed', 'cancelled'],
+    default: 'pending'
+  },
+  priority: {
+    type: String,
+    enum: ['low', 'medium', 'high', 'urgent'],
+    default: 'medium'
+  },
+  notes: {
+    type: String,
+    required: true
+  },
+  assignedTo: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now
+  },
+  resolvedAt: Date,
+  contactMethod: {
+    type: String,
+    enum: ['phone', 'email', 'in_person', 'referral'],
+    required: true
+  },
+  contactInfo: String,
+  followUpDate: Date
 });
 
-export const Patient = mongoose.model('Patient', PatientSchema); 
+const patientSchema = new mongoose.Schema({
+  firstName: {
+    type: String,
+    required: true
+  },
+  lastName: {
+    type: String,
+    required: true
+  },
+  dateOfBirth: {
+    type: Date,
+    required: true
+  },
+  gender: {
+    type: String,
+    enum: ['male', 'female', 'other'],
+    required: true
+  },
+  email: {
+    type: String,
+    required: true
+  },
+  phone: {
+    type: String
+  },
+  emergencyContact: {
+    type: String
+  },
+  address: {
+    type: String
+  },
+  insurance: {
+    type: String
+  },
+  reasonForVisit: {
+    type: String
+  },
+  status: {
+    type: String,
+    enum: ['active', 'inactive', 'discharged'],
+    default: 'active'
+  },
+  hipaaConsent: {
+    type: Boolean,
+    default: false
+  },
+  assignedTherapistId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  inquiries: [inquirySchema],
+  createdAt: {
+    type: Date,
+    default: Date.now
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now
+  }
+});
+
+patientSchema.pre('save', function(next) {
+  this.updatedAt = new Date();
+  next();
+});
+
+export const Patient = mongoose.model('Patient', patientSchema); 

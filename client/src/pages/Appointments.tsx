@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Header } from "@/components/layout/Header";
@@ -10,14 +10,19 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Plus, Calendar, Clock, Eye, Edit, ArrowLeft } from "lucide-react";
-import { Link } from "wouter";
+import { Plus, Calendar, Clock, Eye, Edit, ArrowLeft, CheckCircle, XCircle, FileText, MoreHorizontal } from "lucide-react";
+import { Link, useLocation } from "wouter";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import type { AppointmentWithDetails } from "@shared/schema";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Bell } from "lucide-react";
+import { Trash2 } from "lucide-react";
 
 export default function Appointments() {
   const { toast } = useToast();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
   const [currentPage, setCurrentPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState("");
   const [dateFilter, setDateFilter] = useState("");
@@ -74,6 +79,17 @@ export default function Appointments() {
       status: statusFilter || undefined
     }],
     retry: false,
+    onSuccess: (data) => {
+      console.log('Appointments fetched:', data?.length || 0, 'appointments');
+      if (data && data.length > 0) {
+        console.log('First 3 appointments:', data.slice(0, 3).map(apt => ({
+          id: apt.id,
+          patient: `${apt.patient?.firstName} ${apt.patient?.lastName}`,
+          createdAt: apt.createdAt,
+          appointmentDate: apt.appointmentDate
+        })));
+      }
+    }
   });
 
   const { data: todayAppointments, isLoading: todayLoading } = useQuery({
@@ -97,7 +113,9 @@ export default function Appointments() {
   };
 
   const getInitials = (firstName: string, lastName: string) => {
-    return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
+    const first = firstName?.charAt(0) || '';
+    const last = lastName?.charAt(0) || '';
+    return `${first}${last}`.toUpperCase() || '?';
   };
 
   const formatDateTime = (date: string | Date) => {
@@ -119,15 +137,15 @@ export default function Appointments() {
         <div className="flex items-center">
           <Avatar className="h-8 w-8">
             <AvatarFallback className="bg-primary-100 text-primary-600 text-xs">
-              {getInitials(row.patient.firstName, row.patient.lastName)}
+              {getInitials(row.patient?.firstName || '', row.patient?.lastName || '')}
             </AvatarFallback>
           </Avatar>
           <div className="ml-3">
             <div className="text-sm font-medium text-gray-900">
-              {row.patient.firstName} {row.patient.lastName}
+              {row.patient?.firstName || 'Unknown'} {row.patient?.lastName || 'Patient'}
             </div>
             <div className="text-xs text-gray-500">
-              #P-{row.patient.id.toString().padStart(4, '0')}
+              #P-{row.patient?.id?.toString().padStart(4, '0') || '0000'}
             </div>
           </div>
         </div>
@@ -138,7 +156,7 @@ export default function Appointments() {
       label: "Therapist",
       render: (_, row: AppointmentWithDetails) => (
         <div className="text-sm text-gray-900">
-          {row.therapist.firstName} {row.therapist.lastName}
+          {row.therapist?.firstName || 'Unknown'} {row.therapist?.lastName || 'Therapist'}
         </div>
       ),
     },
@@ -178,13 +196,127 @@ export default function Appointments() {
       key: "actions",
       label: "Actions",
       render: (_, row: AppointmentWithDetails) => (
-        <div className="flex space-x-2">
-          <Button variant="ghost" size="sm">
-            <Eye className="h-4 w-4" />
+        <div className="flex items-center space-x-1">
+          {/* View Details */}
+          <Link href={`/appointments/${row.id}`}>
+            <Button 
+              variant="ghost" 
+              size="sm"
+              className="h-8 w-8 p-0 hover:bg-blue-50 hover:text-blue-600"
+              title="View Details"
+            >
+              <Eye className="h-4 w-4" />
+            </Button>
+          </Link>
+          
+          {/* Edit Appointment */}
+          <Link href={`/appointments/${row.id}/edit`}>
+            <Button 
+              variant="ghost" 
+              size="sm"
+              className="h-8 w-8 p-0 hover:bg-green-50 hover:text-green-600"
+              title="Edit Appointment"
+            >
+              <Edit className="h-4 w-4" />
+            </Button>
+          </Link>
+          
+          {/* Status-based actions */}
+          {row.status === "scheduled" && (
+            <>
+              {/* Complete Appointment */}
+              <Button 
+                variant="ghost" 
+                size="sm"
+                className="h-8 w-8 p-0 hover:bg-emerald-50 hover:text-emerald-600"
+                title="Mark as Completed"
+                onClick={() => handleStatusChange(row.id, "completed")}
+                disabled={updateStatusMutation.isPending}
+              >
+                {updateStatusMutation.isPending ? (
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                ) : (
+                  <CheckCircle className="h-4 w-4" />
+                )}
+              </Button>
+              
+              {/* Cancel Appointment */}
+              <Button 
+                variant="ghost" 
+                size="sm"
+                className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600"
+                title="Cancel Appointment"
+                onClick={() => handleStatusChange(row.id, "cancelled")}
+                disabled={updateStatusMutation.isPending}
+              >
+                {updateStatusMutation.isPending ? (
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                ) : (
+                  <XCircle className="h-4 w-4" />
+                )}
+              </Button>
+            </>
+          )}
+          
+          {row.status === "completed" && (
+            <Button 
+              variant="ghost" 
+              size="sm"
+              className="h-8 w-8 p-0 hover:bg-blue-50 hover:text-blue-600"
+              title="View Treatment Record"
+              onClick={() => handleViewRecord(row.id)}
+            >
+              <FileText className="h-4 w-4" />
+            </Button>
+          )}
+          
+          {/* Delete Appointment - Standalone button for better visibility */}
+          <Button 
+            variant="ghost" 
+            size="sm"
+            className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600"
+            title="Delete Appointment"
+            onClick={() => handleDelete(row.id)}
+            disabled={deleteMutation.isPending}
+          >
+            {deleteMutation.isPending ? (
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+            ) : (
+              <Trash2 className="h-4 w-4" />
+            )}
           </Button>
-          <Button variant="ghost" size="sm">
-            <Edit className="h-4 w-4" />
-          </Button>
+          
+          {/* Quick Actions Menu */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                className="h-8 w-8 p-0 hover:bg-gray-50"
+                title="More Actions"
+                disabled={sendReminderMutation.isPending}
+              >
+                {sendReminderMutation.isPending ? (
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                ) : (
+                  <MoreHorizontal className="h-4 w-4" />
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => handleReschedule(row.id)}>
+                <Clock className="mr-2 h-4 w-4" />
+                Reschedule
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={() => handleSendReminder(row.id)}
+                disabled={sendReminderMutation.isPending}
+              >
+                <Bell className="mr-2 h-4 w-4" />
+                {sendReminderMutation.isPending ? "Sending..." : "Send Reminder"}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       ),
     },
@@ -221,6 +353,172 @@ export default function Appointments() {
     setCurrentPage(1);
   };
 
+  // Action handlers
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ appointmentId, newStatus }: { appointmentId: string; newStatus: string }) => {
+      const response = await fetch(`/api/appointments/${appointmentId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update appointment status');
+      }
+
+      return response.json();
+    },
+    onSuccess: (_, { newStatus }) => {
+      toast({
+        title: "Success",
+        description: `Appointment ${newStatus} successfully`,
+      });
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/appointments"],
+        exact: false 
+      });
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/dashboard/today-appointments"],
+        exact: false 
+      });
+    },
+    onError: (error) => {
+      console.error('Error updating appointment status:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update appointment status",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (appointmentId: string) => {
+      const response = await fetch(`/api/appointments/${appointmentId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete appointment');
+      }
+
+      return response.json();
+    },
+    onMutate: async (appointmentId) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ 
+        queryKey: ["/api/appointments"],
+        exact: false 
+      });
+
+      // Snapshot the previous value
+      const previousAppointments = queryClient.getQueryData(["/api/appointments", { 
+        ...getDateRange(),
+        status: statusFilter || undefined
+      }]);
+
+      // Optimistically update to remove the appointment
+      queryClient.setQueryData(["/api/appointments", { 
+        ...getDateRange(),
+        status: statusFilter || undefined
+      }], (old: any) => {
+        if (!old) return old;
+        return old.filter((apt: any) => apt.id !== appointmentId);
+      });
+
+      // Return a context object with the snapshotted value
+      return { previousAppointments };
+    },
+    onError: (err, appointmentId, context) => {
+      // If the mutation fails, use the context returned from onMutate to roll back
+      if (context?.previousAppointments) {
+        queryClient.setQueryData(["/api/appointments", { 
+          ...getDateRange(),
+          status: statusFilter || undefined
+        }], context.previousAppointments);
+      }
+      console.error('Error deleting appointment:', err);
+      toast({
+        title: "Error",
+        description: "Failed to delete appointment",
+        variant: "destructive",
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Appointment deleted successfully",
+      });
+      // Invalidate all appointment-related queries
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/appointments"],
+        exact: false 
+      });
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/dashboard/today-appointments"],
+        exact: false 
+      });
+    },
+  });
+
+  const sendReminderMutation = useMutation({
+    mutationFn: async (appointmentId: string) => {
+      const response = await fetch(`/api/appointments/${appointmentId}/reminder`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to send reminder');
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Reminder sent successfully",
+      });
+    },
+    onError: (error) => {
+      console.error('Error sending reminder:', error);
+      toast({
+        title: "Error",
+        description: "Failed to send reminder",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleStatusChange = (appointmentId: string, newStatus: string) => {
+    updateStatusMutation.mutate({ appointmentId, newStatus });
+  };
+
+  const handleViewRecord = (appointmentId: string) => {
+    // Navigate to treatment records page with filter for this appointment
+    setLocation(`/records?appointmentId=${appointmentId}`);
+  };
+
+  const handleReschedule = (appointmentId: string) => {
+    // Navigate to edit appointment page
+    setLocation(`/appointments/${appointmentId}/edit?reschedule=true`);
+  };
+
+  const handleSendReminder = (appointmentId: string) => {
+    sendReminderMutation.mutate(appointmentId);
+  };
+
+  const handleDelete = (appointmentId: string) => {
+    if (!confirm('Are you sure you want to delete this appointment? This action cannot be undone.')) {
+      return;
+    }
+    deleteMutation.mutate(appointmentId);
+  };
+
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -248,7 +546,7 @@ export default function Appointments() {
                   <Button 
                     variant="ghost" 
                     size="sm" 
-                    onClick={() => window.location.href = "/"}
+                    onClick={() => setLocation("/")}
                     className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
                   >
                     <ArrowLeft className="h-4 w-4" />
