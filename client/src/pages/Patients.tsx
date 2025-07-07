@@ -52,10 +52,12 @@ import {
   XCircle
 } from "lucide-react";
 import { Link } from "wouter";
-import { isUnauthorizedError } from "@/lib/authUtils";
+import { isUnauthorizedError, canSeeCreatedBy } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
 import type { PatientWithTherapist } from "@shared/schema";
 import { RecentPatients } from "@/components/dashboard/RecentPatients";
+import { Input } from "@/components/ui/input";
+import { useDebounce } from "@/hooks/use-mobile";
 
 export default function Patients() {
   const { toast } = useToast();
@@ -66,12 +68,13 @@ export default function Patients() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [therapistFilter, setTherapistFilter] = useState("");
-  const [viewMode, setViewMode] = useState<"dashboard" | "list" | "grid">("dashboard");
+  const [viewMode, setViewMode] = useState<"dashboard" | "list" | "grid">("list");
   const [selectedPatients, setSelectedPatients] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
   const [exportLoading, setExportLoading] = useState(false);
-  const [showRecentPatients, setShowRecentPatients] = useState(true);
+  const [showRecentPatients, setShowRecentPatients] = useState(false);
   const pageSize = 20;
+  const debouncedSearch = useDebounce(searchQuery, 300);
 
   // Redirect to home if not authenticated
   useEffect(() => {
@@ -88,26 +91,24 @@ export default function Patients() {
     }
   }, [isAuthenticated, authLoading, toast]);
 
-  useEffect(() => {
-    if (localStorage.getItem('showAllPatients') === 'true') {
-      setShowRecentPatients(false);
-      setViewMode('list');
-      setSearchQuery("");
-      setStatusFilter("");
-      setTherapistFilter("");
-      setCurrentPage(1);
-      localStorage.removeItem('showAllPatients');
-    }
-  }, []);
-
   const { data: patientsData, isLoading, refetch } = useQuery<{ patients: PatientWithTherapist[]; total: number }>({
     queryKey: ["/api/patients", { 
       limit: pageSize, 
       offset: (currentPage - 1) * pageSize,
-      search: searchQuery || undefined,
+      search: debouncedSearch || undefined,
       status: statusFilter || undefined,
       therapist: therapistFilter || undefined
     }],
+    queryFn: async ({ queryKey }) => {
+      const [_url, params] = queryKey as [string, Record<string, any>];
+      const url = new URL(_url, window.location.origin);
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== "") url.searchParams.append(key, value);
+      });
+      const res = await fetch(url.toString());
+      if (!res.ok) throw new Error("Failed to fetch patients");
+      return res.json();
+    },
     retry: false,
   });
 
@@ -373,7 +374,7 @@ export default function Patients() {
           <User className="h-4 w-4 text-gray-400 mr-2" />
           <span className="text-sm">
             {row.assignedTherapist
-              ? `${row.assignedTherapist.firstName} ${row.assignedTherapist.lastName}`
+          ? `${row.assignedTherapist.firstName} ${row.assignedTherapist.lastName}`
               : "Unassigned"}
           </span>
         </div>
@@ -394,6 +395,21 @@ export default function Patients() {
         </div>
       ),
     },
+    // Only show "Created By" column for staff and admin users
+    ...(canSeeCreatedBy(user) ? [{
+      key: "createdBy",
+      label: "Created By",
+      render: (_: any, row: PatientWithTherapist) => (
+        <div className="flex items-center">
+          <User className="h-4 w-4 text-gray-400 mr-2" />
+          <span className="text-sm">
+            {row.createdBy
+              ? `${row.createdBy.firstName} ${row.createdBy.lastName}`
+              : "Unknown"}
+          </span>
+        </div>
+      ),
+    }] : []),
     {
       key: "actions",
       label: "Actions",
@@ -402,11 +418,11 @@ export default function Patients() {
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Link href={`/patients/${row.id}`}>
+          <Link href={`/patients/${row.id}`}>
                   <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                    <Eye className="h-4 w-4" />
-                  </Button>
-                </Link>
+              <Eye className="h-4 w-4" />
+            </Button>
+          </Link>
               </TooltipTrigger>
               <TooltipContent>
                 <p>View patient details</p>
@@ -417,11 +433,11 @@ export default function Patients() {
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Link href={`/patients/${row.id}/edit`}>
+          <Link href={`/patients/${row.id}/edit`}>
                   <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                </Link>
+              <Edit className="h-4 w-4" />
+            </Button>
+          </Link>
               </TooltipTrigger>
               <TooltipContent>
                 <p>Edit patient</p>
@@ -537,6 +553,7 @@ export default function Patients() {
   };
 
   const handleSearch = (query: string) => {
+    console.log("DataTable search input:", query);
     setSearchQuery(query);
     setCurrentPage(1);
   };
@@ -636,162 +653,112 @@ export default function Patients() {
         <main className="flex-1 overflow-y-auto">
           <div className="p-6">
             {/* Page Header */}
-            <div className="mb-8">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 mb-2">
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => window.location.href = "/"}
-                    className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
-                  >
-                    <ArrowLeft className="h-4 w-4" />
-                  </Button>
-                  <div>
-                    <h1 className="text-2xl font-semibold text-gray-900">Patients</h1>
-                    <p className="text-gray-600 mt-1">
-                      Manage patient profiles and medical information.
-                    </p>
-                  </div>
+            <div className="mb-8 flex items-center justify-between">
+              <div className="flex items-center gap-2 mb-2">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => window.location.href = "/"}
+                  className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+                <div>
+                  <h1 className="text-2xl font-semibold text-gray-900">Patients</h1>
+                  <p className="text-gray-600 mt-1">
+                    Manage patient profiles and medical information.
+                  </p>
                 </div>
-                {/* Right side header controls restored here if needed */}
               </div>
+              <Link href="/patients/new">
+                <Button className="ml-auto" variant="default">
+                  <Plus className="h-4 w-4 mr-2" /> New Patient
+                </Button>
+              </Link>
             </div>
 
             {/* Content */}
-            {viewMode === "dashboard" ? (
-              <div className="space-y-6">
-                <PatientDashboard 
-                  patientCount={dashboardStats?.totalPatients || 0}
-                  todayAppointments={dashboardStats?.todayAppointments || 0}
-                />
-                
-                {/* Recent Patients for Front Desk */}
-                {isFrontDesk && showRecentPatients && (
-                  <div className="mb-6">
-                    <RecentPatients 
-                      patients={patientsData?.patients.slice(0, 5) || []} 
-                      isLoading={isLoading}
-                      onViewAll={() => {
-                        setSearchQuery("");
-                        setStatusFilter("");
-                        setTherapistFilter("");
-                        setCurrentPage(1);
-                        setViewMode("list");
-                        setShowRecentPatients(false);
-                        setTimeout(() => {
-                          const el = document.getElementById("patients-list-section");
-                          if (el) el.scrollIntoView({ behavior: "smooth" });
-                        }, 100);
-                      }}
-                    />
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {/* Bulk Actions */}
-                {selectedPatients.length > 0 && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-4">
-                        <span className="text-sm font-medium text-blue-900">
-                          {selectedPatients.length} patient{selectedPatients.length !== 1 ? 's' : ''} selected
-                        </span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setSelectedPatients([])}
-                        >
-                          Clear Selection
-                        </Button>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleBulkAction("export-csv")}
-                              className="flex items-center space-x-2"
-                            >
-                              <FileText className="h-4 w-4" />
-                              <span>Export Selected</span>
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleBulkAction("export-csv")}>
-                              <FileText className="h-4 w-4 mr-2" />
-                              Export as CSV
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleBulkAction("export-excel")}>
-                              <FileSpreadsheet className="h-4 w-4 mr-2" />
-                              Export as Excel
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleBulkAction("export-pdf")}>
-                              <FileDown className="h-4 w-4 mr-2" />
-                              Export as PDF
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleBulkAction("assign")}
-                          className="flex items-center space-x-2"
-                        >
-                          <User className="h-4 w-4" />
-                          <span>Assign Therapist</span>
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleBulkAction("status")}
-                          className="flex items-center space-x-2"
-                        >
-                          <AlertCircle className="h-4 w-4" />
-                          <span>Update Status</span>
-                        </Button>
-                      </div>
+            <div className="space-y-6">
+              {/* Bulk Actions */}
+              {selectedPatients.length > 0 && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <span className="text-sm font-medium text-blue-900">
+                        {selectedPatients.length} patient{selectedPatients.length !== 1 ? 's' : ''} selected
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setSelectedPatients([])}
+                      >
+                        Clear Selection
+                      </Button>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleBulkAction("export-csv")}
+                            className="flex items-center space-x-2"
+                          >
+                            <FileText className="h-4 w-4" />
+                            <span>Export Selected</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleBulkAction("export-csv")}>
+                            <FileText className="h-4 w-4 mr-2" />
+                            Export as CSV
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleBulkAction("export-excel")}>
+                            <FileSpreadsheet className="h-4 w-4 mr-2" />
+                            Export as Excel
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleBulkAction("export-pdf")}>
+                            <FileDown className="h-4 w-4 mr-2" />
+                            Export as PDF
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleBulkAction("assign")}
+                        className="flex items-center space-x-2"
+                      >
+                        <User className="h-4 w-4" />
+                        <span>Assign Therapist</span>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleBulkAction("status")}
+                        className="flex items-center space-x-2"
+                      >
+                        <AlertCircle className="h-4 w-4" />
+                        <span>Update Status</span>
+                      </Button>
                     </div>
                   </div>
-                )}
-
-                {/* Data Display */}
-                <div id="patients-list-section">
-                  {isFrontDesk && showRecentPatients && (
-                    <div className="mb-6">
-                      <RecentPatients 
-                        patients={patientsData?.patients.slice(0, 5) || []} 
-                        isLoading={isLoading}
-                        onViewAll={() => {
-                          setSearchQuery("");
-                          setStatusFilter("");
-                          setTherapistFilter("");
-                          setCurrentPage(1);
-                          setViewMode("list");
-                          setShowRecentPatients(false);
-                          setTimeout(() => {
-                            const el = document.getElementById("patients-list-section");
-                            if (el) el.scrollIntoView({ behavior: "smooth" });
-                          }, 100);
-                        }}
-                      />
-                    </div>
-                  )}
-                  {viewMode === "list" ? (
-                    <DataTable
-                      data={patientsData?.patients || []}
-                      columns={columns}
-                      totalItems={patientsData?.total || 0}
-                      currentPage={currentPage}
-                      pageSize={pageSize}
-                      onPageChange={handlePageChange}
-                      onSearch={handleSearch}
-                      onFilter={handleFilter}
-                      searchPlaceholder="Search patients by name, email, or phone..."
-                      filters={filters}
-                      isLoading={isLoading}
+                </div>
+              )}
+              {/* Data Display */}
+              <div id="patients-list-section">
+                {viewMode === "list" ? (
+                  <>
+              <DataTable
+                data={patientsData?.patients || []}
+                columns={columns}
+                totalItems={patientsData?.total || 0}
+                currentPage={currentPage}
+                pageSize={pageSize}
+                onPageChange={handlePageChange}
+                onFilter={handleFilter}
+                filters={filters}
+                isLoading={isLoading}
                       onSelectAll={handleSelectAll}
                       selectAllChecked={selectedPatients.length === (patientsData?.patients?.length || 0) && selectedPatients.length > 0}
                       onRefresh={handleRefresh}
@@ -801,67 +768,76 @@ export default function Patients() {
                       viewMode={viewMode}
                       onViewModeChange={setViewMode}
                       showQuickActions={true}
+                      onSearch={handleSearch}
+                      searchPlaceholder="Search patients by name, surname, email, or phone..."
                     />
-                  ) : (
+                    {!isLoading && (patientsData?.patients?.length === 0) && (
+                      <div className="text-center text-gray-500 py-8 text-lg">No patients found.</div>
+                    )}
+                  </>
+                ) : (
+                  <>
                     <PatientGrid />
-                  )}
+                    {!isLoading && (patientsData?.patients?.length === 0) && (
+                      <div className="text-center text-gray-500 py-8 text-lg">No patients found.</div>
+                    )}
+                  </>
+                )}
+              </div>
+              {/* Quick Stats */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="bg-white rounded-lg shadow p-4">
+                  <div className="flex items-center">
+                    <div className="h-8 w-8 bg-green-100 rounded-lg flex items-center justify-center">
+                      <User className="h-4 w-4 text-green-600" />
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm font-medium text-gray-500">Total Patients</p>
+                      <p className="text-lg font-semibold text-gray-900">{patientsData?.total || 0}</p>
+                    </div>
+                  </div>
                 </div>
-
-                {/* Quick Stats */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div className="bg-white rounded-lg shadow p-4">
-                    <div className="flex items-center">
-                      <div className="h-8 w-8 bg-green-100 rounded-lg flex items-center justify-center">
-                        <User className="h-4 w-4 text-green-600" />
-                      </div>
-                      <div className="ml-3">
-                        <p className="text-sm font-medium text-gray-500">Total Patients</p>
-                        <p className="text-lg font-semibold text-gray-900">{patientsData?.total || 0}</p>
-                      </div>
+                <div className="bg-white rounded-lg shadow p-4">
+                  <div className="flex items-center">
+                    <div className="h-8 w-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                      <User className="h-4 w-4 text-blue-600" />
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm font-medium text-gray-500">Active</p>
+                      <p className="text-lg font-semibold text-gray-900">
+                        {patientsData?.patients?.filter(p => p.status === "active").length || 0}
+                      </p>
                     </div>
                   </div>
-                  <div className="bg-white rounded-lg shadow p-4">
-                    <div className="flex items-center">
-                      <div className="h-8 w-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                        <User className="h-4 w-4 text-blue-600" />
-                      </div>
-                      <div className="ml-3">
-                        <p className="text-sm font-medium text-gray-500">Active</p>
-                        <p className="text-lg font-semibold text-gray-900">
-                          {patientsData?.patients?.filter(p => p.status === "active").length || 0}
-                        </p>
-                      </div>
+                </div>
+                <div className="bg-white rounded-lg shadow p-4">
+                  <div className="flex items-center">
+                    <div className="h-8 w-8 bg-gray-100 rounded-lg flex items-center justify-center">
+                      <User className="h-4 w-4 text-gray-600" />
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm font-medium text-gray-500">Inactive</p>
+                      <p className="text-lg font-semibold text-gray-900">
+                        {patientsData?.patients?.filter(p => p.status === "inactive").length || 0}
+                      </p>
                     </div>
                   </div>
-                  <div className="bg-white rounded-lg shadow p-4">
-                    <div className="flex items-center">
-                      <div className="h-8 w-8 bg-gray-100 rounded-lg flex items-center justify-center">
-                        <User className="h-4 w-4 text-gray-600" />
-                      </div>
-                      <div className="ml-3">
-                        <p className="text-sm font-medium text-gray-500">Inactive</p>
-                        <p className="text-lg font-semibold text-gray-900">
-                          {patientsData?.patients?.filter(p => p.status === "inactive").length || 0}
-                        </p>
-                      </div>
+                </div>
+                <div className="bg-white rounded-lg shadow p-4">
+                  <div className="flex items-center">
+                    <div className="h-8 w-8 bg-red-100 rounded-lg flex items-center justify-center">
+                      <User className="h-4 w-4 text-red-600" />
                     </div>
-                  </div>
-                  <div className="bg-white rounded-lg shadow p-4">
-                    <div className="flex items-center">
-                      <div className="h-8 w-8 bg-red-100 rounded-lg flex items-center justify-center">
-                        <User className="h-4 w-4 text-red-600" />
-                      </div>
-                      <div className="ml-3">
-                        <p className="text-sm font-medium text-gray-500">Discharged</p>
-                        <p className="text-lg font-semibold text-gray-900">
-                          {patientsData?.patients?.filter(p => p.status === "discharged").length || 0}
-                        </p>
-                      </div>
+                    <div className="ml-3">
+                      <p className="text-sm font-medium text-gray-500">Discharged</p>
+                      <p className="text-lg font-semibold text-gray-900">
+                        {patientsData?.patients?.filter(p => p.status === "discharged").length || 0}
+                      </p>
                     </div>
                   </div>
                 </div>
               </div>
-            )}
+            </div>
           </div>
         </main>
       </div>

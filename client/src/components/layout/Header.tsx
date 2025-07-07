@@ -11,12 +11,13 @@ import {
   Command,
   X,
   Loader2,
-  Plus
+  Plus,
+  Mail,
+  Settings
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { useState, useEffect, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { useState, useRef, useEffect } from "react";
+import { Link, useLocation } from "wouter";
 import type { User } from "@shared/schema";
 import {
   CommandDialog,
@@ -55,52 +56,26 @@ interface SearchResult {
   href: string;
 }
 
+interface LocationResult {
+  id: string;
+  type: 'location';
+  title: string;
+  subtitle: string;
+  icon: React.ReactNode;
+  href: string;
+  keywords: string[];
+}
+
 export function Header({ onSearch }: HeaderProps) {
   const { user, logout } = useAuth();
   const typedUser = user as User | undefined;
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
-
-  // Global search query
-  const { data: searchResults, isLoading: searchLoading } = useQuery<SearchResult[]>({
-    queryKey: ["/api/search", searchQuery],
-    enabled: searchQuery.length > 2 && isSearchOpen,
-    retry: false,
-  });
-
-  // Keyboard shortcut for search
-  useEffect(() => {
-    const down = (e: KeyboardEvent) => {
-      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault();
-        setIsSearchOpen((open) => !open);
-      }
-      if (e.key === "Escape") {
-        setIsSearchOpen(false);
-      }
-    };
-
-    document.addEventListener("keydown", down);
-    return () => document.removeEventListener("keydown", down);
-  }, []);
-
-  // Focus search input when opened
-  useEffect(() => {
-    if (isSearchOpen) {
-      setTimeout(() => {
-        const commandInput = document.querySelector('[cmdk-input]') as HTMLInputElement;
-        if (commandInput) {
-          commandInput.focus();
-        }
-      }, 100);
-    }
-  }, [isSearchOpen]);
-
-  const handleSearch = (value: string) => {
-    setSearchQuery(value);
-    onSearch?.(value);
-  };
+  const [, navigate] = useLocation();
+  const [apiResults, setApiResults] = useState<any[]>([]);
+  const [apiLoading, setApiLoading] = useState(false);
+  const prevIsSearchOpen = useRef(false);
 
   const getInitials = (firstName?: string, lastName?: string) => {
     if (!firstName && !lastName) return "U";
@@ -147,6 +122,147 @@ export function Header({ onSearch }: HeaderProps) {
     );
   };
 
+  const portalLocations: LocationResult[] = [
+    {
+      id: 'dashboard',
+      type: 'location',
+      title: 'Dashboard',
+      subtitle: 'Overview and quick stats',
+      icon: <Brain className="h-4 w-4" />,
+      href: '/',
+      keywords: ['dashboard', 'home', 'overview', 'main'],
+    },
+    {
+      id: 'patients',
+      type: 'location',
+      title: 'Patients',
+      subtitle: 'View and manage patients',
+      icon: <Users className="h-4 w-4" />,
+      href: '/patients',
+      keywords: ['patients', 'patient', 'client', 'clients', 'profile', 'profiles'],
+    },
+    {
+      id: 'appointments',
+      type: 'location',
+      title: 'Appointments',
+      subtitle: 'View and manage appointments',
+      icon: <Calendar className="h-4 w-4" />,
+      href: '/appointments',
+      keywords: ['appointments', 'appointment', 'schedule', 'visit', 'visits'],
+    },
+    {
+      id: 'records',
+      type: 'location',
+      title: 'Treatment Records',
+      subtitle: 'View and manage treatment records',
+      icon: <FileText className="h-4 w-4" />,
+      href: '/records',
+      keywords: ['records', 'treatment', 'notes', 'treatment records', 'progress'],
+    },
+    {
+      id: 'inquiries',
+      type: 'location',
+      title: 'Inquiries',
+      subtitle: 'Track and manage patient inquiries',
+      icon: <Mail className="h-4 w-4" />,
+      href: '/inquiries',
+      keywords: ['inquiries', 'inquiry', 'questions', 'contact'],
+    },
+    {
+      id: 'reports',
+      type: 'location',
+      title: 'Reports',
+      subtitle: 'View analytics and reports',
+      icon: <FileText className="h-4 w-4" />,
+      href: '/reports',
+      keywords: ['reports', 'analytics', 'statistics', 'stats'],
+    },
+    {
+      id: 'staff',
+      type: 'location',
+      title: 'Staff',
+      subtitle: 'Manage staff accounts',
+      icon: <Users className="h-4 w-4" />,
+      href: '/staff',
+      keywords: ['staff', 'users', 'team', 'employees'],
+    },
+    {
+      id: 'settings',
+      type: 'location',
+      title: 'Settings',
+      subtitle: 'Portal and account settings',
+      icon: <Settings className="h-4 w-4" />,
+      href: '/settings',
+      keywords: ['settings', 'preferences', 'configuration', 'account'],
+    },
+  ];
+
+  const helpTopics = [
+    { id: 'help-add-patient', title: 'How to add a patient?', answer: 'Go to Patients > New Patient and fill out the form.' },
+    { id: 'help-schedule-appointment', title: 'How to schedule an appointment?', answer: 'Go to Appointments > New Appointment and select a patient and time.' },
+    { id: 'help-export-data', title: 'How to export data?', answer: 'Use the Export button on the Patients or Appointments page.' },
+    { id: 'help-reset-password', title: 'How to reset my password?', answer: 'Go to your profile/settings and click Change Password.' },
+  ];
+
+  useEffect(() => {
+    let ignore = false;
+    const trimmedQuery = searchQuery.trim();
+    const shouldSearch = trimmedQuery.length > 2;
+
+    // Always clear results if input is cleared or too short
+    if (!shouldSearch) {
+      setApiResults([]);
+      setApiLoading(false);
+      return;
+    }
+
+    setApiLoading(true);
+    const timeoutId = setTimeout(() => {
+      fetch(`/api/search?q=${encodeURIComponent(trimmedQuery)}`)
+        .then(res => res.ok ? res.json() : [])
+        .then(data => {
+          if (!ignore) setApiResults(Array.isArray(data) ? data : []);
+        })
+        .catch(() => { if (!ignore) setApiResults([]); })
+        .finally(() => { if (!ignore) setApiLoading(false); });
+    }, 300);
+
+    return () => {
+      ignore = true;
+      clearTimeout(timeoutId);
+    };
+  }, [searchQuery]);
+
+  useEffect(() => {
+    // Only reset when dialog transitions from closed to open
+    if (isSearchOpen && !prevIsSearchOpen.current) {
+      setSearchQuery("");
+      setApiResults([]);
+      setApiLoading(false);
+      setTimeout(() => {
+        searchInputRef.current?.focus();
+      }, 0);
+    }
+    prevIsSearchOpen.current = isSearchOpen;
+  }, [isSearchOpen]);
+
+  const navResults = searchQuery.length > 0
+    ? portalLocations.filter(loc =>
+        loc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        loc.subtitle.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : [];
+  const helpResults = searchQuery.length > 0
+    ? helpTopics.filter(topic =>
+        topic.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        topic.answer.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : [];
+
+  console.log('Search query:', searchQuery);
+  console.log('Location results:', navResults);
+  console.log('Help results:', helpResults);
+
   return (
     <>
       <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
@@ -155,7 +271,7 @@ export function Header({ onSearch }: HeaderProps) {
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 bg-primary-500 rounded-lg flex items-center justify-center">
-                  <Brain className="text-white h-6 w-6" />
+                  <img src="/logo.png" alt="Logo" className="h-8 w-8 object-contain" />
                 </div>
                 <div>
                   <h1 className="text-xl font-semibold text-gray-900">NewLife CRM</h1>
@@ -235,79 +351,69 @@ export function Header({ onSearch }: HeaderProps) {
 
       <CommandDialog open={isSearchOpen} onOpenChange={setIsSearchOpen}>
         <CommandInput 
+          ref={searchInputRef}
           placeholder="Search patients, appointments, records..." 
           value={searchQuery}
-          onValueChange={handleSearch}
+          onValueChange={setSearchQuery}
         />
         <CommandList>
-          <CommandEmpty>
-            {searchLoading ? (
-              <div className="flex items-center justify-center py-6">
+          <CommandGroup heading="Navigate to">
+            {navResults.map((loc) => (
+              <CommandItem key={loc.id} onSelect={() => { setIsSearchOpen(false); navigate(loc.href); }}>
+                <div className="flex items-center space-x-2 mr-2">{loc.icon}</div>
+                <div className="flex-1">
+                  <div className="font-medium">{loc.title}</div>
+                  <div className="text-sm text-gray-500">{loc.subtitle}</div>
+                </div>
+              </CommandItem>
+            ))}
+            {navResults.length === 0 && <div className="text-gray-400 px-4 py-2 text-sm">No navigation matches</div>}
+          </CommandGroup>
+
+          <CommandGroup heading="Help & FAQ">
+            {helpResults.map((topic) => (
+              <CommandItem key={topic.id}>
+                <div className="flex-1">
+                  <div className="font-medium">{topic.title}</div>
+                  <div className="text-sm text-gray-500">{topic.answer}</div>
+                </div>
+              </CommandItem>
+            ))}
+            {helpResults.length === 0 && <div className="text-gray-400 px-4 py-2 text-sm">No help matches</div>}
+          </CommandGroup>
+
+          <CommandGroup heading="Search Results">
+            {apiLoading && (
+              <div className="flex items-center justify-center py-6 text-gray-400">
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
                 <span>Searching...</span>
               </div>
-            ) : searchQuery.length > 2 ? (
-              <div className="text-center py-6">
-                <Search className="h-8 w-8 mx-auto text-gray-400 mb-2" />
-                <p className="text-sm text-gray-500">No results found for "{searchQuery}"</p>
-                <p className="text-xs text-gray-400 mt-1">Try searching for patients, appointments, or records</p>
-              </div>
-            ) : (
-              <div className="text-center py-6">
-                <Search className="h-8 w-8 mx-auto text-gray-400 mb-2" />
-                <p className="text-sm text-gray-500">Start typing to search...</p>
-                <div className="flex items-center justify-center space-x-4 mt-3 text-xs text-gray-400">
-                  <span>⌘K to search</span>
-                  <span>•</span>
-                  <span>ESC to close</span>
+            )}
+            {apiResults.map((result, idx) => (
+              <CommandItem
+                key={result.id || idx}
+                onSelect={() => {
+                  setIsSearchOpen(false);
+                  if (result.href) navigate(result.href);
+                }}
+              >
+                <div className="flex items-center space-x-2 mr-2">
+                  {getSearchIcon(result.type)}
+                  {getTypeBadge(result.type)}
                 </div>
+                <div className="flex-1">
+                  <div className="font-medium">{result.title || result.name}</div>
+                  <div className="text-sm text-gray-500">{result.subtitle || result.type || ''}</div>
+                </div>
+              </CommandItem>
+            ))}
+            {!apiLoading && apiResults.length === 0 && searchQuery.length > 2 && (
+              <div className="text-center py-6 text-gray-400">
+                <Search className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+                <p className="text-sm">No results found for "{searchQuery}"</p>
               </div>
             )}
-          </CommandEmpty>
-          
-          {searchResults && searchResults.length > 0 && (
-            <>
-              <CommandGroup heading="Quick Actions">
-                <Link href="/patients/new">
-                  <CommandItem onSelect={() => setIsSearchOpen(false)}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    <span>Add New Patient</span>
-                  </CommandItem>
-                </Link>
-                <Link href="/appointments/new">
-                  <CommandItem onSelect={() => setIsSearchOpen(false)}>
-                    <Calendar className="mr-2 h-4 w-4" />
-                    <span>Schedule Appointment</span>
-                  </CommandItem>
-                </Link>
-                <Link href="/records/new">
-                  <CommandItem onSelect={() => setIsSearchOpen(false)}>
-                    <FileText className="mr-2 h-4 w-4" />
-                    <span>Create Treatment Record</span>
-                  </CommandItem>
-                </Link>
-              </CommandGroup>
-              
-              <CommandSeparator />
-              
-              <CommandGroup heading="Search Results">
-                {searchResults.map((result) => (
-                  <Link key={`${result.type}-${result.id}`} href={result.href}>
-                    <CommandItem onSelect={() => setIsSearchOpen(false)}>
-                      <div className="flex items-center space-x-2 mr-2">
-                        {getSearchIcon(result.type)}
-                        {getTypeBadge(result.type)}
-                      </div>
-                      <div className="flex-1">
-                        <div className="font-medium">{result.title}</div>
-                        <div className="text-sm text-gray-500">{result.subtitle}</div>
-                      </div>
-                    </CommandItem>
-                  </Link>
-                ))}
-              </CommandGroup>
-            </>
-          )}
+          </CommandGroup>
         </CommandList>
       </CommandDialog>
     </>

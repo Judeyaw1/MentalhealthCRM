@@ -25,7 +25,7 @@ import {
   Phone,
   Mail
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Tooltip,
   TooltipContent,
@@ -92,13 +92,27 @@ export function DataTable<T>({
   showQuickActions = true,
 }: DataTableProps<T>) {
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
   const totalPages = Math.ceil(totalItems / pageSize);
 
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Call onSearch when debounced query changes
+  useEffect(() => {
+    onSearch?.(debouncedSearchQuery);
+  }, [debouncedSearchQuery, onSearch]);
+
   const handleSearch = (query: string) => {
     setSearchQuery(query);
-    onSearch?.(query);
   };
 
   const handleFilterChange = (filterKey: string, value: string) => {
@@ -107,7 +121,7 @@ export function DataTable<T>({
 
   const clearSearch = () => {
     setSearchQuery("");
-    onSearch?.("");
+    setDebouncedSearchQuery("");
   };
 
   const handleRefresh = () => {
@@ -156,11 +170,11 @@ export function DataTable<T>({
           {/* Search Section */}
           <div className="flex-1 w-full">
             <div className="relative">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder={searchPlaceholder}
-                value={searchQuery}
-                onChange={(e) => handleSearch(e.target.value)}
+            <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder={searchPlaceholder}
+              value={searchQuery}
+              onChange={(e) => handleSearch(e.target.value)}
                 onFocus={() => setSearchFocused(true)}
                 onBlur={() => setTimeout(() => setSearchFocused(false), 200)}
                 className="pl-10 pr-10"
@@ -322,20 +336,20 @@ export function DataTable<T>({
         {showFilters && filters.length > 0 && (
           <div className="mt-4 pt-4 border-t border-gray-200">
             <div className="flex flex-wrap gap-3">
-              {filters.map((filter) => (
-                <Select key={filter.key} onValueChange={(value) => handleFilterChange(filter.key, value)}>
-                  <SelectTrigger className="w-full sm:w-[180px]">
-                    <SelectValue placeholder={filter.label} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {filter.options.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+        {filters.map((filter) => (
+          <Select key={filter.key} onValueChange={(value) => handleFilterChange(filter.key, value)}>
+            <SelectTrigger className="w-full sm:w-[180px]">
+              <SelectValue placeholder={filter.label} />
+            </SelectTrigger>
+            <SelectContent>
+              {filter.options.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
               ))}
+            </SelectContent>
+          </Select>
+        ))}
             </div>
           </div>
         )}

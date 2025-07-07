@@ -96,7 +96,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
     <Card className="w-full max-w-md mx-auto">
       <CardHeader className="text-center">
         <div className="mx-auto w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center mb-4">
-          <Brain className="h-6 w-6 text-primary-600" />
+          <img src="/logo.png" alt="Logo" className="h-8 w-8 object-contain" />
         </div>
         <CardTitle>Sign In to NewLife CRM</CardTitle>
         <p className="text-sm text-gray-600">

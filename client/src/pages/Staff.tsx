@@ -107,7 +107,7 @@ export default function Staff() {
     total: staff?.length || 0,
     therapists: staff?.filter((member: User) => member.role === "therapist").length || 0,
     admins: staff?.filter((member: User) => member.role === "admin").length || 0,
-    staff: staff?.filter((member: User) => member.role === "staff").length || 0,
+    support: staff?.filter((member: User) => member.role === "frontdesk").length || 0,
   };
 
   return (
@@ -183,7 +183,7 @@ export default function Staff() {
                   <Users className="h-4 w-4 text-gray-600" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{staffStats.staff}</div>
+                  <div className="text-2xl font-bold">{staffStats.support}</div>
                   <p className="text-xs text-gray-600">Administrative staff</p>
                 </CardContent>
               </Card>

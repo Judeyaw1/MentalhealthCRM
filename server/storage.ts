@@ -25,17 +25,40 @@ export class DatabaseStorage {
     
     const total = await PatientModel.countDocuments(query);
     const patients = await PatientModel.find(query)
+      .populate('assignedTherapistId', 'firstName lastName email')
+      .populate('createdBy', 'firstName lastName email role')
       .limit(limit)
       .skip(offset)
       .sort({ createdAt: -1 })
-      .lean();
+      .lean()
+      .catch(error => {
+        console.error('Error fetching patients with population:', error);
+        // If population fails, try without createdBy population
+        return PatientModel.find(query)
+          .populate('assignedTherapistId', 'firstName lastName email')
+          .limit(limit)
+          .skip(offset)
+          .sort({ createdAt: -1 })
+          .lean();
+      });
     
     const patientsWithId = patients.map((p) => {
       const { _id, ...rest } = p;
+      console.log('Patient createdBy debug:', {
+        patientId: _id.toString(),
+        hasCreatedBy: !!rest.createdBy,
+        createdByData: rest.createdBy,
+        createdByType: typeof rest.createdBy
+      });
+      
       const transformed = {
         ...rest,
         id: _id.toString(),
         assignedTherapist: undefined,
+        createdBy: rest.createdBy ? {
+          ...rest.createdBy,
+          id: rest.createdBy._id.toString()
+        } : undefined
       };
       console.log('Patient transformation:', { originalId: _id, transformedId: transformed.id, type: typeof transformed.id });
       return transformed;
@@ -45,13 +68,20 @@ export class DatabaseStorage {
   }
 
   async getPatient(id: string) {
-    const p = await PatientModel.findById(id).lean();
+    const p = await PatientModel.findById(id)
+      .populate('assignedTherapistId', 'firstName lastName email')
+      .populate('createdBy', 'firstName lastName email role')
+      .lean();
     if (!p) return undefined;
     const { _id, ...rest } = p;
     return {
       ...rest,
       id: _id.toString(),
       assignedTherapist: undefined,
+      createdBy: rest.createdBy ? {
+        ...rest.createdBy,
+        id: rest.createdBy._id.toString()
+      } : undefined
     };
   }
 
@@ -73,12 +103,37 @@ export class DatabaseStorage {
       await newPatient.save();
       console.log('Storage: Patient saved successfully with ID:', newPatient._id);
       
-      const p = newPatient.toObject();
-      const { _id, ...rest } = p;
+      // Debug: Check if createdBy was saved
+      console.log('Storage: Checking createdBy field:', {
+        savedCreatedBy: newPatient.createdBy,
+        createdByType: typeof newPatient.createdBy,
+        patientData: newPatient.toObject()
+      });
+      
+      // Fetch the patient with populated fields
+      const populatedPatient = await PatientModel.findById(newPatient._id)
+        .populate('assignedTherapistId', 'firstName lastName email')
+        .populate('createdBy', 'firstName lastName email role')
+        .lean();
+      
+      if (!populatedPatient) {
+        throw new Error('Failed to fetch created patient');
+      }
+      
+      console.log('Storage: Populated patient data:', {
+        createdBy: populatedPatient.createdBy,
+        hasCreatedBy: !!populatedPatient.createdBy
+      });
+      
+      const { _id, ...rest } = populatedPatient;
       return {
         ...rest,
         id: _id.toString(),
         assignedTherapist: undefined,
+        createdBy: rest.createdBy ? {
+          ...rest.createdBy,
+          id: rest.createdBy._id.toString()
+        } : undefined
       };
     } catch (error) {
       console.error('Storage: Error saving patient:', error);
@@ -179,7 +234,7 @@ export class DatabaseStorage {
   }
 
   // Appointments
-  async getAppointments(therapistId?: string, patientId?: string, startDate?: Date, endDate?: Date) {
+  async getAppointments(therapistId?: string, patientId?: string, startDate?: Date, endDate?: Date, search?: string) {
     const query: any = {};
     
     if (therapistId) {
@@ -194,18 +249,31 @@ export class DatabaseStorage {
       query.appointmentDate = { $gte: startDate, $lte: endDate };
     }
     
-    const appointments = await Appointment.find(query)
+    let appointments = await Appointment.find(query)
       .populate('patientId', 'firstName lastName')
       .populate('therapistId', 'firstName lastName')
       .sort({ createdAt: -1 })
       .lean();
     
-    // Debug logging to verify sorting
-    if (appointments.length > 0) {
-      console.log('Appointments sorted by createdAt (newest first):');
-      appointments.slice(0, 3).forEach((apt, index) => {
-        console.log(`${index + 1}. ID: ${apt._id}, Created: ${apt.createdAt}, Patient: ${apt.patientId?.firstName} ${apt.patientId?.lastName}`);
+    console.log('[getAppointments] search:', search);
+    console.log('[getAppointments] appointments before filter:', appointments.slice(0, 3));
+    if (search) {
+      const searchLower = search.toLowerCase();
+      appointments = appointments.filter((apt: any) => {
+        const patientName = (apt.patientId && typeof apt.patientId === 'object' && 'firstName' in apt.patientId)
+          ? (apt.patientId.firstName + ' ' + apt.patientId.lastName).toLowerCase()
+          : '';
+        const therapistName = (apt.therapistId && typeof apt.therapistId === 'object' && 'firstName' in apt.therapistId)
+          ? (apt.therapistId.firstName + ' ' + apt.therapistId.lastName).toLowerCase()
+          : '';
+        const type = (apt.type || '').toLowerCase();
+        return (
+          patientName.includes(searchLower) ||
+          therapistName.includes(searchLower) ||
+          type.includes(searchLower)
+        );
       });
+      console.log('[getAppointments] appointments after filter:', appointments.slice(0, 3));
     }
     
     return appointments.map((apt: any) => ({
@@ -267,7 +335,7 @@ export class DatabaseStorage {
     if (!populatedAppointment) {
       throw new Error('Failed to create appointment');
     }
-    
+
     return {
       ...populatedAppointment,
       id: populatedAppointment._id.toString(),
@@ -320,7 +388,7 @@ export class DatabaseStorage {
     const today = new Date();
     const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
-    
+
     console.log('getTodayAppointments - Date range:', {
       today: today.toISOString(),
       startOfDay: startOfDay.toISOString(),
@@ -411,7 +479,7 @@ export class DatabaseStorage {
       .lean();
     
     if (!record) return null;
-    
+
     return {
       ...record,
       id: record._id.toString(),

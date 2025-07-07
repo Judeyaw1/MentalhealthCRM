@@ -7,7 +7,7 @@ export default function Login() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="mx-auto w-16 h-16 bg-primary-500 rounded-xl flex items-center justify-center mb-4">
-            <Brain className="text-white h-8 w-8" />
+            <img src="/logo.png" alt="Logo" className="h-12 w-12 object-contain" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900 mb-2">NewLife CRM</h1>
           <p className="text-gray-600">Mental Health Practice Management</p>

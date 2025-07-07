@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { DataTable } from "@/components/ui/data-table";
@@ -11,12 +12,13 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Plus, Calendar, Clock, Eye, Edit, ArrowLeft, CheckCircle, XCircle, FileText, MoreHorizontal } from "lucide-react";
-import { Link, useLocation } from "wouter";
+import { Link } from "wouter";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import type { AppointmentWithDetails } from "@shared/schema";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Bell } from "lucide-react";
 import { Trash2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 
 export default function Appointments() {
   const { toast } = useToast();
@@ -24,9 +26,10 @@ export default function Appointments() {
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
   const [currentPage, setCurrentPage] = useState(1);
-  const [statusFilter, setStatusFilter] = useState("");
-  const [dateFilter, setDateFilter] = useState("");
-  const pageSize = 20;
+  const [pageSize] = useState(10);
+  const [statusFilter, setStatusFilter] = useState<string>("");
+  const [dateFilter, setDateFilter] = useState<string>("");
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Redirect to home if not authenticated
   useEffect(() => {
@@ -76,7 +79,8 @@ export default function Appointments() {
   const { data: appointments, isLoading } = useQuery({
     queryKey: ["/api/appointments", { 
       ...getDateRange(),
-      status: statusFilter || undefined
+      status: statusFilter || undefined,
+      search: searchQuery || undefined
     }],
     retry: false,
     onSuccess: (data) => {
@@ -198,7 +202,7 @@ export default function Appointments() {
       render: (_, row: AppointmentWithDetails) => (
         <div className="flex items-center space-x-1">
           {/* View Details */}
-          <Link href={`/appointments/${row.id}`}>
+          <Link to={`/appointments/${row.id}`}>
             <Button 
               variant="ghost" 
               size="sm"
@@ -210,7 +214,7 @@ export default function Appointments() {
           </Link>
           
           {/* Edit Appointment */}
-          <Link href={`/appointments/${row.id}/edit`}>
+          <Link to={`/appointments/${row.id}/edit`}>
             <Button 
               variant="ghost" 
               size="sm"
@@ -558,7 +562,7 @@ export default function Appointments() {
                     </p>
                   </div>
                 </div>
-                <Link href="/appointments/new">
+                <Link to="/appointments/new">
                   <Button className="flex items-center space-x-2">
                     <Plus className="h-4 w-4" />
                     <span>New Appointment</span>
@@ -624,6 +628,8 @@ export default function Appointments() {
                 currentPage={currentPage}
                 pageSize={pageSize}
                 onPageChange={setCurrentPage}
+                onSearch={setSearchQuery}
+                searchPlaceholder="Search appointments by patient, therapist, or type..."
                 onFilter={handleFilter}
                 filters={filters}
                 isLoading={isLoading}

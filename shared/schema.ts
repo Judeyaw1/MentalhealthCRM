@@ -208,6 +208,7 @@ export type AuditLog = typeof auditLogs.$inferSelect;
 // Extended types with relations
 export type PatientWithTherapist = Patient & {
   assignedTherapist?: User;
+  createdBy?: User;
 };
 
 export type AppointmentWithDetails = Appointment & {

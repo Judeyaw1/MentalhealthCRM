@@ -25,7 +25,7 @@ import {
   Trash2
 } from "lucide-react";
 import { Link } from "wouter";
-import { isUnauthorizedError } from "@/lib/authUtils";
+import { isUnauthorizedError, canSeeCreatedBy } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
 import type { PatientWithTherapist, AppointmentWithDetails, TreatmentRecordWithDetails } from "@shared/schema";
 
@@ -33,7 +33,7 @@ export default function PatientDetail() {
   const params = useParams();
   const patientId = params.id as string;
   const { toast } = useToast();
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, user } = useAuth();
   const queryClient = useQueryClient();
 
   // Redirect to home if not authenticated
@@ -325,6 +325,16 @@ export default function PatientDetail() {
                         <label className="text-sm font-medium text-gray-500">Registration Date</label>
                         <p className="text-sm text-gray-900">{formatDate(patient.createdAt!)}</p>
                       </div>
+                      
+                      {patient.createdBy && canSeeCreatedBy(user) && (
+                        <div>
+                          <label className="text-sm font-medium text-gray-500">Created By</label>
+                          <p className="text-sm text-gray-900">
+                            {patient.createdBy.firstName} {patient.createdBy.lastName} 
+                            <span className="text-gray-500 ml-2">({patient.createdBy.role})</span>
+                          </p>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
 

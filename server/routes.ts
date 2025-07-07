@@ -8,6 +8,7 @@ import {
   insertAuditLogSchema,
 } from "@shared/schema";
 import { z } from "zod";
+import { Patient } from "./models/Patient";
 
 // Custom schema for MongoDB treatment records
 const insertTreatmentRecordSchema = z.object({
@@ -177,7 +178,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const patientData = insertPatientSchema.parse(req.body);
       console.log('Parsed patient data:', JSON.stringify(patientData, null, 2));
       
-      const patient = await storage.createPatient(patientData);
+      // Add the current user as the creator
+      const patientWithCreator = {
+        ...patientData,
+        createdBy: userId
+      };
+      
+      const patient = await storage.createPatient(patientWithCreator);
       await logActivity(userId, "create", "patient", patient.id.toString(), patientData);
       
       res.status(201).json(patient);
@@ -381,7 +388,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.id;
       const user = await storage.getUser(userId);
-      const { patientId, startDate, endDate, status } = req.query;
+      const { patientId, startDate, endDate, status, search } = req.query;
       
       const therapistId = user?.role === "therapist" ? userId : undefined;
       
@@ -389,7 +396,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         therapistId,
         patientId ? patientId.toString() : undefined,
         startDate ? new Date(startDate as string) : undefined,
-        endDate ? new Date(endDate as string) : undefined
+        endDate ? new Date(endDate as string) : undefined,
+        search as string
       );
       
       // Filter by status if provided
@@ -526,6 +534,144 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Staff invitation endpoint
+  app.post("/api/staff/invite", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+      
+      // Only admins can invite staff
+      if (user?.role !== "admin") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      console.log("Staff invitation request body:", JSON.stringify(req.body, null, 2));
+      const { email, firstName, lastName, role, message } = req.body;
+
+      // Validate required fields
+      if (!email || !firstName || !lastName || !role) {
+        console.log("Missing required fields:", { email, firstName, lastName, role });
+        return res.status(400).json({ 
+          message: "Email, first name, last name, and role are required" 
+        });
+      }
+
+      // Validate role
+      const validRoles = ['admin', 'therapist', 'staff', 'frontdesk'];
+      if (!validRoles.includes(role)) {
+        console.log("Invalid role:", role);
+        return res.status(400).json({ 
+          message: "Invalid role. Must be one of: admin, therapist, staff, frontdesk" 
+        });
+      }
+
+      // Check if user already exists
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        console.log("User already exists:", email);
+        return res.status(400).json({ 
+          message: "A user with this email already exists" 
+        });
+      }
+
+      // Generate a secure default password
+      const defaultPassword = Math.random().toString(36).slice(-8) + 
+                             Math.random().toString(36).toUpperCase().slice(-4) + 
+                             Math.floor(Math.random() * 10) + 
+                             '!';
+
+      console.log("Creating user with data:", {
+        email,
+        firstName,
+        lastName,
+        role,
+        password: defaultPassword.substring(0, 3) + "...",
+        forcePasswordChange: true
+      });
+
+      // Create the new user using the storage method (which handles validation)
+      const newUser = await storage.createUser({
+        email,
+        firstName,
+        lastName,
+        role,
+        password: defaultPassword,
+        forcePasswordChange: true // Force them to change password on first login
+      });
+
+      console.log("User created successfully:", newUser.id);
+
+      // Generate invitation URL
+      const inviteUrl = `${req.protocol}://${req.get('host')}/login`;
+
+      // Send invitation email
+      const emailSent = await emailService.sendStaffInvitation({
+        to: email,
+        firstName,
+        lastName,
+        role,
+        message,
+        inviteUrl
+      });
+
+      if (!emailSent) {
+        // If email fails, still create the user but warn about it
+        console.warn(`Failed to send invitation email to ${email}, but user was created`);
+      }
+
+      await logActivity(userId, "invite", "staff", newUser.id.toString(), {
+        email,
+        firstName,
+        lastName,
+        role,
+        emailSent
+      });
+
+      res.status(201).json({
+        message: "Staff invitation sent successfully",
+        user: {
+          id: newUser.id,
+          email: newUser.email,
+          firstName: newUser.firstName,
+          lastName: newUser.lastName,
+          role: newUser.role
+        },
+        emailSent
+      });
+
+    } catch (error: any) {
+      console.error("Error inviting staff:", error);
+      console.error("Error details:", {
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+        code: error.code,
+        path: error.path,
+        issues: error.issues
+      });
+      
+      // Handle validation errors specifically
+      if (error instanceof z.ZodError) {
+        console.error("Zod validation errors:", error.errors);
+        return res.status(400).json({ 
+          message: "Invalid data provided", 
+          errors: error.errors 
+        });
+      }
+      
+      // Handle Mongoose validation errors
+      if (error.name === 'ValidationError') {
+        console.error("Mongoose validation errors:", error.errors);
+        return res.status(400).json({ 
+          message: "Validation failed", 
+          errors: Object.values(error.errors).map((e: any) => e.message)
+        });
+      }
+      
+      res.status(500).json({ message: "Failed to invite staff member" });
+    }
+  });
+
   app.get("/api/therapists", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
@@ -536,6 +682,165 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching therapists:", error);
       res.status(500).json({ message: "Failed to fetch therapists" });
+    }
+  });
+
+  // Password reset endpoint for staff members
+  app.post("/api/staff/:userId/reset-password", isAuthenticated, async (req: any, res) => {
+    try {
+      const adminId = req.user.id;
+      const admin = await storage.getUser(adminId);
+      
+      // Only admins can reset passwords
+      if (admin?.role !== "admin") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const userId = req.params.userId;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Generate a secure default password
+      const defaultPassword = Math.random().toString(36).slice(-8) + 
+                             Math.random().toString(36).toUpperCase().slice(-4) + 
+                             Math.floor(Math.random() * 10) + 
+                             '!';
+
+      // Update user with new password and force password change
+      const updatedUser = await storage.updateUser(userId, {
+        password: defaultPassword,
+        forcePasswordChange: true
+      });
+
+      if (!updatedUser) {
+        return res.status(500).json({ message: "Failed to update user password" });
+      }
+
+      // Send password reset email
+      const emailSent = await emailService.sendPasswordReset({
+        to: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        defaultPassword
+      });
+
+      await logActivity(adminId, "reset_password", "user", userId, {
+        targetEmail: user.email,
+        emailSent
+      });
+
+      res.json({
+        message: "Password reset successfully",
+        defaultPassword,
+        emailSent
+      });
+
+    } catch (error) {
+      console.error("Error resetting password:", error);
+      res.status(500).json({ message: "Failed to reset password" });
+    }
+  });
+
+  // Change password endpoint for authenticated users
+  app.post("/api/auth/change-password", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const { currentPassword, newPassword } = req.body;
+
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ message: "Current password and new password are required" });
+      }
+
+      if (newPassword.length < 8) {
+        return res.status(400).json({ message: "New password must be at least 8 characters long" });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Verify current password
+      if (user.password !== currentPassword) {
+        return res.status(400).json({ message: "Current password is incorrect" });
+      }
+
+      // Update password and remove force password change flag
+      const updatedUser = await storage.updateUser(userId, {
+        password: newPassword,
+        forcePasswordChange: false
+      });
+
+      if (!updatedUser) {
+        return res.status(500).json({ message: "Failed to update password" });
+      }
+
+      await logActivity(userId, "change_password", "user", userId);
+
+      res.json({
+        message: "Password changed successfully"
+      });
+
+    } catch (error: any) {
+      console.error("Error changing password:", error);
+      res.status(500).json({ message: "Failed to change password" });
+    }
+  });
+
+  // Migration endpoint to populate createdBy for existing patients
+  app.post("/api/migrate/patients-created-by", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+      
+      // Only admins can run migrations
+      if (user?.role !== "admin") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      // Find all patients without createdBy field
+      const patientsWithoutCreator = await Patient.find({ 
+        $or: [
+          { createdBy: { $exists: false } },
+          { createdBy: null },
+          { createdBy: "" }
+        ]
+      });
+
+      console.log(`Found ${patientsWithoutCreator.length} patients without createdBy field`);
+
+      if (patientsWithoutCreator.length === 0) {
+        return res.json({ 
+          message: "No patients need migration",
+          migrated: 0
+        });
+      }
+
+      // Update all patients without createdBy to use the current admin as creator
+      const updateResult = await Patient.updateMany(
+        { 
+          $or: [
+            { createdBy: { $exists: false } },
+            { createdBy: null },
+            { createdBy: "" }
+          ]
+        },
+        { createdBy: userId }
+      );
+
+      console.log(`Migration completed: ${updateResult.modifiedCount} patients updated`);
+
+      res.json({
+        message: "Migration completed successfully",
+        migrated: updateResult.modifiedCount
+      });
+
+    } catch (error) {
+      console.error("Migration error:", error);
+      res.status(500).json({ message: "Migration failed" });
     }
   });
 
@@ -611,6 +916,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating sample data:", error);
       res.status(500).json({ message: "Failed to create sample data" });
+    }
+  });
+
+  // --- SEARCH ENDPOINT ---
+  app.get("/api/search", isAuthenticated, async (req: any, res) => {
+    try {
+      const q = (req.query.q || "").toString().trim();
+      console.log('Search request received:', { q, length: q.length });
+      
+      if (!q || q.length < 2) {
+        console.log('Query too short, returning empty results');
+        return res.json([]);
+      }
+
+      console.log('Searching patients...');
+      // Search patients
+      const patientResult = await storage.getPatients(10, 0, q);
+      const patients = (patientResult.patients || []).map((p: any) => ({
+        id: p.id,
+        type: "patient",
+        title: `${p.firstName} ${p.lastName}`.trim(),
+        subtitle: `${p.email || ""}${p.phone ? ` | ${p.phone}` : ""}`.trim(),
+        href: `/patients/${p.id}`,
+      }));
+      console.log('Patient results:', patients.length);
+
+      console.log('Searching appointments...');
+      // Search appointments (by patient name or appointment id)
+      const appointments = (await storage.getAppointments()).filter((apt: any) => {
+        const patientName = apt.patient?.firstName + " " + apt.patient?.lastName;
+        return (
+          apt.id.includes(q) ||
+          (patientName && patientName.toLowerCase().includes(q.toLowerCase()))
+        );
+      }).slice(0, 10).map((apt: any) => ({
+        id: apt.id,
+        type: "appointment",
+        title: `${apt.patient?.firstName || ""} ${apt.patient?.lastName || ""}`.trim(),
+        subtitle: `Appointment on ${new Date(apt.appointmentDate).toLocaleString()}`,
+        href: `/appointments/${apt.id}`,
+      }));
+      console.log('Appointment results:', appointments.length);
+
+      console.log('Searching records...');
+      // Search treatment records (by patient name or record id)
+      const records = (await storage.getAllTreatmentRecords()).filter((rec: any) => {
+        const patientName = rec.patient?.firstName + " " + rec.patient?.lastName;
+        return (
+          rec.id.includes(q) ||
+          (patientName && patientName.toLowerCase().includes(q.toLowerCase()))
+        );
+      }).slice(0, 10).map((rec: any) => ({
+        id: rec.id,
+        type: "record",
+        title: `${rec.patient?.firstName || ""} ${rec.patient?.lastName || ""}`.trim(),
+        subtitle: `Record on ${rec.sessionDate ? new Date(rec.sessionDate).toLocaleDateString() : "Unknown date"}`,
+        href: `/records/${rec.id}`,
+      }));
+      console.log('Record results:', records.length);
+
+      // Combine and return
+      const results = [...patients, ...appointments, ...records];
+      console.log('Total search results:', results.length);
+      console.log('Sending response:', results);
+      res.json(results);
+    } catch (error) {
+      console.error("/api/search error:", error);
+      res.status(500).json({ message: "Search failed" });
     }
   });
 
