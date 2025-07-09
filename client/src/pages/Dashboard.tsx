@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -9,14 +9,28 @@ import { RecentPatients } from "@/components/dashboard/RecentPatients";
 import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import { Button } from "@/components/ui/button";
-import { Download, Plus } from "lucide-react";
+import { Download, Plus, UserCheck } from "lucide-react";
 import { Link } from "wouter";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import type { DashboardStats } from "@/components/dashboard/StatsCards";
+import { Card } from "@/components/ui/card";
 
 export default function Dashboard() {
   const { toast } = useToast();
   const { isAuthenticated, isLoading } = useAuth();
+  const [dateRange, setDateRange] = useState<{ startDate: string; endDate: string }>({
+    startDate: "",
+    endDate: "",
+  });
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (dateRange.startDate) params.append("startDate", dateRange.startDate);
+    if (dateRange.endDate) params.append("endDate", dateRange.endDate);
+    fetch(`/api/audit-logs/unique-logins?${params.toString()}`)
+      .then((res) => res.json())
+      .catch(() => {});
+  }, [dateRange]);
 
   // Redirect to home if not authenticated
   useEffect(() => {
@@ -76,26 +90,32 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
-      
+
       <div className="flex">
-        <Sidebar 
+        <Sidebar
           patientCount={statsData.totalPatients}
           todayAppointments={statsData.todayAppointments}
         />
-        
+
         <main className="flex-1 overflow-y-auto">
           <div className="p-6">
             {/* Dashboard Header */}
             <div className="mb-8">
               <div className="flex items-center justify-between">
                 <div>
-                  <h1 className="text-2xl font-semibold text-gray-900">Dashboard Overview</h1>
+                  <h1 className="text-2xl font-semibold text-gray-900">
+                    Dashboard Overview
+                  </h1>
                   <p className="text-gray-600 mt-1">
-                    Welcome back. Here's what's happening at your practice today.
+                    Welcome back. Here's what's happening at your practice
+                    today.
                   </p>
                 </div>
                 <div className="flex space-x-3">
-                  <Button variant="outline" className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    className="flex items-center space-x-2"
+                  >
                     <Download className="h-4 w-4" />
                     <span>Export Report</span>
                   </Button>
@@ -111,21 +131,18 @@ export default function Dashboard() {
 
             {/* Stats Cards */}
             <div className="mb-8">
-              <StatsCards 
-                stats={statsData}
-                isLoading={statsLoading}
-              />
+              <StatsCards stats={statsData} isLoading={statsLoading} />
             </div>
 
             {/* Main Content Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
               {/* Recent Patients */}
               <div className="lg:col-span-2">
-                <RecentPatients 
-                  patients={Array.isArray(recentPatients) ? recentPatients : []} 
+                <RecentPatients
+                  patients={Array.isArray(recentPatients) ? recentPatients : []}
                   isLoading={patientsLoading}
                   onViewAll={() => {
-                    localStorage.setItem('showAllPatients', 'true');
+                    localStorage.setItem("showAllPatients", "true");
                     window.location.href = "/patients";
                   }}
                 />
@@ -133,7 +150,12 @@ export default function Dashboard() {
 
               {/* Today's Schedule */}
               <div>
-                <TodaySchedule appointments={Array.isArray(todayAppointments) ? todayAppointments : []} isLoading={appointmentsLoading} />
+                <TodaySchedule
+                  appointments={
+                    Array.isArray(todayAppointments) ? todayAppointments : []
+                  }
+                  isLoading={appointmentsLoading}
+                />
               </div>
             </div>
 

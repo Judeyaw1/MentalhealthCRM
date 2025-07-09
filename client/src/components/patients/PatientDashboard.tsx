@@ -4,17 +4,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { 
-  Users, 
-  UserPlus, 
-  Calendar, 
-  TrendingUp, 
+import {
+  Users,
+  UserPlus,
+  Calendar,
+  TrendingUp,
   AlertCircle,
   FileText,
   Download,
   Upload,
   Search,
-  Filter
+  Filter,
 } from "lucide-react";
 import { Link } from "wouter";
 import type { PatientWithTherapist } from "@shared/schema";
@@ -24,7 +24,10 @@ interface PatientDashboardProps {
   todayAppointments?: number;
 }
 
-export function PatientDashboard({ patientCount = 0, todayAppointments = 0 }: PatientDashboardProps) {
+export function PatientDashboard({
+  patientCount = 0,
+  todayAppointments = 0,
+}: PatientDashboardProps) {
   const { toast } = useToast();
   const { data: recentPatients = [] } = useQuery<PatientWithTherapist[]>({
     queryKey: ["/api/dashboard/recent-patients"],
@@ -61,8 +64,12 @@ export function PatientDashboard({ patientCount = 0, todayAppointments = 0 }: Pa
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Patients</p>
-                <p className="text-2xl font-bold text-gray-900">{patientCount}</p>
+                <p className="text-sm font-medium text-gray-600">
+                  Total Patients
+                </p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {patientCount}
+                </p>
               </div>
               <div className="h-12 w-12 bg-primary-100 rounded-lg flex items-center justify-center">
                 <Users className="h-6 w-6 text-primary-600" />
@@ -75,8 +82,12 @@ export function PatientDashboard({ patientCount = 0, todayAppointments = 0 }: Pa
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Today's Appointments</p>
-                <p className="text-2xl font-bold text-gray-900">{todayAppointments}</p>
+                <p className="text-sm font-medium text-gray-600">
+                  Today's Appointments
+                </p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {todayAppointments}
+                </p>
               </div>
               <div className="h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center">
                 <Calendar className="h-6 w-6 text-blue-600" />
@@ -89,9 +100,13 @@ export function PatientDashboard({ patientCount = 0, todayAppointments = 0 }: Pa
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Active Patients</p>
+                <p className="text-sm font-medium text-gray-600">
+                  Active Patients
+                </p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {recentPatients?.filter((p: PatientWithTherapist) => p.status === "active").length || 0}
+                  {recentPatients?.filter(
+                    (p: PatientWithTherapist) => p.status === "active",
+                  ).length || 0}
                 </p>
               </div>
               <div className="h-12 w-12 bg-green-100 rounded-lg flex items-center justify-center">
@@ -105,7 +120,9 @@ export function PatientDashboard({ patientCount = 0, todayAppointments = 0 }: Pa
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Pending Records</p>
+                <p className="text-sm font-medium text-gray-600">
+                  Pending Records
+                </p>
                 <p className="text-2xl font-bold text-gray-900">0</p>
               </div>
               <div className="h-12 w-12 bg-yellow-100 rounded-lg flex items-center justify-center">
@@ -126,21 +143,24 @@ export function PatientDashboard({ patientCount = 0, todayAppointments = 0 }: Pa
         </Link>
 
         <Link href="/appointments/new">
-          <Button variant="outline" className="w-full h-16 flex flex-col items-center justify-center space-y-2">
+          <Button
+            variant="outline"
+            className="w-full h-16 flex flex-col items-center justify-center space-y-2"
+          >
             <Calendar className="h-6 w-6" />
             <span className="text-sm font-medium">Schedule Appointment</span>
           </Button>
         </Link>
 
-        <Button 
-          variant="outline" 
+        <Button
+          variant="outline"
           className="w-full h-16 flex flex-col items-center justify-center space-y-2"
           onClick={async () => {
             try {
-              const response = await fetch('/api/sample-data', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include'
+              const response = await fetch("/api/sample-data", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
               });
               if (response.ok) {
                 toast({
@@ -156,7 +176,7 @@ export function PatientDashboard({ patientCount = 0, todayAppointments = 0 }: Pa
                 });
               }
             } catch (error) {
-              console.error('Error creating sample data:', error);
+              console.error("Error creating sample data:", error);
               toast({
                 title: "Error",
                 description: "Failed to create sample data",
@@ -182,33 +202,40 @@ export function PatientDashboard({ patientCount = 0, todayAppointments = 0 }: Pa
           <CardContent>
             <div className="space-y-4">
               {recentPatients && recentPatients.length > 0 ? (
-                recentPatients.slice(0, 5).map((patient: PatientWithTherapist) => (
-                  <div key={patient.id} className="flex items-center space-x-4 p-3 rounded-lg hover:bg-gray-50">
-                    <Avatar className="h-10 w-10">
-                      <AvatarFallback className="bg-primary-100 text-primary-600">
-                        {getInitials(patient.firstName, patient.lastName)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center space-x-2">
-                        <p className="text-sm font-medium text-gray-900 truncate">
-                          {patient.firstName} {patient.lastName}
+                recentPatients
+                  .slice(0, 5)
+                  .map((patient: PatientWithTherapist) => (
+                    <div
+                      key={patient.id}
+                      className="flex items-center space-x-4 p-3 rounded-lg hover:bg-gray-50"
+                    >
+                      <Avatar className="h-10 w-10">
+                        <AvatarFallback className="bg-primary-100 text-primary-600">
+                          {getInitials(patient.firstName, patient.lastName)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center space-x-2">
+                          <p className="text-sm font-medium text-gray-900 truncate">
+                            {patient.firstName} {patient.lastName}
+                          </p>
+                          <Badge
+                            className={`text-xs ${getStatusColor(patient.status)}`}
+                          >
+                            {patient.status}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-gray-500 truncate">
+                          {patient.email || "No email"}
                         </p>
-                        <Badge className={`text-xs ${getStatusColor(patient.status)}`}>
-                          {patient.status}
-                        </Badge>
                       </div>
-                      <p className="text-sm text-gray-500 truncate">
-                        {patient.email || "No email"}
-                      </p>
+                      <Link href={`/patients/${patient.id}`}>
+                        <Button variant="ghost" size="sm">
+                          View
+                        </Button>
+                      </Link>
                     </div>
-                    <Link href={`/patients/${patient.id}`}>
-                      <Button variant="ghost" size="sm">
-                        View
-                      </Button>
-                    </Link>
-                  </div>
-                ))
+                  ))
               ) : (
                 <div className="text-center py-8">
                   <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -236,22 +263,35 @@ export function PatientDashboard({ patientCount = 0, todayAppointments = 0 }: Pa
             <div className="space-y-4">
               {todayAppointmentsData && todayAppointmentsData.length > 0 ? (
                 todayAppointmentsData.slice(0, 5).map((appointment: any) => (
-                  <div key={appointment.id} className="flex items-center space-x-4 p-3 rounded-lg hover:bg-gray-50">
+                  <div
+                    key={appointment.id}
+                    className="flex items-center space-x-4 p-3 rounded-lg hover:bg-gray-50"
+                  >
                     <div className="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center">
                       <Calendar className="h-5 w-5 text-blue-600" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900 truncate">
-                        {appointment.patient?.firstName} {appointment.patient?.lastName}
+                        {appointment.patient?.firstName}{" "}
+                        {appointment.patient?.lastName}
                       </p>
                       <p className="text-sm text-gray-500 truncate">
-                        {new Date(appointment.appointmentDate).toLocaleTimeString([], { 
-                          hour: '2-digit', 
-                          minute: '2-digit' 
-                        })} - {appointment.type}
+                        {new Date(
+                          appointment.appointmentDate,
+                        ).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}{" "}
+                        - {appointment.type}
                       </p>
                     </div>
-                    <Badge variant={appointment.status === "scheduled" ? "default" : "secondary"}>
+                    <Badge
+                      variant={
+                        appointment.status === "scheduled"
+                          ? "default"
+                          : "secondary"
+                      }
+                    >
                       {appointment.status}
                     </Badge>
                   </div>
@@ -287,7 +327,9 @@ export function PatientDashboard({ patientCount = 0, todayAppointments = 0 }: Pa
                 <Users className="h-8 w-8 text-green-600" />
               </div>
               <p className="text-2xl font-bold text-green-600">
-                {recentPatients?.filter((p: PatientWithTherapist) => p.status === "active").length || 0}
+                {recentPatients?.filter(
+                  (p: PatientWithTherapist) => p.status === "active",
+                ).length || 0}
               </p>
               <p className="text-sm text-gray-600">Active Patients</p>
             </div>
@@ -296,7 +338,9 @@ export function PatientDashboard({ patientCount = 0, todayAppointments = 0 }: Pa
                 <Users className="h-8 w-8 text-gray-600" />
               </div>
               <p className="text-2xl font-bold text-gray-600">
-                {recentPatients?.filter((p: PatientWithTherapist) => p.status === "inactive").length || 0}
+                {recentPatients?.filter(
+                  (p: PatientWithTherapist) => p.status === "inactive",
+                ).length || 0}
               </p>
               <p className="text-sm text-gray-600">Inactive Patients</p>
             </div>
@@ -305,7 +349,9 @@ export function PatientDashboard({ patientCount = 0, todayAppointments = 0 }: Pa
                 <Users className="h-8 w-8 text-red-600" />
               </div>
               <p className="text-2xl font-bold text-red-600">
-                {recentPatients?.filter((p: PatientWithTherapist) => p.status === "discharged").length || 0}
+                {recentPatients?.filter(
+                  (p: PatientWithTherapist) => p.status === "discharged",
+                ).length || 0}
               </p>
               <p className="text-sm text-gray-600">Discharged Patients</p>
             </div>
@@ -314,4 +360,4 @@ export function PatientDashboard({ patientCount = 0, todayAppointments = 0 }: Pa
       </Card>
     </div>
   );
-} 
+}

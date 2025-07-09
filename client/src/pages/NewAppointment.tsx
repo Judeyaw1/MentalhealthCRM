@@ -31,7 +31,7 @@ export default function NewAppointment() {
 
   // Get URL parameters for pre-filled patient
   const urlParams = new URLSearchParams(window.location.search);
-  const preselectedPatientId = urlParams.get('patientId');
+  const preselectedPatientId = urlParams.get("patientId");
 
   // Redirect to home if not authenticated
   useEffect(() => {
@@ -60,35 +60,39 @@ export default function NewAppointment() {
 
   const createAppointmentMutation = useMutation({
     mutationFn: async (appointmentData: InsertAppointment) => {
-      const response = await apiRequest("POST", "/api/appointments", appointmentData);
+      const response = await apiRequest(
+        "POST",
+        "/api/appointments",
+        appointmentData,
+      );
       return response.json();
     },
     onSuccess: () => {
       // Invalidate all appointment-related queries to ensure fresh data
-      queryClient.invalidateQueries({ 
+      queryClient.invalidateQueries({
         queryKey: ["/api/appointments"],
-        exact: false 
+        exact: false,
       });
-      queryClient.invalidateQueries({ 
+      queryClient.invalidateQueries({
         queryKey: ["/api/dashboard/stats"],
-        exact: false 
+        exact: false,
       });
-      queryClient.invalidateQueries({ 
+      queryClient.invalidateQueries({
         queryKey: ["/api/dashboard/today-appointments"],
-        exact: false 
+        exact: false,
       });
-      
+
       // Also remove any cached appointment data to force fresh fetch
-      queryClient.removeQueries({ 
+      queryClient.removeQueries({
         queryKey: ["/api/appointments"],
-        exact: false 
+        exact: false,
       });
-      
+
       toast({
         title: "Success",
         description: "Appointment scheduled successfully.",
       });
-      
+
       setLocation("/appointments");
     },
     onError: (error) => {
@@ -103,7 +107,7 @@ export default function NewAppointment() {
         }, 500);
         return;
       }
-      
+
       toast({
         title: "Error",
         description: "Failed to schedule appointment. Please try again.",
@@ -128,17 +132,17 @@ export default function NewAppointment() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
-      
+
       <div className="flex">
         <Sidebar />
-        
+
         <main className="flex-1 overflow-y-auto">
           <div className="p-6">
             {/* Return Arrow */}
             <div className="mb-4">
-              <Button 
-                variant="ghost" 
-                size="sm" 
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => setLocation("/appointments")}
                 className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
               >
@@ -149,7 +153,9 @@ export default function NewAppointment() {
 
             {/* Page Header */}
             <div className="mb-8">
-              <h1 className="text-2xl font-semibold text-gray-900">Schedule New Appointment</h1>
+              <h1 className="text-2xl font-semibold text-gray-900">
+                Schedule New Appointment
+              </h1>
               <p className="text-gray-600 mt-1">
                 Create a new appointment for patient care.
               </p>

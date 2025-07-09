@@ -11,11 +11,28 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Plus, Calendar, Clock, Eye, Edit, ArrowLeft, CheckCircle, XCircle, FileText, MoreHorizontal } from "lucide-react";
+import {
+  Plus,
+  Calendar,
+  Clock,
+  Eye,
+  Edit,
+  ArrowLeft,
+  CheckCircle,
+  XCircle,
+  FileText,
+  MoreHorizontal,
+} from "lucide-react";
 import { Link } from "wouter";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import type { AppointmentWithDetails } from "@shared/schema";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Bell } from "lucide-react";
 import { Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -49,21 +66,37 @@ export default function Appointments() {
   // Get date range for filtering
   const getDateRange = () => {
     if (!dateFilter) return {};
-    
+
     const today = new Date();
     let startDate: Date;
     let endDate: Date;
-    
+
     switch (dateFilter) {
       case "today":
-        startDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-        endDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+        startDate = new Date(
+          today.getFullYear(),
+          today.getMonth(),
+          today.getDate(),
+        );
+        endDate = new Date(
+          today.getFullYear(),
+          today.getMonth(),
+          today.getDate() + 1,
+        );
         break;
       case "week":
         const weekStart = new Date(today);
         weekStart.setDate(today.getDate() - today.getDay());
-        startDate = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate());
-        endDate = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 7);
+        startDate = new Date(
+          weekStart.getFullYear(),
+          weekStart.getMonth(),
+          weekStart.getDate(),
+        );
+        endDate = new Date(
+          weekStart.getFullYear(),
+          weekStart.getMonth(),
+          weekStart.getDate() + 7,
+        );
         break;
       case "month":
         startDate = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -72,28 +105,37 @@ export default function Appointments() {
       default:
         return {};
     }
-    
-    return { startDate: startDate.toISOString(), endDate: endDate.toISOString() };
+
+    return {
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+    };
   };
 
   const { data: appointments, isLoading } = useQuery({
-    queryKey: ["/api/appointments", { 
-      ...getDateRange(),
-      status: statusFilter || undefined,
-      search: searchQuery || undefined
-    }],
+    queryKey: [
+      "/api/appointments",
+      {
+        ...getDateRange(),
+        status: statusFilter || undefined,
+        search: searchQuery || undefined,
+      },
+    ],
     retry: false,
     onSuccess: (data) => {
-      console.log('Appointments fetched:', data?.length || 0, 'appointments');
+      console.log("Appointments fetched:", data?.length || 0, "appointments");
       if (data && data.length > 0) {
-        console.log('First 3 appointments:', data.slice(0, 3).map(apt => ({
-          id: apt.id,
-          patient: `${apt.patient?.firstName} ${apt.patient?.lastName}`,
-          createdAt: apt.createdAt,
-          appointmentDate: apt.appointmentDate
-        })));
+        console.log(
+          "First 3 appointments:",
+          data.slice(0, 3).map((apt) => ({
+            id: apt.id,
+            patient: `${apt.patient?.firstName} ${apt.patient?.lastName}`,
+            createdAt: apt.createdAt,
+            appointmentDate: apt.appointmentDate,
+          })),
+        );
       }
-    }
+    },
   });
 
   const { data: todayAppointments, isLoading: todayLoading } = useQuery({
@@ -106,20 +148,24 @@ export default function Appointments() {
       case "scheduled":
         return <Badge variant="secondary">Scheduled</Badge>;
       case "completed":
-        return <Badge className="bg-success-100 text-success-500">Completed</Badge>;
+        return (
+          <Badge className="bg-success-100 text-success-500">Completed</Badge>
+        );
       case "cancelled":
         return <Badge className="bg-error-100 text-error-500">Cancelled</Badge>;
       case "no-show":
-        return <Badge className="bg-warning-100 text-warning-500">No Show</Badge>;
+        return (
+          <Badge className="bg-warning-100 text-warning-500">No Show</Badge>
+        );
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
   };
 
   const getInitials = (firstName: string, lastName: string) => {
-    const first = firstName?.charAt(0) || '';
-    const last = lastName?.charAt(0) || '';
-    return `${first}${last}`.toUpperCase() || '?';
+    const first = firstName?.charAt(0) || "";
+    const last = lastName?.charAt(0) || "";
+    return `${first}${last}`.toUpperCase() || "?";
   };
 
   const formatDateTime = (date: string | Date) => {
@@ -141,15 +187,19 @@ export default function Appointments() {
         <div className="flex items-center">
           <Avatar className="h-8 w-8">
             <AvatarFallback className="bg-primary-100 text-primary-600 text-xs">
-              {getInitials(row.patient?.firstName || '', row.patient?.lastName || '')}
+              {getInitials(
+                row.patient?.firstName || "",
+                row.patient?.lastName || "",
+              )}
             </AvatarFallback>
           </Avatar>
           <div className="ml-3">
             <div className="text-sm font-medium text-gray-900">
-              {row.patient?.firstName || 'Unknown'} {row.patient?.lastName || 'Patient'}
+              {row.patient?.firstName || "Unknown"}{" "}
+              {row.patient?.lastName || "Patient"}
             </div>
             <div className="text-xs text-gray-500">
-              #P-{row.patient?.id?.toString().padStart(4, '0') || '0000'}
+              #P-{row.patient?.id?.toString().padStart(4, "0") || "0000"}
             </div>
           </div>
         </div>
@@ -160,7 +210,8 @@ export default function Appointments() {
       label: "Therapist",
       render: (_, row: AppointmentWithDetails) => (
         <div className="text-sm text-gray-900">
-          {row.therapist?.firstName || 'Unknown'} {row.therapist?.lastName || 'Therapist'}
+          {row.therapist?.firstName || "Unknown"}{" "}
+          {row.therapist?.lastName || "Therapist"}
         </div>
       ),
     },
@@ -168,9 +219,7 @@ export default function Appointments() {
       key: "appointmentDate",
       label: "Date & Time",
       render: (value: string) => (
-        <div className="text-sm text-gray-900">
-          {formatDateTime(value)}
-        </div>
+        <div className="text-sm text-gray-900">{formatDateTime(value)}</div>
       ),
     },
     {
@@ -186,9 +235,7 @@ export default function Appointments() {
       key: "duration",
       label: "Duration",
       render: (value: number) => (
-        <div className="text-sm text-gray-900">
-          {value} min
-        </div>
+        <div className="text-sm text-gray-900">{value} min</div>
       ),
     },
     {
@@ -203,8 +250,8 @@ export default function Appointments() {
         <div className="flex items-center space-x-1">
           {/* View Details */}
           <Link to={`/appointments/${row.id}`}>
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               size="sm"
               className="h-8 w-8 p-0 hover:bg-blue-50 hover:text-blue-600"
               title="View Details"
@@ -212,11 +259,11 @@ export default function Appointments() {
               <Eye className="h-4 w-4" />
             </Button>
           </Link>
-          
+
           {/* Edit Appointment */}
           <Link to={`/appointments/${row.id}/edit`}>
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               size="sm"
               className="h-8 w-8 p-0 hover:bg-green-50 hover:text-green-600"
               title="Edit Appointment"
@@ -224,13 +271,25 @@ export default function Appointments() {
               <Edit className="h-4 w-4" />
             </Button>
           </Link>
-          
+
+          {/* Add Treatment Record Button */}
+          <Link to={`/records/new?patientId=${row.patient?.id}&appointmentId=${row.id}`}>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0 hover:bg-emerald-50 hover:text-emerald-600"
+              title="Add Treatment Record"
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          </Link>
+
           {/* Status-based actions */}
           {row.status === "scheduled" && (
             <>
               {/* Complete Appointment */}
-              <Button 
-                variant="ghost" 
+              <Button
+                variant="ghost"
                 size="sm"
                 className="h-8 w-8 p-0 hover:bg-emerald-50 hover:text-emerald-600"
                 title="Mark as Completed"
@@ -243,10 +302,10 @@ export default function Appointments() {
                   <CheckCircle className="h-4 w-4" />
                 )}
               </Button>
-              
+
               {/* Cancel Appointment */}
-              <Button 
-                variant="ghost" 
+              <Button
+                variant="ghost"
                 size="sm"
                 className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600"
                 title="Cancel Appointment"
@@ -261,10 +320,10 @@ export default function Appointments() {
               </Button>
             </>
           )}
-          
+
           {row.status === "completed" && (
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               size="sm"
               className="h-8 w-8 p-0 hover:bg-blue-50 hover:text-blue-600"
               title="View Treatment Record"
@@ -273,10 +332,10 @@ export default function Appointments() {
               <FileText className="h-4 w-4" />
             </Button>
           )}
-          
+
           {/* Delete Appointment - Standalone button for better visibility */}
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             size="sm"
             className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600"
             title="Delete Appointment"
@@ -289,12 +348,12 @@ export default function Appointments() {
               <Trash2 className="h-4 w-4" />
             )}
           </Button>
-          
+
           {/* Quick Actions Menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button 
-                variant="ghost" 
+              <Button
+                variant="ghost"
                 size="sm"
                 className="h-8 w-8 p-0 hover:bg-gray-50"
                 title="More Actions"
@@ -312,12 +371,14 @@ export default function Appointments() {
                 <Clock className="mr-2 h-4 w-4" />
                 Reschedule
               </DropdownMenuItem>
-              <DropdownMenuItem 
+              <DropdownMenuItem
                 onClick={() => handleSendReminder(row.id)}
                 disabled={sendReminderMutation.isPending}
               >
                 <Bell className="mr-2 h-4 w-4" />
-                {sendReminderMutation.isPending ? "Sending..." : "Send Reminder"}
+                {sendReminderMutation.isPending
+                  ? "Sending..."
+                  : "Send Reminder"}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -359,17 +420,23 @@ export default function Appointments() {
 
   // Action handlers
   const updateStatusMutation = useMutation({
-    mutationFn: async ({ appointmentId, newStatus }: { appointmentId: string; newStatus: string }) => {
+    mutationFn: async ({
+      appointmentId,
+      newStatus,
+    }: {
+      appointmentId: string;
+      newStatus: string;
+    }) => {
       const response = await fetch(`/api/appointments/${appointmentId}`, {
-        method: 'PATCH',
+        method: "PATCH",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({ status: newStatus }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update appointment status');
+        throw new Error("Failed to update appointment status");
       }
 
       return response.json();
@@ -379,17 +446,17 @@ export default function Appointments() {
         title: "Success",
         description: `Appointment ${newStatus} successfully`,
       });
-      queryClient.invalidateQueries({ 
+      queryClient.invalidateQueries({
         queryKey: ["/api/appointments"],
-        exact: false 
+        exact: false,
       });
-      queryClient.invalidateQueries({ 
+      queryClient.invalidateQueries({
         queryKey: ["/api/dashboard/today-appointments"],
-        exact: false 
+        exact: false,
       });
     },
     onError: (error) => {
-      console.error('Error updating appointment status:', error);
+      console.error("Error updating appointment status:", error);
       toast({
         title: "Error",
         description: "Failed to update appointment status",
@@ -401,36 +468,45 @@ export default function Appointments() {
   const deleteMutation = useMutation({
     mutationFn: async (appointmentId: string) => {
       const response = await fetch(`/api/appointments/${appointmentId}`, {
-        method: 'DELETE',
+        method: "DELETE",
       });
 
       if (!response.ok) {
-        throw new Error('Failed to delete appointment');
+        throw new Error("Failed to delete appointment");
       }
 
       return response.json();
     },
     onMutate: async (appointmentId) => {
       // Cancel any outgoing refetches
-      await queryClient.cancelQueries({ 
+      await queryClient.cancelQueries({
         queryKey: ["/api/appointments"],
-        exact: false 
+        exact: false,
       });
 
       // Snapshot the previous value
-      const previousAppointments = queryClient.getQueryData(["/api/appointments", { 
-        ...getDateRange(),
-        status: statusFilter || undefined
-      }]);
+      const previousAppointments = queryClient.getQueryData([
+        "/api/appointments",
+        {
+          ...getDateRange(),
+          status: statusFilter || undefined,
+        },
+      ]);
 
       // Optimistically update to remove the appointment
-      queryClient.setQueryData(["/api/appointments", { 
-        ...getDateRange(),
-        status: statusFilter || undefined
-      }], (old: any) => {
-        if (!old) return old;
-        return old.filter((apt: any) => apt.id !== appointmentId);
-      });
+      queryClient.setQueryData(
+        [
+          "/api/appointments",
+          {
+            ...getDateRange(),
+            status: statusFilter || undefined,
+          },
+        ],
+        (old: any) => {
+          if (!old) return old;
+          return old.filter((apt: any) => apt.id !== appointmentId);
+        },
+      );
 
       // Return a context object with the snapshotted value
       return { previousAppointments };
@@ -438,12 +514,18 @@ export default function Appointments() {
     onError: (err, appointmentId, context) => {
       // If the mutation fails, use the context returned from onMutate to roll back
       if (context?.previousAppointments) {
-        queryClient.setQueryData(["/api/appointments", { 
-          ...getDateRange(),
-          status: statusFilter || undefined
-        }], context.previousAppointments);
+        queryClient.setQueryData(
+          [
+            "/api/appointments",
+            {
+              ...getDateRange(),
+              status: statusFilter || undefined,
+            },
+          ],
+          context.previousAppointments,
+        );
       }
-      console.error('Error deleting appointment:', err);
+      console.error("Error deleting appointment:", err);
       toast({
         title: "Error",
         description: "Failed to delete appointment",
@@ -456,28 +538,31 @@ export default function Appointments() {
         description: "Appointment deleted successfully",
       });
       // Invalidate all appointment-related queries
-      queryClient.invalidateQueries({ 
+      queryClient.invalidateQueries({
         queryKey: ["/api/appointments"],
-        exact: false 
+        exact: false,
       });
-      queryClient.invalidateQueries({ 
+      queryClient.invalidateQueries({
         queryKey: ["/api/dashboard/today-appointments"],
-        exact: false 
+        exact: false,
       });
     },
   });
 
   const sendReminderMutation = useMutation({
     mutationFn: async (appointmentId: string) => {
-      const response = await fetch(`/api/appointments/${appointmentId}/reminder`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      const response = await fetch(
+        `/api/appointments/${appointmentId}/reminder`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
         },
-      });
+      );
 
       if (!response.ok) {
-        throw new Error('Failed to send reminder');
+        throw new Error("Failed to send reminder");
       }
 
       return response.json();
@@ -489,7 +574,7 @@ export default function Appointments() {
       });
     },
     onError: (error) => {
-      console.error('Error sending reminder:', error);
+      console.error("Error sending reminder:", error);
       toast({
         title: "Error",
         description: "Failed to send reminder",
@@ -517,7 +602,11 @@ export default function Appointments() {
   };
 
   const handleDelete = (appointmentId: string) => {
-    if (!confirm('Are you sure you want to delete this appointment? This action cannot be undone.')) {
+    if (
+      !confirm(
+        "Are you sure you want to delete this appointment? This action cannot be undone.",
+      )
+    ) {
       return;
     }
     deleteMutation.mutate(appointmentId);
@@ -537,26 +626,28 @@ export default function Appointments() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
-      
+
       <div className="flex">
         <Sidebar />
-        
+
         <main className="flex-1 overflow-y-auto">
           <div className="p-6">
             {/* Page Header */}
             <div className="mb-8">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 mb-2">
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => setLocation("/")}
                     className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
                   >
                     <ArrowLeft className="h-4 w-4" />
                   </Button>
                   <div>
-                    <h1 className="text-2xl font-semibold text-gray-900">Appointments</h1>
+                    <h1 className="text-2xl font-semibold text-gray-900">
+                      Appointments
+                    </h1>
                     <p className="text-gray-600 mt-1">
                       Manage patient appointments and scheduling.
                     </p>
@@ -575,7 +666,9 @@ export default function Appointments() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Today's Appointments</CardTitle>
+                  <CardTitle className="text-sm font-medium">
+                    Today's Appointments
+                  </CardTitle>
                   <Calendar className="h-4 w-4 text-gray-600" />
                 </CardHeader>
                 <CardContent>
@@ -583,38 +676,45 @@ export default function Appointments() {
                     {todayLoading ? "..." : todayAppointments?.length || 0}
                   </div>
                   <p className="text-xs text-gray-600">
-                    {todayLoading ? "Loading..." : `${todayAppointments?.filter((apt: AppointmentWithDetails) => apt.status === "completed").length || 0} completed`}
+                    {todayLoading
+                      ? "Loading..."
+                      : `${todayAppointments?.filter((apt: AppointmentWithDetails) => apt.status === "completed").length || 0} completed`}
                   </p>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Upcoming</CardTitle>
+                  <CardTitle className="text-sm font-medium">
+                    Upcoming
+                  </CardTitle>
                   <Clock className="h-4 w-4 text-gray-600" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    {todayLoading ? "..." : todayAppointments?.filter((apt: AppointmentWithDetails) => apt.status === "scheduled").length || 0}
+                    {todayLoading
+                      ? "..."
+                      : todayAppointments?.filter(
+                          (apt: AppointmentWithDetails) =>
+                            apt.status === "scheduled",
+                        ).length || 0}
                   </div>
-                  <p className="text-xs text-gray-600">
-                    Scheduled for today
-                  </p>
+                  <p className="text-xs text-gray-600">Scheduled for today</p>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">This Week</CardTitle>
+                  <CardTitle className="text-sm font-medium">
+                    This Week
+                  </CardTitle>
                   <Calendar className="h-4 w-4 text-gray-600" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
                     {isLoading ? "..." : appointments?.length || 0}
                   </div>
-                  <p className="text-xs text-gray-600">
-                    Total appointments
-                  </p>
+                  <p className="text-xs text-gray-600">Total appointments</p>
                 </CardContent>
               </Card>
             </div>

@@ -10,14 +10,11 @@ import { z } from "zod";
 import { relations } from "drizzle-orm";
 
 // Session storage table (required for Replit Auth)
-export const sessions = sqliteTable(
-  "sessions",
-  {
-    sid: text("sid").primaryKey(),
-    sess: blob("sess").notNull(),
-    expire: integer("expire", { mode: 'timestamp' }).notNull(),
-  },
-);
+export const sessions = sqliteTable("sessions", {
+  sid: text("sid").primaryKey(),
+  sess: blob("sess").notNull(),
+  expire: integer("expire", { mode: "timestamp" }).notNull(),
+});
 
 // User storage table (required for Replit Auth)
 export const users = sqliteTable("users", {
@@ -28,9 +25,11 @@ export const users = sqliteTable("users", {
   profileImageUrl: text("profile_image_url"),
   role: text("role").notNull().default("staff"), // admin, therapist, staff, frontdesk
   password: text("password"), // For password management
-  forcePasswordChange: integer("force_password_change", { mode: 'boolean' }).default(false), // Force password change on next login
-  createdAt: integer("created_at", { mode: 'timestamp' }).defaultNow(),
-  updatedAt: integer("updated_at", { mode: 'timestamp' }).defaultNow(),
+  forcePasswordChange: integer("force_password_change", {
+    mode: "boolean",
+  }).default(false), // Force password change on next login
+  createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 });
 
 // Patients table
@@ -38,7 +37,7 @@ export const patients = sqliteTable("patients", {
   id: text("id").primaryKey().notNull(),
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
-  dateOfBirth: integer("date_of_birth", { mode: 'timestamp' }).notNull(),
+  dateOfBirth: integer("date_of_birth", { mode: "timestamp" }).notNull(),
   gender: text("gender"),
   email: text("email"),
   phone: text("phone"),
@@ -47,10 +46,12 @@ export const patients = sqliteTable("patients", {
   insurance: text("insurance"),
   reasonForVisit: text("reason_for_visit"),
   status: text("status").notNull().default("active"), // active, inactive, discharged
-  hipaaConsent: integer("hipaa_consent", { mode: 'boolean' }).notNull().default(false),
+  hipaaConsent: integer("hipaa_consent", { mode: "boolean" })
+    .notNull()
+    .default(false),
   assignedTherapistId: text("assigned_therapist_id"),
-  createdAt: integer("created_at", { mode: 'timestamp' }).defaultNow(),
-  updatedAt: integer("updated_at", { mode: 'timestamp' }).defaultNow(),
+  createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 });
 
 // Appointments table
@@ -58,13 +59,13 @@ export const appointments = sqliteTable("appointments", {
   id: text("id").primaryKey().notNull(),
   patientId: text("patient_id").notNull(),
   therapistId: text("therapist_id").notNull(),
-  appointmentDate: integer("appointment_date", { mode: 'timestamp' }).notNull(),
+  appointmentDate: integer("appointment_date", { mode: "timestamp" }).notNull(),
   duration: integer("duration").notNull().default(60), // minutes
   type: text("type").notNull(), // therapy, consultation, group, intake
   status: text("status").notNull().default("scheduled"), // scheduled, completed, cancelled, no-show
   notes: text("notes"),
-  createdAt: integer("created_at", { mode: 'timestamp' }).defaultNow(),
-  updatedAt: integer("updated_at", { mode: 'timestamp' }).defaultNow(),
+  createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 });
 
 // Treatment records table
@@ -73,15 +74,15 @@ export const treatmentRecords = sqliteTable("treatment_records", {
   patientId: text("patient_id").notNull(),
   therapistId: text("therapist_id").notNull(),
   appointmentId: text("appointment_id"),
-  sessionDate: integer("session_date", { mode: 'timestamp' }).notNull(),
+  sessionDate: integer("session_date", { mode: "timestamp" }).notNull(),
   sessionType: text("session_type").notNull(),
   notes: text("notes").notNull(),
   goals: text("goals"),
   interventions: text("interventions"),
   progress: text("progress"),
   planForNextSession: text("plan_for_next_session"),
-  createdAt: integer("created_at", { mode: 'timestamp' }).defaultNow(),
-  updatedAt: integer("updated_at", { mode: 'timestamp' }).defaultNow(),
+  createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 });
 
 // Audit logs table for HIPAA compliance
@@ -92,7 +93,7 @@ export const auditLogs = sqliteTable("audit_logs", {
   resourceType: text("resource_type").notNull(), // patient, appointment, record
   resourceId: text("resource_id").notNull(),
   details: text("details"), // JSON as text for SQLite
-  timestamp: integer("timestamp", { mode: 'timestamp' }).defaultNow(),
+  timestamp: integer("timestamp", { mode: "timestamp" }).defaultNow(),
 });
 
 // Define relations
@@ -112,32 +113,38 @@ export const patientsRelations = relations(patients, ({ one, many }) => ({
   treatmentRecords: many(treatmentRecords),
 }));
 
-export const appointmentsRelations = relations(appointments, ({ one, many }) => ({
-  patient: one(patients, {
-    fields: [appointments.patientId],
-    references: [patients.id],
+export const appointmentsRelations = relations(
+  appointments,
+  ({ one, many }) => ({
+    patient: one(patients, {
+      fields: [appointments.patientId],
+      references: [patients.id],
+    }),
+    therapist: one(users, {
+      fields: [appointments.therapistId],
+      references: [users.id],
+    }),
+    treatmentRecords: many(treatmentRecords),
   }),
-  therapist: one(users, {
-    fields: [appointments.therapistId],
-    references: [users.id],
-  }),
-  treatmentRecords: many(treatmentRecords),
-}));
+);
 
-export const treatmentRecordsRelations = relations(treatmentRecords, ({ one }) => ({
-  patient: one(patients, {
-    fields: [treatmentRecords.patientId],
-    references: [patients.id],
+export const treatmentRecordsRelations = relations(
+  treatmentRecords,
+  ({ one }) => ({
+    patient: one(patients, {
+      fields: [treatmentRecords.patientId],
+      references: [patients.id],
+    }),
+    therapist: one(users, {
+      fields: [treatmentRecords.therapistId],
+      references: [users.id],
+    }),
+    appointment: one(appointments, {
+      fields: [treatmentRecords.appointmentId],
+      references: [appointments.id],
+    }),
   }),
-  therapist: one(users, {
-    fields: [treatmentRecords.therapistId],
-    references: [users.id],
-  }),
-  appointment: one(appointments, {
-    fields: [treatmentRecords.appointmentId],
-    references: [appointments.id],
-  }),
-}));
+);
 
 export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
   user: one(users, {
@@ -157,9 +164,9 @@ export const insertPatientSchema = z.object({
   firstName: z.string(),
   lastName: z.string(),
   dateOfBirth: z.union([z.date(), z.number(), z.string()]).transform((val) => {
-    if (typeof val === 'string') {
+    if (typeof val === "string") {
       return new Date(val);
-    } else if (typeof val === 'number') {
+    } else if (typeof val === "number") {
       return new Date(val);
     }
     return val;
@@ -182,7 +189,9 @@ export const insertAppointmentSchema = createInsertSchema(appointments).omit({
   updatedAt: true,
 });
 
-export const insertTreatmentRecordSchema = createInsertSchema(treatmentRecords).omit({
+export const insertTreatmentRecordSchema = createInsertSchema(
+  treatmentRecords,
+).omit({
   id: true,
   createdAt: true,
   updatedAt: true,

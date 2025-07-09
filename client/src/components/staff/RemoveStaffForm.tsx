@@ -3,7 +3,13 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Trash2, AlertTriangle, Loader2, X } from "lucide-react";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import type { User } from "@shared/schema";
@@ -13,7 +19,10 @@ interface RemoveStaffFormProps {
   onSuccess?: () => void;
 }
 
-export function RemoveStaffForm({ staffMember, onSuccess }: RemoveStaffFormProps) {
+export function RemoveStaffForm({
+  staffMember,
+  onSuccess,
+}: RemoveStaffFormProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
@@ -40,13 +49,13 @@ export function RemoveStaffForm({ staffMember, onSuccess }: RemoveStaffFormProps
         title: "Staff Member Removed",
         description: `${staffMember.firstName} ${staffMember.lastName} has been removed from the team.`,
       });
-      
+
       // Close dialog
       setIsOpen(false);
-      
+
       // Refresh staff list
       queryClient.invalidateQueries({ queryKey: ["/api/staff"] });
-      
+
       // Call success callback
       onSuccess?.();
     },
@@ -65,7 +74,8 @@ export function RemoveStaffForm({ staffMember, onSuccess }: RemoveStaffFormProps
 
       toast({
         title: "Remove Failed",
-        description: error.message || "Failed to remove staff member. Please try again.",
+        description:
+          error.message || "Failed to remove staff member. Please try again.",
         variant: "destructive",
       });
     },
@@ -78,7 +88,12 @@ export function RemoveStaffForm({ staffMember, onSuccess }: RemoveStaffFormProps
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="flex-1 text-red-600 hover:text-red-700 hover:bg-red-50">
+        <Button
+          variant="outline"
+          size="sm"
+          className="flex-1 text-red-600 hover:text-red-700 hover:bg-red-50"
+          onClick={(e) => e.stopPropagation()}
+        >
           <Trash2 className="h-4 w-4 mr-2" />
           Remove
         </Button>
@@ -90,7 +105,7 @@ export function RemoveStaffForm({ staffMember, onSuccess }: RemoveStaffFormProps
             Remove Staff Member
           </DialogTitle>
         </DialogHeader>
-        
+
         <div className="space-y-6">
           {/* Warning Card */}
           <Card className="border-red-200 bg-red-50">
@@ -99,8 +114,11 @@ export function RemoveStaffForm({ staffMember, onSuccess }: RemoveStaffFormProps
             </CardHeader>
             <CardContent className="pt-0">
               <p className="text-red-700">
-                You are about to remove <strong>{staffMember.firstName} {staffMember.lastName}</strong> from the team. 
-                This action cannot be undone.
+                You are about to remove{" "}
+                <strong>
+                  {staffMember.firstName} {staffMember.lastName}
+                </strong>{" "}
+                from the team. This action cannot be undone.
               </p>
             </CardContent>
           </Card>
@@ -113,7 +131,9 @@ export function RemoveStaffForm({ staffMember, onSuccess }: RemoveStaffFormProps
             <CardContent className="pt-0 space-y-3">
               <div className="flex justify-between">
                 <span className="text-gray-600">Name:</span>
-                <span className="font-medium">{staffMember.firstName} {staffMember.lastName}</span>
+                <span className="font-medium">
+                  {staffMember.firstName} {staffMember.lastName}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Email:</span>
@@ -121,7 +141,9 @@ export function RemoveStaffForm({ staffMember, onSuccess }: RemoveStaffFormProps
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Role:</span>
-                <span className="font-medium capitalize">{staffMember.role}</span>
+                <span className="font-medium capitalize">
+                  {staffMember.role}
+                </span>
               </div>
               {staffMember.createdAt && (
                 <div className="flex justify-between">
@@ -137,13 +159,17 @@ export function RemoveStaffForm({ staffMember, onSuccess }: RemoveStaffFormProps
           {/* Impact Information */}
           <Card className="border-amber-200 bg-amber-50">
             <CardHeader className="pb-3">
-              <CardTitle className="text-amber-800 text-base">What happens next?</CardTitle>
+              <CardTitle className="text-amber-800 text-base">
+                What happens next?
+              </CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
               <ul className="text-amber-700 space-y-1 text-sm">
                 <li>• The staff member will lose access to the system</li>
                 <li>• Their account will be deactivated</li>
-                <li>• All associated data will be preserved for audit purposes</li>
+                <li>
+                  • All associated data will be preserved for audit purposes
+                </li>
                 <li>• They can be re-invited if needed in the future</li>
               </ul>
             </CardContent>
@@ -184,4 +210,4 @@ export function RemoveStaffForm({ staffMember, onSuccess }: RemoveStaffFormProps
       </DialogContent>
     </Dialog>
   );
-} 
+}

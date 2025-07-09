@@ -1,7 +1,9 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import { connectToMongo } from './mongo';
+import { connectToMongo } from "./mongo";
+import mongoose from "mongoose";
+import { storage } from "./storage";
 
 const app = express();
 app.use(express.json());
@@ -38,6 +40,10 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Connect to MongoDB before starting the server
+  await connectToMongo();
+  storage.setDatabase(mongoose.connection.db);
+
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -57,15 +63,15 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
-  // Connect to MongoDB before starting the server
-  connectToMongo();
-
   // Serve the app on port 3000 for local development
   const port = process.env.PORT || 3000;
-  server.listen({
-    port,
-    host: "0.0.0.0",
-  }, () => {
-    log(`serving on port ${port}`);
-  });
+  server.listen(
+    {
+      port,
+      host: "0.0.0.0",
+    },
+    () => {
+      log(`serving on port ${port}`);
+    },
+  );
 })();

@@ -4,21 +4,25 @@ import { useToast } from "./use-toast";
 export function useAuth() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  
+
   // Simple authentication check without network requests
   const isAuthenticated = localStorage.getItem("isLoggedIn") === "true";
-  const user = isAuthenticated ? JSON.parse(localStorage.getItem("user") || "null") : null;
-  const forcePasswordChange = localStorage.getItem("forcePasswordChange") === "true";
-  
+  const user = isAuthenticated
+    ? JSON.parse(localStorage.getItem("user") || "null")
+    : null;
+  const forcePasswordChange =
+    localStorage.getItem("forcePasswordChange") === "true";
+
   const logoutMutation = useMutation({
     mutationFn: async () => {
       // Make logout request to clear server session
       try {
-        await fetch("/api/logout", {
+        await fetch("/api/auth/logout", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
+          credentials: "include", // Include cookies
         });
       } catch (error) {
         // Ignore errors, just clear local state
@@ -29,7 +33,7 @@ export function useAuth() {
       // Clear local storage
       localStorage.removeItem("isLoggedIn");
       localStorage.removeItem("user");
-      
+
       // Clear any cached data
       queryClient.clear();
       toast({

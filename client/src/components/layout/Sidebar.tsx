@@ -1,17 +1,17 @@
 import { Link, useLocation } from "wouter";
 import { Badge } from "@/components/ui/badge";
-import { 
-  LayoutDashboard, 
-  Users, 
-  Calendar, 
-  FileText, 
-  DollarSign, 
-  BarChart3, 
-  TrendingUp, 
-  Shield, 
-  UserCog, 
+import {
+  LayoutDashboard,
+  Users,
+  Calendar,
+  FileText,
+  DollarSign,
+  BarChart3,
+  TrendingUp,
+  Shield,
+  UserCog,
   Settings,
-  AlertCircle
+  AlertCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -21,7 +21,10 @@ interface SidebarProps {
   todayAppointments?: number;
 }
 
-export function Sidebar({ patientCount = 0, todayAppointments = 0 }: SidebarProps) {
+export function Sidebar({
+  patientCount = 0,
+  todayAppointments = 0,
+}: SidebarProps) {
   const [location] = useLocation();
   const { user } = useAuth();
 
@@ -50,7 +53,8 @@ export function Sidebar({ patientCount = 0, todayAppointments = 0 }: SidebarProp
           href: "/appointments",
           icon: Calendar,
           current: location.startsWith("/appointments"),
-          badge: todayAppointments > 0 ? todayAppointments.toString() : undefined,
+          badge:
+            todayAppointments > 0 ? todayAppointments.toString() : undefined,
           badgeVariant: "destructive" as const,
         },
         // Show Inquiries for frontdesk users
@@ -150,56 +154,60 @@ export function Sidebar({ patientCount = 0, todayAppointments = 0 }: SidebarProp
                           "hover:shadow-sm hover:scale-[1.02]",
                           item.current
                             ? [
-                                "text-white bg-gradient-to-r from-blue-600 to-blue-700",
-                                "shadow-lg shadow-blue-500/25",
+                                "text-white bg-[#36d399]",
+                                "shadow-lg shadow-green-200/40",
                                 "border-l-4 border-l-white/30",
                                 "transform scale-[1.02]",
-                                "z-10 relative"
+                                "z-10 relative",
                               ].join(" ")
                             : [
                                 "text-gray-700 hover:text-gray-900",
                                 "hover:bg-gradient-to-r hover:from-gray-50 hover:to-gray-100",
-                                "hover:border-l-4 hover:border-l-gray-300"
-                              ].join(" ")
+                                "hover:border-l-4 hover:border-l-gray-300",
+                              ].join(" "),
                         )}
                       >
                         {/* Active indicator line */}
                         {item.current && (
                           <div className="absolute left-0 top-0 bottom-0 w-1 bg-white/50 rounded-r-full" />
                         )}
-                        
-                        <Icon className={cn(
-                          "w-5 h-5 mr-3 transition-transform duration-200",
-                          item.current 
-                            ? "text-white/90 transform scale-110" 
-                            : "text-gray-500 group-hover:text-gray-700 group-hover:scale-110"
-                        )} />
-                        
-                        <span className={cn(
-                          "transition-all duration-200",
-                          item.current 
-                            ? "text-white font-semibold tracking-wide" 
-                            : "group-hover:font-medium"
-                        )}>
+
+                        <Icon
+                          className={cn(
+                            "w-5 h-5 mr-3 transition-transform duration-200",
+                            item.current
+                              ? "text-white/90 transform scale-110"
+                              : "text-gray-500 group-hover:text-gray-700 group-hover:scale-110",
+                          )}
+                        />
+
+                        <span
+                          className={cn(
+                            "transition-all duration-200",
+                            item.current
+                              ? "text-white font-semibold tracking-wide"
+                              : "group-hover:font-medium",
+                          )}
+                        >
                           {item.name}
                         </span>
-                        
+
                         {item.badge && (
-                          <Badge 
-                            variant={item.badgeVariant || "secondary"} 
+                          <Badge
+                            variant={item.badgeVariant || "secondary"}
                             className={cn(
                               "ml-auto transition-all duration-200",
-                              item.current 
-                                ? "bg-white/20 text-white border-white/30" 
+                              item.current
+                                ? "bg-white/20 text-white border-white/30"
                                 : item.badgeVariant === "destructive"
-                                ? "bg-orange-100 text-orange-800 border-orange-200"
-                                : "group-hover:scale-105"
+                                  ? "bg-orange-100 text-orange-800 border-orange-200"
+                                  : "group-hover:scale-105",
                             )}
                           >
                             {item.badge}
                           </Badge>
                         )}
-                        
+
                         {/* Hover effect overlay */}
                         {!item.current && (
                           <div className="absolute inset-0 bg-gradient-to-r from-transparent to-white/5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200" />

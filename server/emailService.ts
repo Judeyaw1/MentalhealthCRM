@@ -1,4 +1,4 @@
-import nodemailer from 'nodemailer';
+import nodemailer from "nodemailer";
 
 interface EmailConfig {
   host: string;
@@ -35,28 +35,28 @@ class EmailService {
   }
 
   private createTransporter(): nodemailer.Transporter {
-    const isDevelopment = process.env.NODE_ENV === 'development';
-    
+    const isDevelopment = process.env.NODE_ENV === "development";
+
     if (isDevelopment) {
       // Use Ethereal Email for development/testing
       return nodemailer.createTransport({
-        host: 'smtp.ethereal.email',
+        host: "smtp.ethereal.email",
         port: 587,
         secure: false,
         auth: {
-          user: process.env.ETHEREAL_USER || 'test@ethereal.email',
-          pass: process.env.ETHEREAL_PASS || 'test123',
+          user: process.env.ETHEREAL_USER || "test@ethereal.email",
+          pass: process.env.ETHEREAL_PASS || "test123",
         },
       });
     } else {
       // Production SMTP configuration
       const config: EmailConfig = {
-        host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-        port: parseInt(process.env.EMAIL_PORT || '587'),
+        host: process.env.EMAIL_HOST || "smtp.gmail.com",
+        port: parseInt(process.env.EMAIL_PORT || "587"),
         secure: false,
         auth: {
-          user: process.env.EMAIL_USER || '',
-          pass: process.env.EMAIL_PASS || '',
+          user: process.env.EMAIL_USER || "",
+          pass: process.env.EMAIL_PASS || "",
         },
       };
 
@@ -67,15 +67,18 @@ class EmailService {
   async sendStaffInvitation(data: InvitationEmailData): Promise<boolean> {
     try {
       const roleDisplayNames = {
-        admin: 'Administrator',
-        therapist: 'Therapist',
-        staff: 'Staff Member',
+        admin: "Administrator",
+        therapist: "Therapist",
+        staff: "Staff Member",
       };
 
       const roleDescription = {
-        admin: 'Full system access including user management, patient records, and administrative functions.',
-        therapist: 'Access to patient records, treatment plans, and appointment scheduling.',
-        staff: 'Basic access to patient information and appointment management.',
+        admin:
+          "Full system access including user management, patient records, and administrative functions.",
+        therapist:
+          "Access to patient records, treatment plans, and appointment scheduling.",
+        staff:
+          "Basic access to patient information and appointment management.",
       };
 
       const htmlContent = `
@@ -196,12 +199,16 @@ class EmailService {
                 <div class="role-description">${roleDescription[data.role as keyof typeof roleDescription]}</div>
               </div>
               
-              ${data.message ? `
+              ${
+                data.message
+                  ? `
                 <div class="message">
                   <strong>Personal Message:</strong><br>
                   ${data.message}
                 </div>
-              ` : ''}
+              `
+                  : ""
+              }
               
               <p>To get started, please click the button below to access your account:</p>
               
@@ -234,7 +241,7 @@ You have been invited to join the NewLife Mental Health team as a ${roleDisplayN
 Your Role: ${roleDisplayNames[data.role as keyof typeof roleDisplayNames]}
 ${roleDescription[data.role as keyof typeof roleDescription]}
 
-${data.message ? `Personal Message: ${data.message}\n` : ''}
+${data.message ? `Personal Message: ${data.message}\n` : ""}
 To access your account, visit: ${data.inviteUrl}
 
 Security Note: This invitation is unique to you and should not be shared.
@@ -244,7 +251,9 @@ The NewLife Mental Health Team
       `;
 
       const mailOptions = {
-        from: process.env.FROM_EMAIL || '"NewLife Mental Health" <noreply@newlife.com>',
+        from:
+          process.env.FROM_EMAIL ||
+          '"NewLife Mental Health" <noreply@newlife.com>',
         to: data.to,
         subject: `Welcome to NewLife Mental Health - You're Invited!`,
         text: textContent,
@@ -252,15 +261,15 @@ The NewLife Mental Health Team
       };
 
       const info = await this.transporter.sendMail(mailOptions);
-      
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Development email sent to Ethereal:');
-        console.log('Preview URL:', nodemailer.getTestMessageUrl(info));
+
+      if (process.env.NODE_ENV === "development") {
+        console.log("Development email sent to Ethereal:");
+        console.log("Preview URL:", nodemailer.getTestMessageUrl(info));
       }
-      
+
       return true;
     } catch (error) {
-      console.error('Error sending invitation email:', error);
+      console.error("Error sending invitation email:", error);
       return false;
     }
   }
@@ -428,7 +437,9 @@ The NewLife Mental Health Team
       `;
 
       const mailOptions = {
-        from: process.env.FROM_EMAIL || '"NewLife Mental Health" <noreply@newlife.com>',
+        from:
+          process.env.FROM_EMAIL ||
+          '"NewLife Mental Health" <noreply@newlife.com>',
         to: data.to,
         subject: `Password Reset Request - NewLife Mental Health`,
         text: textContent,
@@ -436,15 +447,15 @@ The NewLife Mental Health Team
       };
 
       const info = await this.transporter.sendMail(mailOptions);
-      
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Development password reset email sent to Ethereal:');
-        console.log('Preview URL:', nodemailer.getTestMessageUrl(info));
+
+      if (process.env.NODE_ENV === "development") {
+        console.log("Development password reset email sent to Ethereal:");
+        console.log("Preview URL:", nodemailer.getTestMessageUrl(info));
       }
-      
+
       return true;
     } catch (error) {
-      console.error('Error sending password reset email:', error);
+      console.error("Error sending password reset email:", error);
       return false;
     }
   }
@@ -454,10 +465,10 @@ The NewLife Mental Health Team
       await this.transporter.verify();
       return true;
     } catch (error) {
-      console.error('Email service connection failed:', error);
+      console.error("Email service connection failed:", error);
       return false;
     }
   }
 }
 
-export const emailService = new EmailService(); 
+export const emailService = new EmailService();

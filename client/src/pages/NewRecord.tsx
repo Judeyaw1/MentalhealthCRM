@@ -25,7 +25,7 @@ type InsertTreatmentRecord = {
 };
 
 // Type for form submission with timestamp
-type TreatmentRecordFormData = Omit<InsertTreatmentRecord, 'sessionDate'> & {
+type TreatmentRecordFormData = Omit<InsertTreatmentRecord, "sessionDate"> & {
   sessionDate: number;
 };
 
@@ -37,7 +37,7 @@ export default function NewRecord() {
 
   // Get URL parameters for pre-filled patient
   const urlParams = new URLSearchParams(window.location.search);
-  const preselectedPatientId = urlParams.get('patientId');
+  const preselectedPatientId = urlParams.get("patientId");
 
   // Redirect to home if not authenticated
   useEffect(() => {
@@ -54,12 +54,17 @@ export default function NewRecord() {
     }
   }, [isAuthenticated, authLoading, toast]);
 
-  const { data: patients } = useQuery<{ patients: { id: number; firstName: string; lastName: string }[]; total: number }>({
+  const { data: patients } = useQuery<{
+    patients: { id: number; firstName: string; lastName: string }[];
+    total: number;
+  }>({
     queryKey: ["/api/patients", { limit: 1000 }],
     retry: false,
   });
 
-  const { data: therapists } = useQuery<{ id: string; firstName: string; lastName: string }[]>({
+  const { data: therapists } = useQuery<
+    { id: string; firstName: string; lastName: string }[]
+  >({
     queryKey: ["/api/therapists"],
     retry: false,
   });
@@ -72,14 +77,16 @@ export default function NewRecord() {
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/records"] });
       if (preselectedPatientId) {
-        queryClient.invalidateQueries({ queryKey: [`/api/patients/${preselectedPatientId}/records`] });
+        queryClient.invalidateQueries({
+          queryKey: [`/api/patients/${preselectedPatientId}/records`],
+        });
       }
-      
+
       toast({
         title: "Success",
         description: "Treatment record created successfully.",
       });
-      
+
       setLocation("/records");
     },
     onError: (error) => {
@@ -94,7 +101,7 @@ export default function NewRecord() {
         }, 500);
         return;
       }
-      
+
       toast({
         title: "Error",
         description: "Failed to create treatment record. Please try again.",
@@ -117,17 +124,17 @@ export default function NewRecord() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
-      
+
       <div className="flex">
         <Sidebar />
-        
+
         <main className="flex-1 overflow-y-auto">
           <div className="p-6">
             {/* Return Arrow */}
             <div className="mb-4">
-              <Button 
-                variant="ghost" 
-                size="sm" 
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => setLocation("/records")}
                 className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
               >
@@ -138,7 +145,9 @@ export default function NewRecord() {
 
             {/* Page Header */}
             <div className="mb-8">
-              <h1 className="text-2xl font-semibold text-gray-900">New Treatment Record</h1>
+              <h1 className="text-2xl font-semibold text-gray-900">
+                New Treatment Record
+              </h1>
               <p className="text-gray-600 mt-1">
                 Document patient session details and treatment progress.
               </p>

@@ -5,7 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, Phone, Mail, User, AlertCircle, Clock } from "lucide-react";
@@ -28,17 +34,22 @@ interface InquiryData {
   assignedTo?: string;
 }
 
-export function InquiryForm({ patientId, patientName, onSuccess, onCancel }: InquiryFormProps) {
+export function InquiryForm({
+  patientId,
+  patientName,
+  onSuccess,
+  onCancel,
+}: InquiryFormProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [formData, setFormData] = useState<InquiryData>({
-    inquiryType: 'general',
-    priority: 'medium',
-    notes: '',
-    contactMethod: 'phone',
-    contactInfo: '',
-    followUpDate: '',
-    assignedTo: ''
+    inquiryType: "general",
+    priority: "medium",
+    notes: "",
+    contactMethod: "phone",
+    contactInfo: "",
+    followUpDate: "",
+    assignedTo: "",
   });
 
   const createInquiryMutation = useMutation({
@@ -50,7 +61,9 @@ export function InquiryForm({ patientId, patientName, onSuccess, onCancel }: Inq
         title: "Inquiry Created",
         description: "Patient inquiry has been created successfully.",
       });
-      queryClient.invalidateQueries({ queryKey: [`/api/patients/${patientId}`] });
+      queryClient.invalidateQueries({
+        queryKey: [`/api/patients/${patientId}`],
+      });
       onSuccess?.();
     },
     onError: (error) => {
@@ -68,16 +81,21 @@ export function InquiryForm({ patientId, patientName, onSuccess, onCancel }: Inq
   };
 
   const handleInputChange = (field: keyof InquiryData, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'urgent': return 'bg-red-100 text-red-800';
-      case 'high': return 'bg-orange-100 text-orange-800';
-      case 'medium': return 'bg-yellow-100 text-yellow-800';
-      case 'low': return 'bg-green-100 text-green-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case "urgent":
+        return "bg-red-100 text-red-800";
+      case "high":
+        return "bg-orange-100 text-orange-800";
+      case "medium":
+        return "bg-yellow-100 text-yellow-800";
+      case "low":
+        return "bg-green-100 text-green-800";
+      default:
+        return "bg-gray-100 text-gray-800";
     }
   };
 
@@ -97,7 +115,12 @@ export function InquiryForm({ patientId, patientName, onSuccess, onCancel }: Inq
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="inquiryType">Inquiry Type</Label>
-              <Select value={formData.inquiryType} onValueChange={(value) => handleInputChange('inquiryType', value)}>
+              <Select
+                value={formData.inquiryType}
+                onValueChange={(value) =>
+                  handleInputChange("inquiryType", value)
+                }
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -110,10 +133,13 @@ export function InquiryForm({ patientId, patientName, onSuccess, onCancel }: Inq
                 </SelectContent>
               </Select>
             </div>
-            
+
             <div>
               <Label htmlFor="priority">Priority</Label>
-              <Select value={formData.priority} onValueChange={(value) => handleInputChange('priority', value)}>
+              <Select
+                value={formData.priority}
+                onValueChange={(value) => handleInputChange("priority", value)}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -130,7 +156,12 @@ export function InquiryForm({ patientId, patientName, onSuccess, onCancel }: Inq
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="contactMethod">Contact Method</Label>
-              <Select value={formData.contactMethod} onValueChange={(value) => handleInputChange('contactMethod', value)}>
+              <Select
+                value={formData.contactMethod}
+                onValueChange={(value) =>
+                  handleInputChange("contactMethod", value)
+                }
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -142,13 +173,15 @@ export function InquiryForm({ patientId, patientName, onSuccess, onCancel }: Inq
                 </SelectContent>
               </Select>
             </div>
-            
+
             <div>
               <Label htmlFor="contactInfo">Contact Information</Label>
               <Input
                 id="contactInfo"
                 value={formData.contactInfo}
-                onChange={(e) => handleInputChange('contactInfo', e.target.value)}
+                onChange={(e) =>
+                  handleInputChange("contactInfo", e.target.value)
+                }
                 placeholder="Phone, email, or other contact info"
               />
             </div>
@@ -160,7 +193,9 @@ export function InquiryForm({ patientId, patientName, onSuccess, onCancel }: Inq
               id="followUpDate"
               type="datetime-local"
               value={formData.followUpDate}
-              onChange={(e) => handleInputChange('followUpDate', e.target.value)}
+              onChange={(e) =>
+                handleInputChange("followUpDate", e.target.value)
+              }
             />
           </div>
 
@@ -169,7 +204,7 @@ export function InquiryForm({ patientId, patientName, onSuccess, onCancel }: Inq
             <Textarea
               id="notes"
               value={formData.notes}
-              onChange={(e) => handleInputChange('notes', e.target.value)}
+              onChange={(e) => handleInputChange("notes", e.target.value)}
               placeholder="Describe the inquiry details..."
               rows={4}
               required
@@ -179,22 +214,30 @@ export function InquiryForm({ patientId, patientName, onSuccess, onCancel }: Inq
           <div className="flex items-center justify-between pt-4">
             <div className="flex items-center gap-2">
               <Badge className={getPriorityColor(formData.priority)}>
-                {formData.priority.charAt(0).toUpperCase() + formData.priority.slice(1)} Priority
+                {formData.priority.charAt(0).toUpperCase() +
+                  formData.priority.slice(1)}{" "}
+                Priority
               </Badge>
               <Badge variant="outline">
-                {formData.inquiryType.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                {formData.inquiryType
+                  .replace("_", " ")
+                  .replace(/\b\w/g, (l) => l.toUpperCase())}
               </Badge>
             </div>
-            
+
             <div className="flex gap-2">
               <Button type="button" variant="outline" onClick={onCancel}>
                 Cancel
               </Button>
-              <Button 
-                type="submit" 
-                disabled={createInquiryMutation.isPending || !formData.notes.trim()}
+              <Button
+                type="submit"
+                disabled={
+                  createInquiryMutation.isPending || !formData.notes.trim()
+                }
               >
-                {createInquiryMutation.isPending ? "Creating..." : "Create Inquiry"}
+                {createInquiryMutation.isPending
+                  ? "Creating..."
+                  : "Create Inquiry"}
               </Button>
             </div>
           </div>
@@ -202,4 +245,4 @@ export function InquiryForm({ patientId, patientName, onSuccess, onCancel }: Inq
       </CardContent>
     </Card>
   );
-} 
+}

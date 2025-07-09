@@ -8,18 +8,24 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { 
-  Search, 
-  Filter, 
-  AlertCircle, 
-  Clock, 
-  Phone, 
-  Mail, 
-  User, 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Search,
+  Filter,
+  AlertCircle,
+  Clock,
+  Phone,
+  Mail,
+  User,
   Calendar,
   ArrowLeft,
-  Plus
+  Plus,
 } from "lucide-react";
 import { Link } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
@@ -74,26 +80,40 @@ export default function Inquiries() {
   }
 
   const { data: inquiries, isLoading } = useQuery<Inquiry[]>({
-    queryKey: ["/api/inquiries", { status: statusFilter, priority: priorityFilter }],
+    queryKey: [
+      "/api/inquiries",
+      { status: statusFilter, priority: priorityFilter },
+    ],
     retry: false,
   });
 
-  const filteredInquiries = inquiries?.filter(inquiry => {
-    const matchesSearch = searchQuery === "" || 
-      inquiry.patientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      inquiry.notes.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      inquiry.contactInfo.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesStatus = statusFilter === "" || inquiry.status === statusFilter;
-    const matchesPriority = priorityFilter === "" || inquiry.priority === priorityFilter;
-    
-    return matchesSearch && matchesStatus && matchesPriority;
-  }) || [];
+  const filteredInquiries =
+    inquiries?.filter((inquiry) => {
+      const matchesSearch =
+        searchQuery === "" ||
+        inquiry.patientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        inquiry.notes.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        inquiry.contactInfo.toLowerCase().includes(searchQuery.toLowerCase());
+
+      const matchesStatus =
+        statusFilter === "" || inquiry.status === statusFilter;
+      const matchesPriority =
+        priorityFilter === "" || inquiry.priority === priorityFilter;
+
+      return matchesSearch && matchesStatus && matchesPriority;
+    }) || [];
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "pending":
-        return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">Pending</Badge>;
+        return (
+          <Badge
+            variant="outline"
+            className="bg-yellow-50 text-yellow-700 border-yellow-200"
+          >
+            Pending
+          </Badge>
+        );
       case "in_progress":
         return <Badge className="bg-blue-100 text-blue-800">In Progress</Badge>;
       case "completed":
@@ -147,7 +167,7 @@ export default function Inquiries() {
   };
 
   const getInquiryTypeDisplay = (type: string) => {
-    return type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+    return type.replace("_", " ").replace(/\b\w/g, (l) => l.toUpperCase());
   };
 
   if (authLoading) {
@@ -164,25 +184,27 @@ export default function Inquiries() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
-      
+
       <div className="flex">
         <Sidebar />
-        
+
         <main className="flex-1 overflow-y-auto">
           <div className="p-6">
             {/* Page Header */}
             <div className="mb-8">
               <div className="flex items-center gap-2 mb-2">
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={() => window.location.href = "/"}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => (window.location.href = "/")}
                   className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
                 >
                   <ArrowLeft className="h-4 w-4" />
                 </Button>
                 <div>
-                  <h1 className="text-2xl font-semibold text-gray-900">Patient Inquiries</h1>
+                  <h1 className="text-2xl font-semibold text-gray-900">
+                    Patient Inquiries
+                  </h1>
                   <p className="text-gray-600 mt-1">
                     Manage and track patient inquiries and follow-ups.
                   </p>
@@ -194,7 +216,9 @@ export default function Inquiries() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Inquiries</CardTitle>
+                  <CardTitle className="text-sm font-medium">
+                    Total Inquiries
+                  </CardTitle>
                   <AlertCircle className="h-4 w-4 text-gray-600" />
                 </CardHeader>
                 <CardContent>
@@ -211,31 +235,44 @@ export default function Inquiries() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-yellow-600">
-                    {isLoading ? "..." : inquiries?.filter(i => i.status === 'pending').length || 0}
+                    {isLoading
+                      ? "..."
+                      : inquiries?.filter((i) => i.status === "pending")
+                          .length || 0}
                   </div>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">In Progress</CardTitle>
+                  <CardTitle className="text-sm font-medium">
+                    In Progress
+                  </CardTitle>
                   <AlertCircle className="h-4 w-4 text-blue-600" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-blue-600">
-                    {isLoading ? "..." : inquiries?.filter(i => i.status === 'in_progress').length || 0}
+                    {isLoading
+                      ? "..."
+                      : inquiries?.filter((i) => i.status === "in_progress")
+                          .length || 0}
                   </div>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Completed</CardTitle>
+                  <CardTitle className="text-sm font-medium">
+                    Completed
+                  </CardTitle>
                   <Calendar className="h-4 w-4 text-green-600" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-green-600">
-                    {isLoading ? "..." : inquiries?.filter(i => i.status === 'completed').length || 0}
+                    {isLoading
+                      ? "..."
+                      : inquiries?.filter((i) => i.status === "completed")
+                          .length || 0}
                   </div>
                 </CardContent>
               </Card>
@@ -255,7 +292,7 @@ export default function Inquiries() {
                     />
                   </div>
                 </div>
-                
+
                 <Button
                   variant="outline"
                   onClick={() => setShowFilters(!showFilters)}
@@ -269,8 +306,13 @@ export default function Inquiries() {
               {showFilters && (
                 <div className="mt-4 pt-4 border-t border-gray-200 grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="text-sm font-medium text-gray-700 mb-2 block">Status</label>
-                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <label className="text-sm font-medium text-gray-700 mb-2 block">
+                      Status
+                    </label>
+                    <Select
+                      value={statusFilter}
+                      onValueChange={setStatusFilter}
+                    >
                       <SelectTrigger>
                         <SelectValue placeholder="All statuses" />
                       </SelectTrigger>
@@ -283,10 +325,15 @@ export default function Inquiries() {
                       </SelectContent>
                     </Select>
                   </div>
-                  
+
                   <div>
-                    <label className="text-sm font-medium text-gray-700 mb-2 block">Priority</label>
-                    <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                    <label className="text-sm font-medium text-gray-700 mb-2 block">
+                      Priority
+                    </label>
+                    <Select
+                      value={priorityFilter}
+                      onValueChange={setPriorityFilter}
+                    >
                       <SelectTrigger>
                         <SelectValue placeholder="All priorities" />
                       </SelectTrigger>
@@ -313,12 +360,19 @@ export default function Inquiries() {
               ) : filteredInquiries.length === 0 ? (
                 <div className="text-center py-12">
                   <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No inquiries found</h3>
-                  <p className="text-gray-600">No inquiries match your current filters.</p>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    No inquiries found
+                  </h3>
+                  <p className="text-gray-600">
+                    No inquiries match your current filters.
+                  </p>
                 </div>
               ) : (
                 filteredInquiries.map((inquiry) => (
-                  <Card key={inquiry.id} className="hover:shadow-md transition-shadow">
+                  <Card
+                    key={inquiry.id}
+                    className="hover:shadow-md transition-shadow"
+                  >
                     <CardContent className="p-6">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
@@ -329,45 +383,56 @@ export default function Inquiries() {
                             {getStatusBadge(inquiry.status)}
                             {getPriorityBadge(inquiry.priority)}
                           </div>
-                          
+
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                             <div className="space-y-2">
                               <div className="flex items-center gap-2 text-sm text-gray-600">
                                 <AlertCircle className="h-4 w-4" />
                                 <span className="font-medium">Type:</span>
-                                <span>{getInquiryTypeDisplay(inquiry.inquiryType)}</span>
+                                <span>
+                                  {getInquiryTypeDisplay(inquiry.inquiryType)}
+                                </span>
                               </div>
-                              
+
                               <div className="flex items-center gap-2 text-sm text-gray-600">
                                 {getContactIcon(inquiry.contactMethod)}
                                 <span className="font-medium">Contact:</span>
                                 <span>{inquiry.contactInfo}</span>
                               </div>
-                              
+
                               {inquiry.assignedTo && (
                                 <div className="flex items-center gap-2 text-sm text-gray-600">
                                   <User className="h-4 w-4" />
-                                  <span className="font-medium">Assigned to:</span>
-                                  <span>{inquiry.assignedTo.firstName} {inquiry.assignedTo.lastName}</span>
+                                  <span className="font-medium">
+                                    Assigned to:
+                                  </span>
+                                  <span>
+                                    {inquiry.assignedTo.firstName}{" "}
+                                    {inquiry.assignedTo.lastName}
+                                  </span>
                                 </div>
                               )}
                             </div>
-                            
+
                             <div className="space-y-2">
                               <div className="flex items-center gap-2 text-sm text-gray-600">
                                 <Clock className="h-4 w-4" />
                                 <span className="font-medium">Created:</span>
                                 <span>{formatDate(inquiry.createdAt)}</span>
                               </div>
-                              
+
                               {inquiry.followUpDate && (
                                 <div className="flex items-center gap-2 text-sm text-gray-600">
                                   <Calendar className="h-4 w-4" />
-                                  <span className="font-medium">Follow-up:</span>
-                                  <span>{formatDate(inquiry.followUpDate)}</span>
+                                  <span className="font-medium">
+                                    Follow-up:
+                                  </span>
+                                  <span>
+                                    {formatDate(inquiry.followUpDate)}
+                                  </span>
                                 </div>
                               )}
-                              
+
                               {inquiry.resolvedAt && (
                                 <div className="flex items-center gap-2 text-sm text-gray-600">
                                   <Calendar className="h-4 w-4" />
@@ -377,12 +442,14 @@ export default function Inquiries() {
                               )}
                             </div>
                           </div>
-                          
+
                           <div className="bg-gray-50 rounded-lg p-3">
-                            <p className="text-sm text-gray-700">{inquiry.notes}</p>
+                            <p className="text-sm text-gray-700">
+                              {inquiry.notes}
+                            </p>
                           </div>
                         </div>
-                        
+
                         <div className="flex flex-col gap-2 ml-4">
                           <Link href={`/patients/${inquiry.patientId}`}>
                             <Button variant="outline" size="sm">
@@ -404,4 +471,4 @@ export default function Inquiries() {
       </div>
     </div>
   );
-} 
+}

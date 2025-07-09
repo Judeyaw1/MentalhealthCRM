@@ -1,122 +1,122 @@
-import mongoose from 'mongoose';
+import mongoose from "mongoose";
 
 // Inquiry schema for front desk tracking
 const inquirySchema = new mongoose.Schema({
   inquiryType: {
     type: String,
-    enum: ['new_patient', 'follow_up', 'referral', 'general', 'emergency'],
-    required: true
+    enum: ["new_patient", "follow_up", "referral", "general", "emergency"],
+    required: true,
   },
   status: {
     type: String,
-    enum: ['pending', 'in_progress', 'completed', 'cancelled'],
-    default: 'pending'
+    enum: ["pending", "in_progress", "completed", "cancelled"],
+    default: "pending",
   },
   priority: {
     type: String,
-    enum: ['low', 'medium', 'high', 'urgent'],
-    default: 'medium'
+    enum: ["low", "medium", "high", "urgent"],
+    default: "medium",
   },
   notes: {
     type: String,
-    required: true
+    required: true,
   },
   assignedTo: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
+    ref: "User",
   },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
+    ref: "User",
+    required: true,
   },
   createdAt: {
     type: Date,
-    default: Date.now
+    default: Date.now,
   },
   updatedAt: {
     type: Date,
-    default: Date.now
+    default: Date.now,
   },
   resolvedAt: Date,
   contactMethod: {
     type: String,
-    enum: ['phone', 'email', 'in_person', 'referral'],
-    required: true
+    enum: ["phone", "email", "in_person", "referral"],
+    required: true,
   },
   contactInfo: String,
-  followUpDate: Date
+  followUpDate: Date,
 });
 
 const patientSchema = new mongoose.Schema({
   firstName: {
     type: String,
-    required: true
+    required: true,
   },
   lastName: {
     type: String,
-    required: true
+    required: true,
   },
   dateOfBirth: {
     type: Date,
-    required: true
+    required: true,
   },
   gender: {
     type: String,
-    enum: ['male', 'female', 'other'],
-    required: true
+    enum: ["male", "female", "other"],
+    required: true,
   },
   email: {
     type: String,
-    required: true
+    required: true,
   },
   phone: {
-    type: String
+    type: String,
   },
   emergencyContact: {
-    type: String
+    type: String,
   },
   address: {
-    type: String
+    type: String,
   },
   insurance: {
-    type: String
+    type: String,
   },
   reasonForVisit: {
-    type: String
+    type: String,
   },
   status: {
     type: String,
-    enum: ['active', 'inactive', 'discharged'],
-    default: 'active'
+    enum: ["active", "inactive", "discharged"],
+    default: "active",
   },
   hipaaConsent: {
     type: Boolean,
-    default: false
+    default: false,
   },
   assignedTherapistId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
+    ref: "User",
   },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: false
+    ref: "User",
+    required: false,
   },
   inquiries: [inquirySchema],
   createdAt: {
     type: Date,
-    default: Date.now
+    default: Date.now,
   },
   updatedAt: {
     type: Date,
-    default: Date.now
-  }
+    default: Date.now,
+  },
 });
 
-patientSchema.pre('save', function(next) {
+patientSchema.pre("save", function (next) {
   this.updatedAt = new Date();
   next();
 });
 
-export const Patient = mongoose.model('Patient', patientSchema); 
+export const Patient = mongoose.model("Patient", patientSchema);

@@ -11,23 +11,27 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
-import { 
-  Edit, 
-  Calendar, 
-  Phone, 
-  Mail, 
-  MapPin, 
+import {
+  Edit,
+  Calendar,
+  Phone,
+  Mail,
+  MapPin,
   CreditCard,
   FileText,
   Clock,
   User,
   ArrowLeft,
-  Trash2
+  Trash2,
 } from "lucide-react";
 import { Link } from "wouter";
 import { isUnauthorizedError, canSeeCreatedBy } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
-import type { PatientWithTherapist, AppointmentWithDetails, TreatmentRecordWithDetails } from "@shared/schema";
+import type {
+  PatientWithTherapist,
+  AppointmentWithDetails,
+  TreatmentRecordWithDetails,
+} from "@shared/schema";
 
 export default function PatientDetail() {
   const params = useParams();
@@ -55,26 +59,28 @@ export default function PatientDetail() {
     queryKey: [`/api/patients/${patientId}`],
     retry: false,
     enabled: !!patientId,
-  }) as { data: any, isLoading: boolean };
+  }) as { data: any; isLoading: boolean };
 
   const { data: appointments, isLoading: appointmentsLoading } = useQuery({
     queryKey: ["/api/appointments", { patientId }],
     retry: false,
     enabled: !!patientId,
-  }) as { data: any[], isLoading: boolean };
+  }) as { data: any[]; isLoading: boolean };
 
   const { data: records, isLoading: recordsLoading } = useQuery({
     queryKey: [`/api/patients/${patientId}/records`],
     retry: false,
     enabled: !!patientId,
-  }) as { data: any[], isLoading: boolean };
+  }) as { data: any[]; isLoading: boolean };
 
   const updateStatusMutation = useMutation({
     mutationFn: async (status: string) => {
       await apiRequest("PATCH", `/api/patients/${patientId}`, { status });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/patients/${patientId}`] });
+      queryClient.invalidateQueries({
+        queryKey: [`/api/patients/${patientId}`],
+      });
       toast({
         title: "Success",
         description: "Patient status updated successfully.",
@@ -104,10 +110,10 @@ export default function PatientDetail() {
   const deleteAppointmentMutation = useMutation({
     mutationFn: async (appointmentId: string) => {
       const response = await fetch(`/api/appointments/${appointmentId}`, {
-        method: 'DELETE',
+        method: "DELETE",
       });
       if (!response.ok) {
-        throw new Error('Failed to delete appointment');
+        throw new Error("Failed to delete appointment");
       }
       return response.json();
     },
@@ -116,8 +122,12 @@ export default function PatientDetail() {
         title: "Success",
         description: "Appointment deleted successfully",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/appointments", { patientId }] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/today-appointments"] });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/appointments", { patientId }],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/dashboard/today-appointments"],
+      });
     },
     onError: (err) => {
       toast({
@@ -148,8 +158,12 @@ export default function PatientDetail() {
           <main className="flex-1 overflow-y-auto">
             <div className="p-6">
               <div className="text-center py-12">
-                <h1 className="text-2xl font-semibold text-gray-900 mb-2">Patient Not Found</h1>
-                <p className="text-gray-600">The requested patient could not be found.</p>
+                <h1 className="text-2xl font-semibold text-gray-900 mb-2">
+                  Patient Not Found
+                </h1>
+                <p className="text-gray-600">
+                  The requested patient could not be found.
+                </p>
                 <Link href="/patients">
                   <Button className="mt-4">Back to Patients</Button>
                 </Link>
@@ -164,7 +178,9 @@ export default function PatientDetail() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "active":
-        return <Badge className="bg-success-100 text-success-500">Active</Badge>;
+        return (
+          <Badge className="bg-success-100 text-success-500">Active</Badge>
+        );
       case "inactive":
         return <Badge variant="secondary">Inactive</Badge>;
       case "discharged":
@@ -202,27 +218,34 @@ export default function PatientDetail() {
     const birthDate = new Date(dateOfBirth);
     let age = today.getFullYear() - birthDate.getFullYear();
     const monthDiff = today.getMonth() - birthDate.getMonth();
-    
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+
+    if (
+      monthDiff < 0 ||
+      (monthDiff === 0 && today.getDate() < birthDate.getDate())
+    ) {
       age--;
     }
-    
+
     return age;
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
-      
+
       <div className="flex">
         <Sidebar />
-        
+
         <main className="flex-1 overflow-y-auto">
           <div className="p-6">
             {/* Return Arrow */}
             <div className="mb-4">
               <Link href="/patients">
-                <Button variant="ghost" size="sm" className="flex items-center gap-2 text-gray-600 hover:text-gray-900">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
+                >
                   <ArrowLeft className="h-4 w-4" />
                   Back to Patients
                 </Button>
@@ -238,7 +261,7 @@ export default function PatientDetail() {
                       {getInitials(patient.firstName, patient.lastName)}
                     </AvatarFallback>
                   </Avatar>
-                  
+
                   <div>
                     <h1 className="text-3xl font-semibold text-gray-900">
                       {patient.firstName} {patient.lastName}
@@ -253,26 +276,34 @@ export default function PatientDetail() {
                       </span>
                       {patient.assignedTherapist && (
                         <span className="text-sm text-gray-500">
-                          Therapist: {patient.assignedTherapist.firstName} {patient.assignedTherapist.lastName}
+                          Therapist: {patient.assignedTherapist.firstName}{" "}
+                          {patient.assignedTherapist.lastName}
                         </span>
                       )}
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="flex space-x-3">
                   <Link href={`/patients/${patient.id}/edit`}>
-                    <Button variant="outline" className="flex items-center space-x-2">
+                    <Button
+                      variant="outline"
+                      className="flex items-center space-x-2"
+                    >
                       <Edit className="h-4 w-4" />
                       <span>Edit Patient</span>
                     </Button>
                   </Link>
-                  
+
                   <Button
-                    variant={patient.status === "active" ? "outline" : "default"}
-                    onClick={() => updateStatusMutation.mutate(
-                      patient.status === "active" ? "inactive" : "active"
-                    )}
+                    variant={
+                      patient.status === "active" ? "outline" : "default"
+                    }
+                    onClick={() =>
+                      updateStatusMutation.mutate(
+                        patient.status === "active" ? "inactive" : "active",
+                      )
+                    }
                     disabled={updateStatusMutation.isPending}
                   >
                     {patient.status === "active" ? "Deactivate" : "Activate"}
@@ -301,37 +332,62 @@ export default function PatientDetail() {
                     <CardContent className="space-y-4">
                       <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <label className="text-sm font-medium text-gray-500">First Name</label>
-                          <p className="text-sm text-gray-900">{patient.firstName}</p>
+                          <label className="text-sm font-medium text-gray-500">
+                            First Name
+                          </label>
+                          <p className="text-sm text-gray-900">
+                            {patient.firstName}
+                          </p>
                         </div>
                         <div>
-                          <label className="text-sm font-medium text-gray-500">Last Name</label>
-                          <p className="text-sm text-gray-900">{patient.lastName}</p>
+                          <label className="text-sm font-medium text-gray-500">
+                            Last Name
+                          </label>
+                          <p className="text-sm text-gray-900">
+                            {patient.lastName}
+                          </p>
                         </div>
                       </div>
-                      
+
                       <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <label className="text-sm font-medium text-gray-500">Date of Birth</label>
-                          <p className="text-sm text-gray-900">{formatDate(patient.dateOfBirth)}</p>
+                          <label className="text-sm font-medium text-gray-500">
+                            Date of Birth
+                          </label>
+                          <p className="text-sm text-gray-900">
+                            {formatDate(patient.dateOfBirth)}
+                          </p>
                         </div>
                         <div>
-                          <label className="text-sm font-medium text-gray-500">Gender</label>
-                          <p className="text-sm text-gray-900 capitalize">{patient.gender || "Not specified"}</p>
+                          <label className="text-sm font-medium text-gray-500">
+                            Gender
+                          </label>
+                          <p className="text-sm text-gray-900 capitalize">
+                            {patient.gender || "Not specified"}
+                          </p>
                         </div>
                       </div>
-                      
+
                       <div>
-                        <label className="text-sm font-medium text-gray-500">Registration Date</label>
-                        <p className="text-sm text-gray-900">{formatDate(patient.createdAt!)}</p>
+                        <label className="text-sm font-medium text-gray-500">
+                          Registration Date
+                        </label>
+                        <p className="text-sm text-gray-900">
+                          {formatDate(patient.createdAt!)}
+                        </p>
                       </div>
-                      
+
                       {patient.createdBy && canSeeCreatedBy(user) && (
                         <div>
-                          <label className="text-sm font-medium text-gray-500">Created By</label>
+                          <label className="text-sm font-medium text-gray-500">
+                            Created By
+                          </label>
                           <p className="text-sm text-gray-900">
-                            {patient.createdBy.firstName} {patient.createdBy.lastName} 
-                            <span className="text-gray-500 ml-2">({patient.createdBy.role})</span>
+                            {patient.createdBy.firstName}{" "}
+                            {patient.createdBy.lastName}
+                            <span className="text-gray-500 ml-2">
+                              ({patient.createdBy.role})
+                            </span>
                           </p>
                         </div>
                       )}
@@ -350,32 +406,48 @@ export default function PatientDetail() {
                       <div className="flex items-center space-x-3">
                         <Mail className="h-4 w-4 text-gray-400" />
                         <div>
-                          <label className="text-sm font-medium text-gray-500">Email</label>
-                          <p className="text-sm text-gray-900">{patient.email || "Not provided"}</p>
+                          <label className="text-sm font-medium text-gray-500">
+                            Email
+                          </label>
+                          <p className="text-sm text-gray-900">
+                            {patient.email || "Not provided"}
+                          </p>
                         </div>
                       </div>
-                      
+
                       <div className="flex items-center space-x-3">
                         <Phone className="h-4 w-4 text-gray-400" />
                         <div>
-                          <label className="text-sm font-medium text-gray-500">Phone</label>
-                          <p className="text-sm text-gray-900">{patient.phone || "Not provided"}</p>
+                          <label className="text-sm font-medium text-gray-500">
+                            Phone
+                          </label>
+                          <p className="text-sm text-gray-900">
+                            {patient.phone || "Not provided"}
+                          </p>
                         </div>
                       </div>
-                      
+
                       <div className="flex items-center space-x-3">
                         <Phone className="h-4 w-4 text-gray-400" />
                         <div>
-                          <label className="text-sm font-medium text-gray-500">Emergency Contact</label>
-                          <p className="text-sm text-gray-900">{patient.emergencyContact || "Not provided"}</p>
+                          <label className="text-sm font-medium text-gray-500">
+                            Emergency Contact
+                          </label>
+                          <p className="text-sm text-gray-900">
+                            {patient.emergencyContact || "Not provided"}
+                          </p>
                         </div>
                       </div>
-                      
+
                       <div className="flex items-start space-x-3">
                         <MapPin className="h-4 w-4 text-gray-400 mt-1" />
                         <div>
-                          <label className="text-sm font-medium text-gray-500">Address</label>
-                          <p className="text-sm text-gray-900">{patient.address || "Not provided"}</p>
+                          <label className="text-sm font-medium text-gray-500">
+                            Address
+                          </label>
+                          <p className="text-sm text-gray-900">
+                            {patient.address || "Not provided"}
+                          </p>
                         </div>
                       </div>
                     </CardContent>
@@ -391,17 +463,27 @@ export default function PatientDetail() {
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div>
-                        <label className="text-sm font-medium text-gray-500">Insurance Provider</label>
-                        <p className="text-sm text-gray-900">{patient.insurance || "Not provided"}</p>
+                        <label className="text-sm font-medium text-gray-500">
+                          Insurance Provider
+                        </label>
+                        <p className="text-sm text-gray-900">
+                          {patient.insurance || "Not provided"}
+                        </p>
                       </div>
-                      
+
                       <div>
-                        <label className="text-sm font-medium text-gray-500">Reason for Visit</label>
-                        <p className="text-sm text-gray-900">{patient.reasonForVisit || "Not provided"}</p>
+                        <label className="text-sm font-medium text-gray-500">
+                          Reason for Visit
+                        </label>
+                        <p className="text-sm text-gray-900">
+                          {patient.reasonForVisit || "Not provided"}
+                        </p>
                       </div>
-                      
+
                       <div>
-                        <label className="text-sm font-medium text-gray-500">HIPAA Consent</label>
+                        <label className="text-sm font-medium text-gray-500">
+                          HIPAA Consent
+                        </label>
                         <p className="text-sm text-gray-900">
                           {patient.hipaaConsent ? "Provided" : "Not provided"}
                         </p>
@@ -416,14 +498,20 @@ export default function PatientDetail() {
                     </CardHeader>
                     <CardContent className="space-y-3">
                       <Link href={`/appointments/new?patientId=${patient.id}`}>
-                        <Button variant="outline" className="w-full justify-start">
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start"
+                        >
                           <Calendar className="h-4 w-4 mr-2" />
                           Schedule Appointment
                         </Button>
                       </Link>
-                      
+
                       <Link href={`/records/new?patientId=${patient.id}`}>
-                        <Button variant="outline" className="w-full justify-start">
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start"
+                        >
                           <FileText className="h-4 w-4 mr-2" />
                           Add Treatment Note
                         </Button>
@@ -450,7 +538,10 @@ export default function PatientDetail() {
                     {appointmentsLoading ? (
                       <div className="space-y-4">
                         {Array.from({ length: 3 }).map((_, i) => (
-                          <div key={i} className="flex items-center space-x-4 p-4 border rounded-lg animate-pulse">
+                          <div
+                            key={i}
+                            className="flex items-center space-x-4 p-4 border rounded-lg animate-pulse"
+                          >
                             <div className="w-3 h-3 bg-gray-200 rounded-full"></div>
                             <div className="flex-1 space-y-2">
                               <div className="h-4 bg-gray-200 rounded w-1/3"></div>
@@ -462,42 +553,65 @@ export default function PatientDetail() {
                       </div>
                     ) : appointments && appointments.length > 0 ? (
                       <div className="space-y-4">
-                        {appointments.map((appointment: AppointmentWithDetails) => (
-                          <div key={appointment.id} className="flex items-center space-x-4 p-4 border rounded-lg hover:bg-gray-50">
-                            <div className={`w-3 h-3 rounded-full crm-status-${appointment.status}`}></div>
-                            <div className="flex-1">
-                              <p className="font-medium text-gray-900">{appointment.type}</p>
-                              <p className="text-sm text-gray-600">
-                                {formatDateTime(appointment.appointmentDate)} • {appointment.duration} minutes
-                              </p>
-                              <p className="text-sm text-gray-500">
-                                with {appointment.therapist.firstName} {appointment.therapist.lastName}
-                              </p>
-                            </div>
-                            <Badge variant={appointment.status === "completed" ? "default" : "secondary"}>
-                              {appointment.status}
-                            </Badge>
-                            {/* Delete button */}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600"
-                              title="Delete Appointment"
-                              onClick={() => {
-                                if (window.confirm('Are you sure you want to delete this appointment? This action cannot be undone.')) {
-                                  deleteAppointmentMutation.mutate(appointment.id);
-                                }
-                              }}
-                              disabled={deleteAppointmentMutation.isPending}
+                        {appointments.map(
+                          (appointment: AppointmentWithDetails) => (
+                            <div
+                              key={appointment.id}
+                              className="flex items-center space-x-4 p-4 border rounded-lg hover:bg-gray-50"
                             >
-                              {deleteAppointmentMutation.isPending ? (
-                                <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                              ) : (
-                                <Trash2 className="h-4 w-4" />
-                              )}
-                            </Button>
-                          </div>
-                        ))}
+                              <div
+                                className={`w-3 h-3 rounded-full crm-status-${appointment.status}`}
+                              ></div>
+                              <div className="flex-1">
+                                <p className="font-medium text-gray-900">
+                                  {appointment.type}
+                                </p>
+                                <p className="text-sm text-gray-600">
+                                  {formatDateTime(appointment.appointmentDate)}{" "}
+                                  • {appointment.duration} minutes
+                                </p>
+                                <p className="text-sm text-gray-500">
+                                  with {appointment.therapist.firstName}{" "}
+                                  {appointment.therapist.lastName}
+                                </p>
+                              </div>
+                              <Badge
+                                variant={
+                                  appointment.status === "completed"
+                                    ? "default"
+                                    : "secondary"
+                                }
+                              >
+                                {appointment.status}
+                              </Badge>
+                              {/* Delete button */}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600"
+                                title="Delete Appointment"
+                                onClick={() => {
+                                  if (
+                                    window.confirm(
+                                      "Are you sure you want to delete this appointment? This action cannot be undone.",
+                                    )
+                                  ) {
+                                    deleteAppointmentMutation.mutate(
+                                      appointment.id,
+                                    );
+                                  }
+                                }}
+                                disabled={deleteAppointmentMutation.isPending}
+                              >
+                                {deleteAppointmentMutation.isPending ? (
+                                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                ) : (
+                                  <Trash2 className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </div>
+                          ),
+                        )}
                       </div>
                     ) : (
                       <div className="text-center py-8 text-gray-500">
@@ -525,7 +639,10 @@ export default function PatientDetail() {
                     {recordsLoading ? (
                       <div className="space-y-4">
                         {Array.from({ length: 3 }).map((_, i) => (
-                          <div key={i} className="p-4 border rounded-lg animate-pulse">
+                          <div
+                            key={i}
+                            className="p-4 border rounded-lg animate-pulse"
+                          >
                             <div className="space-y-3">
                               <div className="flex justify-between">
                                 <div className="h-4 bg-gray-200 rounded w-1/4"></div>
@@ -540,30 +657,44 @@ export default function PatientDetail() {
                     ) : records && records.length > 0 ? (
                       <div className="space-y-4">
                         {records.map((record: TreatmentRecordWithDetails) => (
-                          <div key={record.id} className="p-4 border rounded-lg hover:bg-gray-50">
+                          <div
+                            key={record.id}
+                            className="p-4 border rounded-lg hover:bg-gray-50"
+                          >
                             <div className="flex items-start justify-between mb-3">
                               <div>
-                                <h4 className="font-medium text-gray-900">{record.sessionType}</h4>
+                                <h4 className="font-medium text-gray-900">
+                                  {record.sessionType}
+                                </h4>
                                 <p className="text-sm text-gray-600">
-                                  {formatDateTime(record.sessionDate)} • by {record.therapist
+                                  {formatDateTime(record.sessionDate)} • by{" "}
+                                  {record.therapist
                                     ? `${record.therapist.firstName} ${record.therapist.lastName}`
                                     : "Unknown Therapist"}
                                 </p>
                               </div>
                               <Clock className="h-4 w-4 text-gray-400" />
                             </div>
-                            
+
                             {record.notes && (
                               <div className="mb-3">
-                                <h5 className="text-sm font-medium text-gray-700 mb-1">Session Notes</h5>
-                                <p className="text-sm text-gray-600 line-clamp-3">{record.notes}</p>
+                                <h5 className="text-sm font-medium text-gray-700 mb-1">
+                                  Session Notes
+                                </h5>
+                                <p className="text-sm text-gray-600 line-clamp-3">
+                                  {record.notes}
+                                </p>
                               </div>
                             )}
-                            
+
                             {record.goals && (
                               <div className="mb-3">
-                                <h5 className="text-sm font-medium text-gray-700 mb-1">Goals</h5>
-                                <p className="text-sm text-gray-600">{record.goals}</p>
+                                <h5 className="text-sm font-medium text-gray-700 mb-1">
+                                  Goals
+                                </h5>
+                                <p className="text-sm text-gray-600">
+                                  {record.goals}
+                                </p>
                               </div>
                             )}
                           </div>

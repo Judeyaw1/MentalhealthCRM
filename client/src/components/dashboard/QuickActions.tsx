@@ -40,12 +40,12 @@ export function QuickActions() {
       <CardHeader>
         <h2 className="text-lg font-semibold text-gray-900">Quick Actions</h2>
       </CardHeader>
-      
+
       <CardContent>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {actions.map((action) => {
             const Icon = action.icon;
-            
+
             return (
               <Link key={action.title} href={action.href}>
                 <Button
@@ -53,7 +53,9 @@ export function QuickActions() {
                   className={`flex flex-col items-center justify-center space-y-2 h-20 w-full ${action.color} transition-colors`}
                 >
                   <Icon className="h-6 w-6" />
-                  <span className="text-sm font-medium text-center">{action.title}</span>
+                  <span className="text-sm font-medium text-center">
+                    {action.title}
+                  </span>
                 </Button>
               </Link>
             );

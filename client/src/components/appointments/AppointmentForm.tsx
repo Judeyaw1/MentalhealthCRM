@@ -4,17 +4,30 @@ import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 // Custom schema for MongoDB appointments
 const insertAppointmentSchema = z.object({
   patientId: z.string().min(1, "Patient ID is required"),
   therapistId: z.string().min(1, "Therapist ID is required"),
-  appointmentDate: z.union([z.date(), z.string()]).transform((val) => 
-    typeof val === 'string' ? new Date(val) : val
-  ),
+  appointmentDate: z
+    .union([z.date(), z.string()])
+    .transform((val) => (typeof val === "string" ? new Date(val) : val)),
   duration: z.number().default(60),
   type: z.string().min(1, "Appointment type is required"),
   status: z.string().default("scheduled"),
@@ -32,13 +45,13 @@ interface AppointmentFormProps {
   therapists?: { id: string; firstName: string; lastName: string }[];
 }
 
-export function AppointmentForm({ 
-  initialData, 
-  onSubmit, 
+export function AppointmentForm({
+  initialData,
+  onSubmit,
   isLoading = false,
   submitLabel = "Schedule Appointment",
   patients = [],
-  therapists = []
+  therapists = [],
 }: AppointmentFormProps) {
   const form = useForm<InsertAppointment>({
     resolver: zodResolver(insertAppointmentSchema),
@@ -59,10 +72,10 @@ export function AppointmentForm({
 
   const formatDateTimeLocal = (date: Date) => {
     const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
     return `${year}-${month}-${day}T${hours}:${minutes}`;
   };
 
@@ -85,7 +98,10 @@ export function AppointmentForm({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Patient *</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value?.toString() || ''}>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value?.toString() || ""}
+                    >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select patient" />
@@ -93,27 +109,32 @@ export function AppointmentForm({
                       </FormControl>
                       <SelectContent>
                         {patients.map((patient) => (
-                          <SelectItem key={patient.id} value={patient.id.toString()}>
+                          <SelectItem
+                            key={patient.id}
+                            value={patient.id.toString()}
+                          >
                             {patient.firstName} {patient.lastName}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />
-                    {field.value && !isNaN(Number(field.value)) && patients.some(p => p.id === Number(field.value)) && (
-                      <a
-                        href={`/patients/${field.value}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary-600 hover:underline text-sm ml-2"
-                      >
-                        View Patient
-                      </a>
-                    )}
+                    {field.value &&
+                      !isNaN(Number(field.value)) &&
+                      patients.some((p) => p.id === Number(field.value)) && (
+                        <a
+                          href={`/patients/${field.value}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary-600 hover:underline text-sm ml-2"
+                        >
+                          View Patient
+                        </a>
+                      )}
                   </FormItem>
                 )}
               />
-              
+
               <FormField
                 control={form.control}
                 name="therapistId"
@@ -151,14 +172,16 @@ export function AppointmentForm({
                       <Input
                         type="datetime-local"
                         value={formatDateTimeLocal(new Date(field.value))}
-                        onChange={(e) => field.onChange(parseDateTimeLocal(e.target.value))}
+                        onChange={(e) =>
+                          field.onChange(parseDateTimeLocal(e.target.value))
+                        }
                       />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              
+
               <FormField
                 control={form.control}
                 name="duration"
@@ -169,7 +192,9 @@ export function AppointmentForm({
                       <Input
                         type="number"
                         {...field}
-                        onChange={(e) => field.onChange(parseInt(e.target.value) || 60)}
+                        onChange={(e) =>
+                          field.onChange(parseInt(e.target.value) || 60)
+                        }
                         min="15"
                         max="240"
                         step="15"
@@ -196,7 +221,9 @@ export function AppointmentForm({
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="therapy">Therapy Session</SelectItem>
-                        <SelectItem value="consultation">Initial Consultation</SelectItem>
+                        <SelectItem value="consultation">
+                          Initial Consultation
+                        </SelectItem>
                         <SelectItem value="group">Group Therapy</SelectItem>
                         <SelectItem value="intake">Patient Intake</SelectItem>
                         <SelectItem value="follow-up">Follow-up</SelectItem>
@@ -206,7 +233,7 @@ export function AppointmentForm({
                   </FormItem>
                 )}
               />
-              
+
               <FormField
                 control={form.control}
                 name="status"
@@ -239,8 +266,8 @@ export function AppointmentForm({
                 <FormItem>
                   <FormLabel>Notes</FormLabel>
                   <FormControl>
-                    <Textarea 
-                      {...field} 
+                    <Textarea
+                      {...field}
                       value={field.value || ""}
                       placeholder="Any additional notes about this appointment..."
                       rows={3}

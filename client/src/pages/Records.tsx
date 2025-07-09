@@ -9,12 +9,18 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { 
-  Plus, 
-  FileText, 
-  Clock, 
-  Search, 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Plus,
+  FileText,
+  Clock,
+  Search,
   Filter,
   Calendar,
   User,
@@ -26,7 +32,7 @@ import {
   TrendingUp,
   Target,
   MessageSquare,
-  ArrowLeft
+  ArrowLeft,
 } from "lucide-react";
 import { Link } from "wouter";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -75,29 +81,54 @@ export default function Records() {
   }, [isAuthenticated, authLoading, toast]);
 
   // Fetch records with filters
-  const { data: recordsData, isLoading: recordsLoading, refetch } = useQuery<{ records: TreatmentRecordWithDetails[]; total: number }>({
-    queryKey: ["/api/records", { 
-      limit: pageSize, 
-      offset: (currentPage - 1) * pageSize,
-      search: searchQuery || undefined,
-      patientId: selectedPatient && selectedPatient !== "all" ? selectedPatient : undefined,
-      therapistId: selectedTherapist && selectedTherapist !== "all" ? selectedTherapist : undefined,
-      sessionType: selectedSessionType && selectedSessionType !== "all" ? selectedSessionType : undefined,
-      startDate: dateRange === "week" ? new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) : 
-                dateRange === "month" ? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) : undefined,
-      endDate: undefined,
-    }],
+  const {
+    data: recordsData,
+    isLoading: recordsLoading,
+    refetch,
+  } = useQuery<{ records: TreatmentRecordWithDetails[]; total: number }>({
+    queryKey: [
+      "/api/records",
+      {
+        limit: pageSize,
+        offset: (currentPage - 1) * pageSize,
+        search: searchQuery || undefined,
+        patientId:
+          selectedPatient && selectedPatient !== "all"
+            ? selectedPatient
+            : undefined,
+        therapistId:
+          selectedTherapist && selectedTherapist !== "all"
+            ? selectedTherapist
+            : undefined,
+        sessionType:
+          selectedSessionType && selectedSessionType !== "all"
+            ? selectedSessionType
+            : undefined,
+        startDate:
+          dateRange === "week"
+            ? new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+            : dateRange === "month"
+              ? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+              : undefined,
+        endDate: undefined,
+      },
+    ],
     retry: false,
   });
 
   // Fetch patients for filter
-  const { data: patients } = useQuery<{ patients: { id: number; firstName: string; lastName: string }[]; total: number }>({
+  const { data: patients } = useQuery<{
+    patients: { id: number; firstName: string; lastName: string }[];
+    total: number;
+  }>({
     queryKey: ["/api/patients", { limit: 1000 }],
     retry: false,
   });
 
   // Fetch therapists for filter
-  const { data: therapists } = useQuery<{ id: string; firstName: string; lastName: string }[]>({
+  const { data: therapists } = useQuery<
+    { id: string; firstName: string; lastName: string }[]
+  >({
     queryKey: ["/api/therapists"],
     retry: false,
   });
@@ -127,7 +158,7 @@ export default function Records() {
         }, 500);
         return;
       }
-      
+
       toast({
         title: "Error",
         description: "Failed to delete treatment record. Please try again.",
@@ -166,18 +197,24 @@ export default function Records() {
       family: "bg-purple-100 text-purple-800",
       assessment: "bg-orange-100 text-orange-800",
       consultation: "bg-indigo-100 text-indigo-800",
-      intake: "bg-red-100 text-red-800"
+      intake: "bg-red-100 text-red-800",
     };
-    
+
     return (
-      <Badge className={`text-xs ${variants[sessionType as keyof typeof variants] || 'bg-gray-100 text-gray-800'}`}>
+      <Badge
+        className={`text-xs ${variants[sessionType as keyof typeof variants] || "bg-gray-100 text-gray-800"}`}
+      >
         {sessionType.charAt(0).toUpperCase() + sessionType.slice(1)}
       </Badge>
     );
   };
 
   const handleDeleteRecord = (recordId: number) => {
-    if (confirm("Are you sure you want to delete this treatment record? This action cannot be undone.")) {
+    if (
+      confirm(
+        "Are you sure you want to delete this treatment record? This action cannot be undone.",
+      )
+    ) {
       deleteRecordMutation.mutate(recordId);
     }
   };
@@ -218,28 +255,31 @@ export default function Records() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
-      
+
       <div className="flex">
         <Sidebar />
-        
+
         <main className="flex-1 overflow-y-auto">
           <div className="p-6">
             {/* Page Header */}
             <div className="mb-8">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 mb-2">
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => window.location.href = "/"}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => (window.location.href = "/")}
                     className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
                   >
                     <ArrowLeft className="h-4 w-4" />
                   </Button>
                   <div>
-                    <h1 className="text-2xl font-semibold text-gray-900">Treatment Records</h1>
+                    <h1 className="text-2xl font-semibold text-gray-900">
+                      Treatment Records
+                    </h1>
                     <p className="text-gray-600 mt-1">
-                      View and manage patient treatment documentation and progress tracking.
+                      View and manage patient treatment documentation and
+                      progress tracking.
                     </p>
                   </div>
                 </div>
@@ -247,18 +287,29 @@ export default function Records() {
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button variant="outline" size="icon" onClick={handleRefresh} disabled={recordsLoading}>
-                          <RefreshCw className={`h-4 w-4 ${recordsLoading ? 'animate-spin' : ''}`} />
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={handleRefresh}
+                          disabled={recordsLoading}
+                        >
+                          <RefreshCw
+                            className={`h-4 w-4 ${recordsLoading ? "animate-spin" : ""}`}
+                          />
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>
                         <p>Refresh records</p>
                       </TooltipContent>
                     </Tooltip>
-                    
+
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button variant="outline" size="icon" onClick={handleExport}>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={handleExport}
+                        >
                           <Download className="h-4 w-4" />
                         </Button>
                       </TooltipTrigger>
@@ -267,7 +318,7 @@ export default function Records() {
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
-                  
+
                   <Link href="/records/new">
                     <Button className="flex items-center space-x-2">
                       <Plus className="h-4 w-4" />
@@ -282,73 +333,89 @@ export default function Records() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Records</CardTitle>
+                  <CardTitle className="text-sm font-medium">
+                    Total Records
+                  </CardTitle>
                   <FileText className="h-4 w-4 text-gray-600" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
                     {recordsLoading ? "..." : recordsData?.total || 0}
                   </div>
-                  <p className="text-xs text-gray-600">
-                    All treatment records
-                  </p>
+                  <p className="text-xs text-gray-600">All treatment records</p>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">This Week</CardTitle>
+                  <CardTitle className="text-sm font-medium">
+                    This Week
+                  </CardTitle>
                   <Clock className="h-4 w-4 text-gray-600" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    {recordsLoading ? "..." : 
-                      recordsData?.records?.filter((record: TreatmentRecordWithDetails) => {
-                        const recordDate = new Date(record.sessionDate);
-                        const weekAgo = new Date();
-                        weekAgo.setDate(weekAgo.getDate() - 7);
-                        return recordDate >= weekAgo;
-                      }).length || 0
-                    }
+                    {recordsLoading
+                      ? "..."
+                      : recordsData?.records?.filter(
+                          (record: TreatmentRecordWithDetails) => {
+                            const recordDate = new Date(record.sessionDate);
+                            const weekAgo = new Date();
+                            weekAgo.setDate(weekAgo.getDate() - 7);
+                            return recordDate >= weekAgo;
+                          },
+                        ).length || 0}
                   </div>
-                  <p className="text-xs text-gray-600">
-                    Recent records
-                  </p>
+                  <p className="text-xs text-gray-600">Recent records</p>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Active Patients</CardTitle>
+                  <CardTitle className="text-sm font-medium">
+                    Active Patients
+                  </CardTitle>
                   <User className="h-4 w-4 text-gray-600" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    {recordsLoading ? "..." : 
-                      new Set(recordsData?.records?.map((record: TreatmentRecordWithDetails) => record.patient.id)).size || 0
-                    }
+                    {recordsLoading
+                      ? "..."
+                      : new Set(
+                          recordsData?.records?.map(
+                            (record: TreatmentRecordWithDetails) =>
+                              record.patient.id,
+                          ),
+                        ).size || 0}
                   </div>
-                  <p className="text-xs text-gray-600">
-                    With records
-                  </p>
+                  <p className="text-xs text-gray-600">With records</p>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Avg. Sessions</CardTitle>
+                  <CardTitle className="text-sm font-medium">
+                    Avg. Sessions
+                  </CardTitle>
                   <TrendingUp className="h-4 w-4 text-gray-600" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    {recordsLoading ? "..." : 
-                      recordsData?.total && recordsData.records ? 
-                        Math.round(recordsData.total / new Set(recordsData.records.map((record: TreatmentRecordWithDetails) => record.patient.id)).size) : 0
-                    }
+                    {recordsLoading
+                      ? "..."
+                      : recordsData?.total && recordsData.records
+                        ? Math.round(
+                            recordsData.total /
+                              new Set(
+                                recordsData.records.map(
+                                  (record: TreatmentRecordWithDetails) =>
+                                    record.patient.id,
+                                ),
+                              ).size,
+                          )
+                        : 0}
                   </div>
-                  <p className="text-xs text-gray-600">
-                    Per patient
-                  </p>
+                  <p className="text-xs text-gray-600">Per patient</p>
                 </CardContent>
               </Card>
             </div>
@@ -366,22 +433,31 @@ export default function Records() {
                       className="pl-10"
                     />
                   </div>
-                  
-                  <Select value={selectedPatient} onValueChange={setSelectedPatient}>
+
+                  <Select
+                    value={selectedPatient}
+                    onValueChange={setSelectedPatient}
+                  >
                     <SelectTrigger className="w-full lg:w-[200px]">
                       <SelectValue placeholder="Filter by patient" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Patients</SelectItem>
                       {patients?.patients?.map((patient) => (
-                        <SelectItem key={patient.id} value={patient.id.toString()}>
+                        <SelectItem
+                          key={patient.id}
+                          value={patient.id.toString()}
+                        >
                           {patient.firstName} {patient.lastName}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
 
-                  <Select value={selectedTherapist} onValueChange={setSelectedTherapist}>
+                  <Select
+                    value={selectedTherapist}
+                    onValueChange={setSelectedTherapist}
+                  >
                     <SelectTrigger className="w-full lg:w-[200px]">
                       <SelectValue placeholder="Filter by therapist" />
                     </SelectTrigger>
@@ -395,13 +471,18 @@ export default function Records() {
                     </SelectContent>
                   </Select>
 
-                  <Select value={selectedSessionType} onValueChange={setSelectedSessionType}>
+                  <Select
+                    value={selectedSessionType}
+                    onValueChange={setSelectedSessionType}
+                  >
                     <SelectTrigger className="w-full lg:w-[200px]">
                       <SelectValue placeholder="Filter by session type" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Session Types</SelectItem>
-                      <SelectItem value="therapy">Individual Therapy</SelectItem>
+                      <SelectItem value="therapy">
+                        Individual Therapy
+                      </SelectItem>
                       <SelectItem value="group">Group Therapy</SelectItem>
                       <SelectItem value="family">Family Therapy</SelectItem>
                       <SelectItem value="assessment">Assessment</SelectItem>
@@ -444,119 +525,149 @@ export default function Records() {
                 ))
               ) : recordsData?.records && recordsData.records.length > 0 ? (
                 <>
-                  {recordsData.records.map((record: TreatmentRecordWithDetails) => (
-                    <Card key={record.id} className="hover:shadow-md transition-shadow">
-                      <CardContent className="p-6">
-                        <div className="flex items-start space-x-4">
-                          <Avatar className="h-10 w-10">
-                            <AvatarFallback className="bg-primary-100 text-primary-600">
-                              {getInitials(record.patient.firstName, record.patient.lastName)}
-                            </AvatarFallback>
-                          </Avatar>
-                          
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between mb-3">
-                              <div className="flex items-center space-x-3">
-                                <div>
-                                  <h3 className="text-lg font-medium text-gray-900">
-                                    {record.patient.firstName} {record.patient.lastName}
-                                  </h3>
-                                  <div className="flex items-center space-x-2 mt-1">
-                                    {getSessionTypeBadge(record.sessionType)}
-                                    <span className="text-sm text-gray-500">
-                                      {formatDateTime(record.sessionDate)}
-                                    </span>
+                  {recordsData.records.map(
+                    (record: TreatmentRecordWithDetails) => (
+                      <Card
+                        key={record.id}
+                        className="hover:shadow-md transition-shadow"
+                      >
+                        <CardContent className="p-6">
+                          <div className="flex items-start space-x-4">
+                            <Avatar className="h-10 w-10">
+                              <AvatarFallback className="bg-primary-100 text-primary-600">
+                                {getInitials(
+                                  record.patient.firstName,
+                                  record.patient.lastName,
+                                )}
+                              </AvatarFallback>
+                            </Avatar>
+
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center space-x-3">
+                                  <div>
+                                    <h3 className="text-lg font-medium text-gray-900">
+                                      {record.patient.firstName}{" "}
+                                      {record.patient.lastName}
+                                    </h3>
+                                    <div className="flex items-center space-x-2 mt-1">
+                                      {getSessionTypeBadge(record.sessionType)}
+                                      <span className="text-sm text-gray-500">
+                                        {formatDateTime(record.sessionDate)}
+                                      </span>
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                <Badge variant="outline" className="text-xs">
-                                  {record.therapist
-                                    ? `${record.therapist.firstName} ${record.therapist.lastName}`
-                                    : "Unknown Therapist"}
-                                </Badge>
-                                
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="icon">
-                                      <MoreHorizontal className="h-4 w-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                    <DropdownMenuItem asChild>
-                                      <Link href={`/patients/${record.patient.id}`}>
-                                        <Eye className="h-4 w-4 mr-2" />
-                                        View Patient
-                                      </Link>
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem asChild>
-                                      <Link href={`/records/${record.id}/edit`}>
-                                        <Edit className="h-4 w-4 mr-2" />
-                                        Edit Record
-                                      </Link>
-                                    </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem 
-                                      onClick={() => handleDeleteRecord(record.id)}
-                                      className="text-red-600"
-                                    >
-                                      Delete Record
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              </div>
-                            </div>
-                            
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              {record.goals && (
-                                <div>
-                                  <h4 className="text-sm font-medium text-gray-700 mb-1 flex items-center">
-                                    <Target className="h-3 w-3 mr-1" />
-                                    Session Goals
-                                  </h4>
-                                  <p className="text-sm text-gray-600 line-clamp-2">{record.goals}</p>
+                                <div className="flex items-center space-x-2">
+                                  <Badge variant="outline" className="text-xs">
+                                    {record.therapist
+                                      ? `${record.therapist.firstName} ${record.therapist.lastName}`
+                                      : "Unknown Therapist"}
+                                  </Badge>
+
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="icon">
+                                        <MoreHorizontal className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuItem asChild>
+                                        <Link
+                                          href={`/patients/${record.patient.id}`}
+                                        >
+                                          <Eye className="h-4 w-4 mr-2" />
+                                          View Patient
+                                        </Link>
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem asChild>
+                                        <Link
+                                          href={`/records/${record.id}/edit`}
+                                        >
+                                          <Edit className="h-4 w-4 mr-2" />
+                                          Edit Record
+                                        </Link>
+                                      </DropdownMenuItem>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem
+                                        onClick={() =>
+                                          handleDeleteRecord(record.id)
+                                        }
+                                        className="text-red-600"
+                                      >
+                                        Delete Record
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
                                 </div>
-                              )}
-                              
-                              {record.notes && (
-                                <div>
-                                  <h4 className="text-sm font-medium text-gray-700 mb-1 flex items-center">
-                                    <MessageSquare className="h-3 w-3 mr-1" />
-                                    Session Notes
-                                  </h4>
-                                  <p className="text-sm text-gray-600 line-clamp-3">{record.notes}</p>
-                                </div>
-                              )}
-                            </div>
-                            
-                            {(record.progress || record.planForNextSession) && (
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                                {record.progress && (
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {record.goals && (
                                   <div>
-                                    <h4 className="text-sm font-medium text-gray-700 mb-1">Progress</h4>
-                                    <p className="text-sm text-gray-600 line-clamp-2">{record.progress}</p>
+                                    <h4 className="text-sm font-medium text-gray-700 mb-1 flex items-center">
+                                      <Target className="h-3 w-3 mr-1" />
+                                      Session Goals
+                                    </h4>
+                                    <p className="text-sm text-gray-600 line-clamp-2">
+                                      {record.goals}
+                                    </p>
                                   </div>
                                 )}
-                                
-                                {record.planForNextSession && (
+
+                                {record.notes && (
                                   <div>
-                                    <h4 className="text-sm font-medium text-gray-700 mb-1">Next Session Plan</h4>
-                                    <p className="text-sm text-gray-600 line-clamp-2">{record.planForNextSession}</p>
+                                    <h4 className="text-sm font-medium text-gray-700 mb-1 flex items-center">
+                                      <MessageSquare className="h-3 w-3 mr-1" />
+                                      Session Notes
+                                    </h4>
+                                    <p className="text-sm text-gray-600 line-clamp-3">
+                                      {record.notes}
+                                    </p>
                                   </div>
                                 )}
                               </div>
-                            )}
+
+                              {(record.progress ||
+                                record.planForNextSession) && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                                  {record.progress && (
+                                    <div>
+                                      <h4 className="text-sm font-medium text-gray-700 mb-1">
+                                        Progress
+                                      </h4>
+                                      <p className="text-sm text-gray-600 line-clamp-2">
+                                        {record.progress}
+                                      </p>
+                                    </div>
+                                  )}
+
+                                  {record.planForNextSession && (
+                                    <div>
+                                      <h4 className="text-sm font-medium text-gray-700 mb-1">
+                                        Next Session Plan
+                                      </h4>
+                                      <p className="text-sm text-gray-600 line-clamp-2">
+                                        {record.planForNextSession}
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                  
+                        </CardContent>
+                      </Card>
+                    ),
+                  )}
+
                   {/* Pagination */}
                   {totalPages > 1 && (
                     <div className="flex items-center justify-between mt-6">
                       <div className="text-sm text-gray-600">
-                        Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, recordsData.total)} of {recordsData.total} records
+                        Showing {(currentPage - 1) * pageSize + 1} to{" "}
+                        {Math.min(currentPage * pageSize, recordsData.total)} of{" "}
+                        {recordsData.total} records
                       </div>
                       <div className="flex items-center space-x-2">
                         <Button
@@ -586,12 +697,16 @@ export default function Records() {
                 <Card>
                   <CardContent className="p-12 text-center">
                     <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No Treatment Records Found</h3>
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">
+                      No Treatment Records Found
+                    </h3>
                     <p className="text-gray-600 mb-4">
-                      {searchQuery || selectedPatient || selectedTherapist || selectedSessionType
+                      {searchQuery ||
+                      selectedPatient ||
+                      selectedTherapist ||
+                      selectedSessionType
                         ? "No records match your current filters."
-                        : "Start documenting patient sessions by creating your first treatment record."
-                      }
+                        : "Start documenting patient sessions by creating your first treatment record."}
                     </p>
                     <Link href="/records/new">
                       <Button>

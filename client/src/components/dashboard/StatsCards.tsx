@@ -1,5 +1,12 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { Users, Calendar, Heart, DollarSign, ArrowUp, Clock } from "lucide-react";
+import {
+  Users,
+  Calendar,
+  Heart,
+  DollarSign,
+  ArrowUp,
+  Clock,
+} from "lucide-react";
 
 export interface DashboardStats {
   totalPatients: number;
@@ -82,29 +89,39 @@ export function StatsCards({ stats, isLoading }: StatsCardsProps) {
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
       {statCards.map((stat, index) => {
         const Icon = stat.icon;
-        
+
         return (
           <Card key={index} className="hover:shadow-md transition-shadow">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">{stat.title}</p>
+                  <p className="text-sm font-medium text-gray-600">
+                    {stat.title}
+                  </p>
                   <p className="text-3xl font-semibold text-gray-900 mt-2">
                     {stat.value}
                   </p>
-                  <p className={`text-sm mt-1 flex items-center ${
-                    stat.changeType === "positive" 
-                      ? "text-success-500" 
-                      : stat.changeType === "warning"
-                      ? "text-warning-500"
-                      : "text-gray-500"
-                  }`}>
-                    {stat.changeType === "positive" && <ArrowUp className="h-3 w-3 mr-1" />}
-                    {stat.changeType === "warning" && <Clock className="h-3 w-3 mr-1" />}
+                  <p
+                    className={`text-sm mt-1 flex items-center ${
+                      stat.changeType === "positive"
+                        ? "text-success-500"
+                        : stat.changeType === "warning"
+                          ? "text-warning-500"
+                          : "text-gray-500"
+                    }`}
+                  >
+                    {stat.changeType === "positive" && (
+                      <ArrowUp className="h-3 w-3 mr-1" />
+                    )}
+                    {stat.changeType === "warning" && (
+                      <Clock className="h-3 w-3 mr-1" />
+                    )}
                     {stat.change}
                   </p>
                 </div>
-                <div className={`w-12 h-12 ${stat.iconBg} rounded-lg flex items-center justify-center`}>
+                <div
+                  className={`w-12 h-12 ${stat.iconBg} rounded-lg flex items-center justify-center`}
+                >
                   <Icon className={`${stat.iconColor} h-6 w-6`} />
                 </div>
               </div>

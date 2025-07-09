@@ -9,7 +9,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Save, Calendar, Clock } from "lucide-react";
 import { useLocation } from "wouter";
@@ -63,7 +69,7 @@ export default function EditAppointment() {
       if (!appointmentId) return null;
       const response = await fetch(`/api/appointments/${appointmentId}`);
       if (!response.ok) {
-        throw new Error('Failed to fetch appointment');
+        throw new Error("Failed to fetch appointment");
       }
       return response.json();
     },
@@ -77,7 +83,7 @@ export default function EditAppointment() {
     queryFn: async () => {
       const response = await fetch("/api/patients");
       if (!response.ok) {
-        throw new Error('Failed to fetch patients');
+        throw new Error("Failed to fetch patients");
       }
       return response.json();
     },
@@ -90,7 +96,7 @@ export default function EditAppointment() {
     queryFn: async () => {
       const response = await fetch("/api/therapists");
       if (!response.ok) {
-        throw new Error('Failed to fetch therapists');
+        throw new Error("Failed to fetch therapists");
       }
       return response.json();
     },
@@ -102,7 +108,7 @@ export default function EditAppointment() {
     if (appointment) {
       const appointmentDate = new Date(appointment.appointmentDate);
       setFormData({
-        appointmentDate: appointmentDate.toISOString().split('T')[0],
+        appointmentDate: appointmentDate.toISOString().split("T")[0],
         appointmentTime: appointmentDate.toTimeString().slice(0, 5),
         duration: appointment.duration,
         type: appointment.type,
@@ -118,15 +124,15 @@ export default function EditAppointment() {
   const updateMutation = useMutation({
     mutationFn: async (data: any) => {
       const response = await fetch(`/api/appointments/${appointmentId}`, {
-        method: 'PATCH',
+        method: "PATCH",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(data),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update appointment');
+        throw new Error("Failed to update appointment");
       }
 
       return response.json();
@@ -136,11 +142,14 @@ export default function EditAppointment() {
         title: "Success",
         description: "Appointment updated successfully",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/appointments"], exact: false });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/appointments"],
+        exact: false,
+      });
       setLocation(`/appointments/${appointmentId}`);
     },
     onError: (error) => {
-      console.error('Error updating appointment:', error);
+      console.error("Error updating appointment:", error);
       toast({
         title: "Error",
         description: "Failed to update appointment",
@@ -151,9 +160,11 @@ export default function EditAppointment() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    const appointmentDateTime = new Date(`${formData.appointmentDate}T${formData.appointmentTime}`);
-    
+
+    const appointmentDateTime = new Date(
+      `${formData.appointmentDate}T${formData.appointmentTime}`,
+    );
+
     const updateData = {
       appointmentDate: appointmentDateTime.toISOString(),
       duration: formData.duration,
@@ -168,9 +179,9 @@ export default function EditAppointment() {
   };
 
   const handleInputChange = (field: string, value: string | number) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [field]: value
+      [field]: value,
     }));
   };
 
@@ -194,7 +205,9 @@ export default function EditAppointment() {
           <main className="flex-1 overflow-y-auto">
             <div className="p-6">
               <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-500 mx-auto"></div>
-              <p className="mt-4 text-gray-600 text-center">Loading appointment details...</p>
+              <p className="mt-4 text-gray-600 text-center">
+                Loading appointment details...
+              </p>
             </div>
           </main>
         </div>
@@ -205,25 +218,27 @@ export default function EditAppointment() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
-      
+
       <div className="flex">
         <Sidebar />
-        
+
         <main className="flex-1 overflow-y-auto">
           <div className="p-6">
             {/* Page Header */}
             <div className="mb-8">
               <div className="flex items-center gap-2 mb-2">
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => setLocation(`/appointments/${appointmentId}`)}
                   className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
                 >
                   <ArrowLeft className="h-4 w-4" />
                 </Button>
                 <div>
-                  <h1 className="text-2xl font-semibold text-gray-900">Edit Appointment</h1>
+                  <h1 className="text-2xl font-semibold text-gray-900">
+                    Edit Appointment
+                  </h1>
                   <p className="text-gray-600 mt-1">
                     Update appointment details and scheduling information.
                   </p>
@@ -241,9 +256,11 @@ export default function EditAppointment() {
                     {/* Patient Selection */}
                     <div className="space-y-2">
                       <Label htmlFor="patientId">Patient</Label>
-                      <Select 
-                        value={formData.patientId} 
-                        onValueChange={(value) => handleInputChange('patientId', value)}
+                      <Select
+                        value={formData.patientId}
+                        onValueChange={(value) =>
+                          handleInputChange("patientId", value)
+                        }
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select a patient" />
@@ -251,7 +268,8 @@ export default function EditAppointment() {
                         <SelectContent>
                           {patientsData?.patients?.map((patient: any) => (
                             <SelectItem key={patient.id} value={patient.id}>
-                              {patient.firstName} {patient.lastName} (#{patient.id.toString().padStart(4, '0')})
+                              {patient.firstName} {patient.lastName} (#
+                              {patient.id.toString().padStart(4, "0")})
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -261,9 +279,11 @@ export default function EditAppointment() {
                     {/* Therapist Selection */}
                     <div className="space-y-2">
                       <Label htmlFor="therapistId">Therapist</Label>
-                      <Select 
-                        value={formData.therapistId} 
-                        onValueChange={(value) => handleInputChange('therapistId', value)}
+                      <Select
+                        value={formData.therapistId}
+                        onValueChange={(value) =>
+                          handleInputChange("therapistId", value)
+                        }
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select a therapist" />
@@ -288,7 +308,12 @@ export default function EditAppointment() {
                             id="appointmentDate"
                             type="date"
                             value={formData.appointmentDate}
-                            onChange={(e) => handleInputChange('appointmentDate', e.target.value)}
+                            onChange={(e) =>
+                              handleInputChange(
+                                "appointmentDate",
+                                e.target.value,
+                              )
+                            }
                             className="pl-10"
                             required
                           />
@@ -302,7 +327,12 @@ export default function EditAppointment() {
                             id="appointmentTime"
                             type="time"
                             value={formData.appointmentTime}
-                            onChange={(e) => handleInputChange('appointmentTime', e.target.value)}
+                            onChange={(e) =>
+                              handleInputChange(
+                                "appointmentTime",
+                                e.target.value,
+                              )
+                            }
                             className="pl-10"
                             required
                           />
@@ -314,9 +344,11 @@ export default function EditAppointment() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="duration">Duration (minutes)</Label>
-                        <Select 
-                          value={formData.duration.toString()} 
-                          onValueChange={(value) => handleInputChange('duration', parseInt(value))}
+                        <Select
+                          value={formData.duration.toString()}
+                          onValueChange={(value) =>
+                            handleInputChange("duration", parseInt(value))
+                          }
                         >
                           <SelectTrigger>
                             <SelectValue />
@@ -332,17 +364,25 @@ export default function EditAppointment() {
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="type">Appointment Type</Label>
-                        <Select 
-                          value={formData.type} 
-                          onValueChange={(value) => handleInputChange('type', value)}
+                        <Select
+                          value={formData.type}
+                          onValueChange={(value) =>
+                            handleInputChange("type", value)
+                          }
                         >
                           <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="therapy-session">Therapy Session</SelectItem>
-                            <SelectItem value="consultation">Consultation</SelectItem>
-                            <SelectItem value="group-therapy">Group Therapy</SelectItem>
+                            <SelectItem value="therapy-session">
+                              Therapy Session
+                            </SelectItem>
+                            <SelectItem value="consultation">
+                              Consultation
+                            </SelectItem>
+                            <SelectItem value="group-therapy">
+                              Group Therapy
+                            </SelectItem>
                             <SelectItem value="intake">Intake</SelectItem>
                             <SelectItem value="follow-up">Follow-up</SelectItem>
                           </SelectContent>
@@ -353,9 +393,11 @@ export default function EditAppointment() {
                     {/* Status */}
                     <div className="space-y-2">
                       <Label htmlFor="status">Status</Label>
-                      <Select 
-                        value={formData.status} 
-                        onValueChange={(value) => handleInputChange('status', value)}
+                      <Select
+                        value={formData.status}
+                        onValueChange={(value) =>
+                          handleInputChange("status", value)
+                        }
                       >
                         <SelectTrigger>
                           <SelectValue />
@@ -375,7 +417,9 @@ export default function EditAppointment() {
                       <Textarea
                         id="notes"
                         value={formData.notes}
-                        onChange={(e) => handleInputChange('notes', e.target.value)}
+                        onChange={(e) =>
+                          handleInputChange("notes", e.target.value)
+                        }
                         placeholder="Add any notes about this appointment..."
                         rows={4}
                       />
@@ -383,8 +427,8 @@ export default function EditAppointment() {
 
                     {/* Submit Button */}
                     <div className="flex gap-3 pt-4">
-                      <Button 
-                        type="submit" 
+                      <Button
+                        type="submit"
                         disabled={updateMutation.isPending}
                         className="flex items-center gap-2"
                       >
@@ -393,12 +437,16 @@ export default function EditAppointment() {
                         ) : (
                           <Save className="h-4 w-4" />
                         )}
-                        {updateMutation.isPending ? "Saving..." : "Save Changes"}
+                        {updateMutation.isPending
+                          ? "Saving..."
+                          : "Save Changes"}
                       </Button>
-                      <Button 
-                        type="button" 
+                      <Button
+                        type="button"
                         variant="outline"
-                        onClick={() => setLocation(`/appointments/${appointmentId}`)}
+                        onClick={() =>
+                          setLocation(`/appointments/${appointmentId}`)
+                        }
                       >
                         Cancel
                       </Button>
@@ -412,4 +460,4 @@ export default function EditAppointment() {
       </div>
     </div>
   );
-} 
+}

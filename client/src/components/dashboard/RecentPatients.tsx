@@ -12,10 +12,18 @@ interface RecentPatientsProps {
   onViewAll?: () => void;
 }
 
-export function RecentPatients({ patients, isLoading, onViewAll }: RecentPatientsProps) {
-  console.log('RecentPatients render:', { patients: patients.length, isLoading, hasOnViewAll: !!onViewAll });
+export function RecentPatients({
+  patients,
+  isLoading,
+  onViewAll,
+}: RecentPatientsProps) {
+  console.log("RecentPatients render:", {
+    patients: patients.length,
+    isLoading,
+    hasOnViewAll: !!onViewAll,
+  });
   if (onViewAll) {
-    console.log('Rendering button, onViewAll:', !!onViewAll);
+    console.log("Rendering button, onViewAll:", !!onViewAll);
   }
 
   if (isLoading) {
@@ -23,14 +31,19 @@ export function RecentPatients({ patients, isLoading, onViewAll }: RecentPatient
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">Recent Patients</h2>
+            <h2 className="text-lg font-semibold text-gray-900">
+              Recent Patients
+            </h2>
             <div className="h-4 bg-gray-200 rounded w-16 animate-pulse"></div>
           </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="flex items-center space-x-4 p-3 bg-gray-50 rounded-lg animate-pulse">
+              <div
+                key={i}
+                className="flex items-center space-x-4 p-3 bg-gray-50 rounded-lg animate-pulse"
+              >
                 <div className="w-10 h-10 bg-gray-200 rounded-full"></div>
                 <div className="flex-1 space-y-2">
                   <div className="h-4 bg-gray-200 rounded w-32"></div>
@@ -48,7 +61,9 @@ export function RecentPatients({ patients, isLoading, onViewAll }: RecentPatient
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "active":
-        return <Badge className="bg-success-100 text-success-500">Active</Badge>;
+        return (
+          <Badge className="bg-success-100 text-success-500">Active</Badge>
+        );
       case "inactive":
         return <Badge variant="secondary">Inactive</Badge>;
       case "discharged":
@@ -66,12 +81,14 @@ export function RecentPatients({ patients, isLoading, onViewAll }: RecentPatient
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">Recent Patients</h2>
-          {console.log('Rendering button, onViewAll:', !!onViewAll)}
+          <h2 className="text-lg font-semibold text-gray-900">
+            Recent Patients
+          </h2>
+          {console.log("Rendering button, onViewAll:", !!onViewAll)}
           {onViewAll ? (
-            <Button 
-              variant="ghost" 
-              size="sm" 
+            <Button
+              variant="ghost"
+              size="sm"
               className="text-primary-500 hover:text-primary-600"
               onClick={onViewAll}
             >
@@ -79,14 +96,18 @@ export function RecentPatients({ patients, isLoading, onViewAll }: RecentPatient
             </Button>
           ) : (
             <Link href="/patients">
-              <Button variant="ghost" size="sm" className="text-primary-500 hover:text-primary-600">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-primary-500 hover:text-primary-600"
+              >
                 View All
               </Button>
             </Link>
           )}
         </div>
       </CardHeader>
-      
+
       <CardContent>
         {patients.length === 0 ? (
           <div className="text-center py-8">
@@ -113,7 +134,13 @@ export function RecentPatients({ patients, isLoading, onViewAll }: RecentPatient
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {patients.map((patient) => {
-                  console.log('Patient ID in RecentPatients:', patient.id, typeof patient.id, 'Full patient:', patient);
+                  console.log(
+                    "Patient ID in RecentPatients:",
+                    patient.id,
+                    typeof patient.id,
+                    "Full patient:",
+                    patient,
+                  );
                   return (
                     <tr key={patient.id} className="hover:bg-gray-50">
                       <td className="px-4 py-4 whitespace-nowrap">
@@ -134,10 +161,9 @@ export function RecentPatients({ patients, isLoading, onViewAll }: RecentPatient
                         </div>
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {patient.updatedAt 
+                        {patient.updatedAt
                           ? new Date(patient.updatedAt).toLocaleDateString()
-                          : "Never"
-                        }
+                          : "Never"}
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap">
                         {getStatusBadge(patient.status)}
@@ -148,7 +174,15 @@ export function RecentPatients({ patients, isLoading, onViewAll }: RecentPatient
                             <Eye className="h-4 w-4" />
                           </Button>
                         </Link>
-                        <Link href={`/patients/${patient.id}/edit`} onClick={() => console.log('Edit link clicked, URL:', `/patients/${patient.id}/edit`)}>
+                        <Link
+                          href={`/patients/${patient.id}/edit`}
+                          onClick={() =>
+                            console.log(
+                              "Edit link clicked, URL:",
+                              `/patients/${patient.id}/edit`,
+                            )
+                          }
+                        >
                           <Button variant="ghost" size="sm">
                             <Edit className="h-4 w-4" />
                           </Button>

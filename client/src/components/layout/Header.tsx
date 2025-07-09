@@ -1,19 +1,19 @@
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { 
-  Bell, 
-  Search, 
-  Brain, 
-  Users, 
-  Calendar, 
+import {
+  Bell,
+  Search,
+  Brain,
+  Users,
+  Calendar,
   FileText,
   Command,
   X,
   Loader2,
   Plus,
   Mail,
-  Settings
+  Settings,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useState, useRef, useEffect } from "react";
@@ -49,7 +49,7 @@ interface HeaderProps {
 
 interface SearchResult {
   id: string | number;
-  type: 'patient' | 'appointment' | 'record';
+  type: "patient" | "appointment" | "record";
   title: string;
   subtitle: string;
   icon: React.ReactNode;
@@ -58,7 +58,7 @@ interface SearchResult {
 
 interface LocationResult {
   id: string;
-  type: 'location';
+  type: "location";
   title: string;
   subtitle: string;
   icon: React.ReactNode;
@@ -97,11 +97,11 @@ export function Header({ onSearch }: HeaderProps) {
 
   const getSearchIcon = (type: string) => {
     switch (type) {
-      case 'patient':
+      case "patient":
         return <Users className="h-4 w-4" />;
-      case 'appointment':
+      case "appointment":
         return <Calendar className="h-4 w-4" />;
-      case 'record':
+      case "record":
         return <FileText className="h-4 w-4" />;
       default:
         return <Search className="h-4 w-4" />;
@@ -111,12 +111,14 @@ export function Header({ onSearch }: HeaderProps) {
   const getTypeBadge = (type: string) => {
     const variants = {
       patient: "bg-blue-100 text-blue-800",
-      appointment: "bg-green-100 text-green-800", 
-      record: "bg-purple-100 text-purple-800"
+      appointment: "bg-green-100 text-green-800",
+      record: "bg-purple-100 text-purple-800",
     };
-    
+
     return (
-      <Badge className={`text-xs ${variants[type as keyof typeof variants] || 'bg-gray-100 text-gray-800'}`}>
+      <Badge
+        className={`text-xs ${variants[type as keyof typeof variants] || "bg-gray-100 text-gray-800"}`}
+      >
         {type.charAt(0).toUpperCase() + type.slice(1)}
       </Badge>
     );
@@ -124,84 +126,114 @@ export function Header({ onSearch }: HeaderProps) {
 
   const portalLocations: LocationResult[] = [
     {
-      id: 'dashboard',
-      type: 'location',
-      title: 'Dashboard',
-      subtitle: 'Overview and quick stats',
+      id: "dashboard",
+      type: "location",
+      title: "Dashboard",
+      subtitle: "Overview and quick stats",
       icon: <Brain className="h-4 w-4" />,
-      href: '/',
-      keywords: ['dashboard', 'home', 'overview', 'main'],
+      href: "/",
+      keywords: ["dashboard", "home", "overview", "main"],
     },
     {
-      id: 'patients',
-      type: 'location',
-      title: 'Patients',
-      subtitle: 'View and manage patients',
+      id: "patients",
+      type: "location",
+      title: "Patients",
+      subtitle: "View and manage patients",
       icon: <Users className="h-4 w-4" />,
-      href: '/patients',
-      keywords: ['patients', 'patient', 'client', 'clients', 'profile', 'profiles'],
+      href: "/patients",
+      keywords: [
+        "patients",
+        "patient",
+        "client",
+        "clients",
+        "profile",
+        "profiles",
+      ],
     },
     {
-      id: 'appointments',
-      type: 'location',
-      title: 'Appointments',
-      subtitle: 'View and manage appointments',
+      id: "appointments",
+      type: "location",
+      title: "Appointments",
+      subtitle: "View and manage appointments",
       icon: <Calendar className="h-4 w-4" />,
-      href: '/appointments',
-      keywords: ['appointments', 'appointment', 'schedule', 'visit', 'visits'],
+      href: "/appointments",
+      keywords: ["appointments", "appointment", "schedule", "visit", "visits"],
     },
     {
-      id: 'records',
-      type: 'location',
-      title: 'Treatment Records',
-      subtitle: 'View and manage treatment records',
+      id: "records",
+      type: "location",
+      title: "Treatment Records",
+      subtitle: "View and manage treatment records",
       icon: <FileText className="h-4 w-4" />,
-      href: '/records',
-      keywords: ['records', 'treatment', 'notes', 'treatment records', 'progress'],
+      href: "/records",
+      keywords: [
+        "records",
+        "treatment",
+        "notes",
+        "treatment records",
+        "progress",
+      ],
     },
     {
-      id: 'inquiries',
-      type: 'location',
-      title: 'Inquiries',
-      subtitle: 'Track and manage patient inquiries',
+      id: "inquiries",
+      type: "location",
+      title: "Inquiries",
+      subtitle: "Track and manage patient inquiries",
       icon: <Mail className="h-4 w-4" />,
-      href: '/inquiries',
-      keywords: ['inquiries', 'inquiry', 'questions', 'contact'],
+      href: "/inquiries",
+      keywords: ["inquiries", "inquiry", "questions", "contact"],
     },
     {
-      id: 'reports',
-      type: 'location',
-      title: 'Reports',
-      subtitle: 'View analytics and reports',
+      id: "reports",
+      type: "location",
+      title: "Reports",
+      subtitle: "View analytics and reports",
       icon: <FileText className="h-4 w-4" />,
-      href: '/reports',
-      keywords: ['reports', 'analytics', 'statistics', 'stats'],
+      href: "/reports",
+      keywords: ["reports", "analytics", "statistics", "stats"],
     },
     {
-      id: 'staff',
-      type: 'location',
-      title: 'Staff',
-      subtitle: 'Manage staff accounts',
+      id: "staff",
+      type: "location",
+      title: "Staff",
+      subtitle: "Manage staff accounts",
       icon: <Users className="h-4 w-4" />,
-      href: '/staff',
-      keywords: ['staff', 'users', 'team', 'employees'],
+      href: "/staff",
+      keywords: ["staff", "users", "team", "employees"],
     },
     {
-      id: 'settings',
-      type: 'location',
-      title: 'Settings',
-      subtitle: 'Portal and account settings',
+      id: "settings",
+      type: "location",
+      title: "Settings",
+      subtitle: "Portal and account settings",
       icon: <Settings className="h-4 w-4" />,
-      href: '/settings',
-      keywords: ['settings', 'preferences', 'configuration', 'account'],
+      href: "/settings",
+      keywords: ["settings", "preferences", "configuration", "account"],
     },
   ];
 
   const helpTopics = [
-    { id: 'help-add-patient', title: 'How to add a patient?', answer: 'Go to Patients > New Patient and fill out the form.' },
-    { id: 'help-schedule-appointment', title: 'How to schedule an appointment?', answer: 'Go to Appointments > New Appointment and select a patient and time.' },
-    { id: 'help-export-data', title: 'How to export data?', answer: 'Use the Export button on the Patients or Appointments page.' },
-    { id: 'help-reset-password', title: 'How to reset my password?', answer: 'Go to your profile/settings and click Change Password.' },
+    {
+      id: "help-add-patient",
+      title: "How to add a patient?",
+      answer: "Go to Patients > New Patient and fill out the form.",
+    },
+    {
+      id: "help-schedule-appointment",
+      title: "How to schedule an appointment?",
+      answer:
+        "Go to Appointments > New Appointment and select a patient and time.",
+    },
+    {
+      id: "help-export-data",
+      title: "How to export data?",
+      answer: "Use the Export button on the Patients or Appointments page.",
+    },
+    {
+      id: "help-reset-password",
+      title: "How to reset my password?",
+      answer: "Go to your profile/settings and click Change Password.",
+    },
   ];
 
   useEffect(() => {
@@ -219,12 +251,16 @@ export function Header({ onSearch }: HeaderProps) {
     setApiLoading(true);
     const timeoutId = setTimeout(() => {
       fetch(`/api/search?q=${encodeURIComponent(trimmedQuery)}`)
-        .then(res => res.ok ? res.json() : [])
-        .then(data => {
+        .then((res) => (res.ok ? res.json() : []))
+        .then((data) => {
           if (!ignore) setApiResults(Array.isArray(data) ? data : []);
         })
-        .catch(() => { if (!ignore) setApiResults([]); })
-        .finally(() => { if (!ignore) setApiLoading(false); });
+        .catch(() => {
+          if (!ignore) setApiResults([]);
+        })
+        .finally(() => {
+          if (!ignore) setApiLoading(false);
+        });
     }, 300);
 
     return () => {
@@ -246,22 +282,26 @@ export function Header({ onSearch }: HeaderProps) {
     prevIsSearchOpen.current = isSearchOpen;
   }, [isSearchOpen]);
 
-  const navResults = searchQuery.length > 0
-    ? portalLocations.filter(loc =>
-        loc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        loc.subtitle.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : [];
-  const helpResults = searchQuery.length > 0
-    ? helpTopics.filter(topic =>
-        topic.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        topic.answer.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : [];
+  const navResults =
+    searchQuery.length > 0
+      ? portalLocations.filter(
+          (loc) =>
+            loc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            loc.subtitle.toLowerCase().includes(searchQuery.toLowerCase()),
+        )
+      : [];
+  const helpResults =
+    searchQuery.length > 0
+      ? helpTopics.filter(
+          (topic) =>
+            topic.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            topic.answer.toLowerCase().includes(searchQuery.toLowerCase()),
+        )
+      : [];
 
-  console.log('Search query:', searchQuery);
-  console.log('Location results:', navResults);
-  console.log('Help results:', helpResults);
+  console.log("Search query:", searchQuery);
+  console.log("Location results:", navResults);
+  console.log("Help results:", helpResults);
 
   return (
     <>
@@ -271,15 +311,23 @@ export function Header({ onSearch }: HeaderProps) {
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 bg-primary-500 rounded-lg flex items-center justify-center">
-                  <img src="/logo.png" alt="Logo" className="h-8 w-8 object-contain" />
+                  <img
+                    src="/logo.png"
+                    alt="Logo"
+                    className="h-8 w-8 object-contain"
+                  />
                 </div>
                 <div>
-                  <h1 className="text-xl font-semibold text-gray-900">NewLife CRM</h1>
-                  <p className="text-sm text-gray-500">Mental Health Practice Management</p>
+                  <h1 className="text-xl font-semibold text-gray-900">
+                    NewLife CRM
+                  </h1>
+                  <p className="text-sm text-gray-500">
+                    Mental Health Practice Management
+                  </p>
                 </div>
               </div>
             </div>
-            
+
             <div className="flex items-center space-x-4">
               <TooltipProvider>
                 <Tooltip>
@@ -302,43 +350,63 @@ export function Header({ onSearch }: HeaderProps) {
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
-              
+
               <Button variant="ghost" size="icon" className="relative">
                 <Bell className="h-5 w-5" />
                 <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
                   3
                 </span>
               </Button>
-              
+
               <div className="flex items-center space-x-3 pl-4 border-l border-gray-200">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <div className="flex items-center gap-2 cursor-pointer select-none">
                       <div className="text-right">
                         <p className="text-sm font-medium text-gray-900">
-                          {typedUser ? `${typedUser.firstName || ""} ${typedUser.lastName || ""}`.trim() || "User" : "Loading..."}
+                          {typedUser
+                            ? `${typedUser.firstName || ""} ${typedUser.lastName || ""}`.trim() ||
+                              "User"
+                            : "Loading..."}
                         </p>
                         <p className="text-xs text-gray-500">
                           {typedUser ? getUserRole(typedUser.role) : ""}
                         </p>
                       </div>
                       <Avatar>
-                        <AvatarImage src={typedUser?.profileImageUrl || undefined} alt="User profile" />
+                        <AvatarImage
+                          src={typedUser?.profileImageUrl || undefined}
+                          alt="User profile"
+                        />
                         <AvatarFallback className="bg-primary-100 text-primary-600">
-                          {getInitials(typedUser?.firstName || undefined, typedUser?.lastName || undefined)}
+                          {getInitials(
+                            typedUser?.firstName || undefined,
+                            typedUser?.lastName || undefined,
+                          )}
                         </AvatarFallback>
                       </Avatar>
                     </div>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => {/* TODO: Navigate to profile */}}>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        /* TODO: Navigate to profile */
+                      }}
+                    >
                       Profile
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => {/* TODO: Navigate to settings */}}>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        /* TODO: Navigate to settings */
+                      }}
+                    >
                       Settings
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={logout} className="text-red-600 focus:text-red-700">
+                    <DropdownMenuItem
+                      onClick={logout}
+                      className="text-red-600 focus:text-red-700"
+                    >
                       Logout
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -350,24 +418,36 @@ export function Header({ onSearch }: HeaderProps) {
       </header>
 
       <CommandDialog open={isSearchOpen} onOpenChange={setIsSearchOpen}>
-        <CommandInput 
+        <CommandInput
           ref={searchInputRef}
-          placeholder="Search patients, appointments, records..." 
+          placeholder="Search patients, appointments, records..."
           value={searchQuery}
           onValueChange={setSearchQuery}
         />
         <CommandList>
           <CommandGroup heading="Navigate to">
             {navResults.map((loc) => (
-              <CommandItem key={loc.id} onSelect={() => { setIsSearchOpen(false); navigate(loc.href); }}>
-                <div className="flex items-center space-x-2 mr-2">{loc.icon}</div>
+              <CommandItem
+                key={loc.id}
+                onSelect={() => {
+                  setIsSearchOpen(false);
+                  navigate(loc.href);
+                }}
+              >
+                <div className="flex items-center space-x-2 mr-2">
+                  {loc.icon}
+                </div>
                 <div className="flex-1">
                   <div className="font-medium">{loc.title}</div>
                   <div className="text-sm text-gray-500">{loc.subtitle}</div>
                 </div>
               </CommandItem>
             ))}
-            {navResults.length === 0 && <div className="text-gray-400 px-4 py-2 text-sm">No navigation matches</div>}
+            {navResults.length === 0 && (
+              <div className="text-gray-400 px-4 py-2 text-sm">
+                No navigation matches
+              </div>
+            )}
           </CommandGroup>
 
           <CommandGroup heading="Help & FAQ">
@@ -379,7 +459,11 @@ export function Header({ onSearch }: HeaderProps) {
                 </div>
               </CommandItem>
             ))}
-            {helpResults.length === 0 && <div className="text-gray-400 px-4 py-2 text-sm">No help matches</div>}
+            {helpResults.length === 0 && (
+              <div className="text-gray-400 px-4 py-2 text-sm">
+                No help matches
+              </div>
+            )}
           </CommandGroup>
 
           <CommandGroup heading="Search Results">
@@ -402,17 +486,25 @@ export function Header({ onSearch }: HeaderProps) {
                   {getTypeBadge(result.type)}
                 </div>
                 <div className="flex-1">
-                  <div className="font-medium">{result.title || result.name}</div>
-                  <div className="text-sm text-gray-500">{result.subtitle || result.type || ''}</div>
+                  <div className="font-medium">
+                    {result.title || result.name}
+                  </div>
+                  <div className="text-sm text-gray-500">
+                    {result.subtitle || result.type || ""}
+                  </div>
                 </div>
               </CommandItem>
             ))}
-            {!apiLoading && apiResults.length === 0 && searchQuery.length > 2 && (
-              <div className="text-center py-6 text-gray-400">
-                <Search className="h-8 w-8 mx-auto text-gray-400 mb-2" />
-                <p className="text-sm">No results found for "{searchQuery}"</p>
-              </div>
-            )}
+            {!apiLoading &&
+              apiResults.length === 0 &&
+              searchQuery.length > 2 && (
+                <div className="text-center py-6 text-gray-400">
+                  <Search className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+                  <p className="text-sm">
+                    No results found for "{searchQuery}"
+                  </p>
+                </div>
+              )}
           </CommandGroup>
         </CommandList>
       </CommandDialog>

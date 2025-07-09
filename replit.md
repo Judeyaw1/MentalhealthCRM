@@ -9,6 +9,7 @@ NewLife CRM is a comprehensive mental health practice management system designed
 The application follows a full-stack TypeScript architecture with a modern web stack:
 
 **Frontend Architecture:**
+
 - React 18 with TypeScript for the user interface
 - Vite as the build tool and development server
 - Wouter for client-side routing
@@ -17,12 +18,14 @@ The application follows a full-stack TypeScript architecture with a modern web s
 - React Hook Form with Zod validation for form handling
 
 **Backend Architecture:**
+
 - Express.js server with TypeScript
 - RESTful API design with structured route handling
 - Middleware-based request processing and logging
 - Session-based authentication using Replit Auth
 
 **Database Layer:**
+
 - PostgreSQL database with Neon serverless connection
 - Drizzle ORM for type-safe database operations
 - Structured schema with relationships between entities
@@ -31,30 +34,35 @@ The application follows a full-stack TypeScript architecture with a modern web s
 ## Key Components
 
 **Authentication System:**
+
 - Replit OpenID Connect (OIDC) integration
 - Session management with PostgreSQL storage
 - Role-based access control (admin, therapist, staff)
 - Secure authentication middleware
 
 **Patient Management:**
+
 - Comprehensive patient profiles with personal and medical information
 - HIPAA consent tracking and emergency contact management
 - Patient status management (active, inactive, discharged)
 - Therapist assignment and caseload management
 
 **Appointment System:**
+
 - Appointment scheduling with multiple duration options
 - Status tracking (scheduled, in-progress, completed, cancelled)
 - Integration with patient and therapist records
 - Calendar-based appointment management
 
 **Treatment Documentation:**
+
 - Structured treatment record creation and storage
 - Session notes, goals, interventions, and progress tracking
 - Treatment plan documentation with next session planning
 - Secure storage of sensitive clinical information
 
 **Dashboard and Analytics:**
+
 - Practice overview with key performance indicators
 - Recent patient activity and today's schedule
 - Quick action buttons for common tasks
@@ -71,6 +79,7 @@ The application follows a full-stack TypeScript architecture with a modern web s
 ## External Dependencies
 
 **Primary Dependencies:**
+
 - `@neondatabase/serverless`: PostgreSQL serverless connection for Neon database
 - `drizzle-orm` & `drizzle-kit`: Type-safe ORM and migration tools
 - `@tanstack/react-query`: Server state management and caching
@@ -80,11 +89,13 @@ The application follows a full-stack TypeScript architecture with a modern web s
 - `tailwindcss`: Utility-first CSS framework
 
 **Authentication:**
+
 - `openid-client` & `passport`: OpenID Connect authentication
 - `express-session` & `connect-pg-simple`: Session management
 - Custom Replit Auth integration
 
 **Development Tools:**
+
 - `vite`: Build tool and development server
 - `typescript`: Static type checking
 - `tsx`: TypeScript execution for development
@@ -93,24 +104,28 @@ The application follows a full-stack TypeScript architecture with a modern web s
 ## Deployment Strategy
 
 **Development Environment:**
+
 - Vite development server with HMR support
 - TypeScript compilation with incremental builds
 - Database migrations using Drizzle Kit
 - Environment-specific configuration management
 
 **Production Build:**
+
 - Client-side bundling with Vite for optimized assets
 - Server-side bundling with esbuild for Node.js deployment
 - Static asset serving with Express
 - Database connection pooling for production loads
 
 **Environment Configuration:**
+
 - `DATABASE_URL`: PostgreSQL connection string (required)
 - `SESSION_SECRET`: Session encryption key (required)
 - `REPLIT_DOMAINS`: Allowed domains for OIDC (required)
 - `ISSUER_URL`: OIDC issuer URL (optional, defaults to Replit)
 
 **Database Management:**
+
 - Schema definitions in `shared/schema.ts`
 - Migrations generated in `./migrations` directory
 - Push-based deployment with `npm run db:push`

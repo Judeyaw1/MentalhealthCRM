@@ -45,19 +45,27 @@ export default function EditPatient() {
 
   const updatePatientMutation = useMutation({
     mutationFn: async (patientData: Partial<InsertPatient>) => {
-      const response = await apiRequest("PATCH", `/api/patients/${patientId}`, patientData);
+      const response = await apiRequest(
+        "PATCH",
+        `/api/patients/${patientId}`,
+        patientData,
+      );
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/patients/${patientId}`] });
+      queryClient.invalidateQueries({
+        queryKey: [`/api/patients/${patientId}`],
+      });
       queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/recent-patients"] });
-      
+      queryClient.invalidateQueries({
+        queryKey: ["/api/dashboard/recent-patients"],
+      });
+
       toast({
         title: "Success",
         description: "Patient updated successfully.",
       });
-      
+
       setLocation(`/patients/${patientId}`);
     },
     onError: (error) => {
@@ -72,7 +80,7 @@ export default function EditPatient() {
         }, 500);
         return;
       }
-      
+
       toast({
         title: "Error",
         description: "Failed to update patient. Please try again.",
@@ -101,8 +109,12 @@ export default function EditPatient() {
           <main className="flex-1 overflow-y-auto">
             <div className="p-6">
               <div className="text-center py-12">
-                <h1 className="text-2xl font-semibold text-gray-900 mb-2">Patient Not Found</h1>
-                <p className="text-gray-600">The requested patient could not be found.</p>
+                <h1 className="text-2xl font-semibold text-gray-900 mb-2">
+                  Patient Not Found
+                </h1>
+                <p className="text-gray-600">
+                  The requested patient could not be found.
+                </p>
               </div>
             </div>
           </main>
@@ -114,17 +126,17 @@ export default function EditPatient() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
-      
+
       <div className="flex">
         <Sidebar />
-        
+
         <main className="flex-1 overflow-y-auto">
           <div className="p-6">
             {/* Return Arrow */}
             <div className="mb-4">
-              <Button 
-                variant="ghost" 
-                size="sm" 
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => setLocation(`/patients/${patientId}`)}
                 className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
               >

@@ -1,14 +1,27 @@
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { 
-  ChevronLeft, 
-  ChevronRight, 
-  Search, 
-  Filter, 
-  X, 
+import {
+  ChevronLeft,
+  ChevronRight,
+  Search,
+  Filter,
+  X,
   RefreshCw,
   Download,
   MoreHorizontal,
@@ -23,7 +36,7 @@ import {
   Calendar,
   User,
   Phone,
-  Mail
+  Mail,
 } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import {
@@ -56,7 +69,11 @@ interface DataTableProps<T> {
   onSearch?: (query: string) => void;
   onFilter?: (filter: { key: string; value: string }) => void;
   searchPlaceholder?: string;
-  filters?: { key: string; label: string; options: { value: string; label: string }[] }[];
+  filters?: {
+    key: string;
+    label: string;
+    options: { value: string; label: string }[];
+  }[];
   isLoading?: boolean;
   onSelectAll?: (checked: boolean) => void;
   selectAllChecked?: boolean;
@@ -138,27 +155,27 @@ export function DataTable<T>({
 
   const getSearchSuggestions = () => {
     if (!searchQuery || searchQuery.length < 2) return [];
-    
+
     const suggestions = [];
     const query = searchQuery.toLowerCase();
-    
+
     // Add common search suggestions based on the data
     if (data.length > 0) {
       const firstRow = data[0] as any;
-      if (firstRow.firstName && query.includes('name')) {
-        suggestions.push('Search by first name');
+      if (firstRow.firstName && query.includes("name")) {
+        suggestions.push("Search by first name");
       }
-      if (firstRow.email && query.includes('email')) {
-        suggestions.push('Search by email');
+      if (firstRow.email && query.includes("email")) {
+        suggestions.push("Search by email");
       }
-      if (firstRow.phone && query.includes('phone')) {
-        suggestions.push('Search by phone');
+      if (firstRow.phone && query.includes("phone")) {
+        suggestions.push("Search by phone");
       }
-      if (firstRow.status && query.includes('status')) {
-        suggestions.push('Filter by status');
+      if (firstRow.status && query.includes("status")) {
+        suggestions.push("Filter by status");
       }
     }
-    
+
     return suggestions.slice(0, 3);
   };
 
@@ -170,11 +187,11 @@ export function DataTable<T>({
           {/* Search Section */}
           <div className="flex-1 w-full">
             <div className="relative">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder={searchPlaceholder}
-              value={searchQuery}
-              onChange={(e) => handleSearch(e.target.value)}
+              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder={searchPlaceholder}
+                value={searchQuery}
+                onChange={(e) => handleSearch(e.target.value)}
                 onFocus={() => setSearchFocused(true)}
                 onBlur={() => setTimeout(() => setSearchFocused(false), 200)}
                 className="pl-10 pr-10"
@@ -189,21 +206,23 @@ export function DataTable<T>({
                   <X className="h-3 w-3" />
                 </Button>
               )}
-              
+
               {/* Search Suggestions */}
-              {searchFocused && searchQuery && getSearchSuggestions().length > 0 && (
-                <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-md shadow-lg z-10 mt-1">
-                  {getSearchSuggestions().map((suggestion, index) => (
-                    <div
-                      key={index}
-                      className="px-3 py-2 hover:bg-gray-50 cursor-pointer text-sm text-gray-600"
-                      onClick={() => handleSearch(suggestion)}
-                    >
-                      {suggestion}
-                    </div>
-                  ))}
-                </div>
-              )}
+              {searchFocused &&
+                searchQuery &&
+                getSearchSuggestions().length > 0 && (
+                  <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-md shadow-lg z-10 mt-1">
+                    {getSearchSuggestions().map((suggestion, index) => (
+                      <div
+                        key={index}
+                        className="px-3 py-2 hover:bg-gray-50 cursor-pointer text-sm text-gray-600"
+                        onClick={() => handleSearch(suggestion)}
+                      >
+                        {suggestion}
+                      </div>
+                    ))}
+                  </div>
+                )}
             </div>
           </div>
 
@@ -230,7 +249,7 @@ export function DataTable<T>({
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
-                  
+
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -281,7 +300,9 @@ export function DataTable<T>({
                       disabled={isLoading}
                       className="h-8 w-8 p-0"
                     >
-                      <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+                      <RefreshCw
+                        className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
+                      />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
@@ -315,11 +336,7 @@ export function DataTable<T>({
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8 w-8 p-0"
-                    >
+                    <Button variant="outline" size="sm" className="h-8 w-8 p-0">
                       <Settings className="h-4 w-4" />
                     </Button>
                   </TooltipTrigger>
@@ -336,20 +353,25 @@ export function DataTable<T>({
         {showFilters && filters.length > 0 && (
           <div className="mt-4 pt-4 border-t border-gray-200">
             <div className="flex flex-wrap gap-3">
-        {filters.map((filter) => (
-          <Select key={filter.key} onValueChange={(value) => handleFilterChange(filter.key, value)}>
-            <SelectTrigger className="w-full sm:w-[180px]">
-              <SelectValue placeholder={filter.label} />
-            </SelectTrigger>
-            <SelectContent>
-              {filter.options.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
+              {filters.map((filter) => (
+                <Select
+                  key={filter.key}
+                  onValueChange={(value) =>
+                    handleFilterChange(filter.key, value)
+                  }
+                >
+                  <SelectTrigger className="w-full sm:w-[180px]">
+                    <SelectValue placeholder={filter.label} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {filter.options.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               ))}
-            </SelectContent>
-          </Select>
-        ))}
             </div>
           </div>
         )}
@@ -359,7 +381,7 @@ export function DataTable<T>({
           <div className="mt-4 pt-4 border-t border-gray-200">
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-600">
-                {selectedCount} item{selectedCount !== 1 ? 's' : ''} selected
+                {selectedCount} item{selectedCount !== 1 ? "s" : ""} selected
               </span>
               <div className="flex items-center gap-2">
                 <Button
@@ -397,11 +419,15 @@ export function DataTable<T>({
                       Mark as Important
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => handleBulkAction("schedule")}>
+                    <DropdownMenuItem
+                      onClick={() => handleBulkAction("schedule")}
+                    >
                       <Calendar className="h-4 w-4 mr-2" />
                       Schedule Follow-up
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleBulkAction("assign")}>
+                    <DropdownMenuItem
+                      onClick={() => handleBulkAction("assign")}
+                    >
                       <User className="h-4 w-4 mr-2" />
                       Assign Therapist
                     </DropdownMenuItem>
@@ -419,11 +445,16 @@ export function DataTable<T>({
           <TableHeader>
             <TableRow>
               {columns.map((column) => (
-                <TableHead key={column.key} className={column.key === "select" ? "w-12" : ""}>
+                <TableHead
+                  key={column.key}
+                  className={column.key === "select" ? "w-12" : ""}
+                >
                   {column.key === "select" && onSelectAll ? (
                     <Checkbox
                       checked={selectAllChecked}
-                      onCheckedChange={(checked: boolean) => onSelectAll(checked)}
+                      onCheckedChange={(checked: boolean) =>
+                        onSelectAll(checked)
+                      }
                     />
                   ) : (
                     column.label
@@ -435,7 +466,10 @@ export function DataTable<T>({
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center">
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-24 text-center"
+                >
                   <div className="flex items-center justify-center space-x-2">
                     <RefreshCw className="h-4 w-4 animate-spin" />
                     <span>Loading...</span>
@@ -444,7 +478,10 @@ export function DataTable<T>({
               </TableRow>
             ) : data.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center">
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-24 text-center"
+                >
                   <div className="flex flex-col items-center space-y-2">
                     <Search className="h-8 w-8 text-gray-400" />
                     <p className="text-gray-500">No results found</p>
@@ -479,7 +516,7 @@ export function DataTable<T>({
           Showing {Math.min((currentPage - 1) * pageSize + 1, totalItems)} to{" "}
           {Math.min(currentPage * pageSize, totalItems)} of {totalItems} results
         </div>
-        
+
         <div className="flex items-center space-x-2">
           <Button
             variant="outline"
@@ -490,7 +527,7 @@ export function DataTable<T>({
             <ChevronLeft className="h-4 w-4" />
             Previous
           </Button>
-          
+
           <div className="flex items-center space-x-1">
             {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
               const page = i + 1;
@@ -506,7 +543,7 @@ export function DataTable<T>({
               );
             })}
           </div>
-          
+
           <Button
             variant="outline"
             size="sm"

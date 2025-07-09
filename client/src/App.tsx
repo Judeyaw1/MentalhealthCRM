@@ -23,6 +23,7 @@ import Records from "@/pages/Records";
 import NewRecord from "@/pages/NewRecord";
 import Staff from "@/pages/Staff";
 import Reports from "@/pages/Reports";
+import AuditLogs from "@/pages/AuditLogs";
 
 function RouterComponent() {
   const { logout, isAuthenticated, user, forcePasswordChange } = useAuth();
@@ -63,15 +64,19 @@ function RouterComponent() {
             <Route path="/records/new" component={NewRecord} />
             <Route path="/staff" component={Staff} />
             <Route path="/reports" component={Reports} />
+            <Route path="/audit" component={AuditLogs} />
             <Route path="*" component={NotFound} />
           </>
         ) : (
           <>
             <Route path="/" component={Landing} />
-            <Route path="*" component={() => {
-              window.location.href = "/login";
-              return null;
-            }} />
+            <Route
+              path="*"
+              component={() => {
+                window.location.href = "/login";
+                return null;
+              }}
+            />
           </>
         )}
       </Switch>

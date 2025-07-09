@@ -3,24 +3,37 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Calendar, 
-  Clock, 
-  User, 
-  Target, 
-  MessageSquare, 
-  TrendingUp, 
+import {
+  Calendar,
+  Clock,
+  User,
+  Target,
+  MessageSquare,
+  TrendingUp,
   FileText,
   Save,
   Loader2,
   AlertCircle,
   CheckCircle,
-  X
+  X,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -29,9 +42,9 @@ import { useToast } from "@/hooks/use-toast";
 const insertTreatmentRecordSchema = z.object({
   patientId: z.string().min(1, "Patient ID is required"),
   therapistId: z.string().min(1, "Therapist ID is required"),
-  sessionDate: z.union([z.date(), z.string()]).transform((val) => 
-    typeof val === 'string' ? new Date(val) : val
-  ),
+  sessionDate: z
+    .union([z.date(), z.string()])
+    .transform((val) => (typeof val === "string" ? new Date(val) : val)),
   sessionType: z.string().min(1, "Session type is required"),
   notes: z.string().optional(),
   goals: z.string().optional(),
@@ -43,7 +56,7 @@ const insertTreatmentRecordSchema = z.object({
 type InsertTreatmentRecord = z.infer<typeof insertTreatmentRecordSchema>;
 
 // Type for form submission with timestamp
-type TreatmentRecordFormData = Omit<InsertTreatmentRecord, 'sessionDate'> & {
+type TreatmentRecordFormData = Omit<InsertTreatmentRecord, "sessionDate"> & {
   sessionDate: number;
 };
 
@@ -57,38 +70,54 @@ interface TreatmentRecordFormProps {
 
 const SESSION_TEMPLATES = {
   therapy: {
-    goals: "• Explore current challenges and stressors\n• Develop coping strategies\n• Work on identified treatment goals\n• Process recent experiences and emotions",
-    notes: "Session focused on [specific topic/issue]. Patient demonstrated [observations about engagement, mood, etc.]. Key interventions included [list specific techniques used].",
-    interventions: "• Cognitive Behavioral Therapy techniques\n• Mindfulness exercises\n• Psychoeducation on [topic]\n• Role-playing scenarios",
-    progress: "Patient shows [specific progress indicators]. Areas of improvement include [list improvements]. Continued challenges include [list ongoing issues].",
-    planForNextSession: "Continue work on [specific goals]. Focus on [next session priorities]. Consider [additional interventions or approaches]."
+    goals:
+      "• Explore current challenges and stressors\n• Develop coping strategies\n• Work on identified treatment goals\n• Process recent experiences and emotions",
+    notes:
+      "Session focused on [specific topic/issue]. Patient demonstrated [observations about engagement, mood, etc.]. Key interventions included [list specific techniques used].",
+    interventions:
+      "• Cognitive Behavioral Therapy techniques\n• Mindfulness exercises\n• Psychoeducation on [topic]\n• Role-playing scenarios",
+    progress:
+      "Patient shows [specific progress indicators]. Areas of improvement include [list improvements]. Continued challenges include [list ongoing issues].",
+    planForNextSession:
+      "Continue work on [specific goals]. Focus on [next session priorities]. Consider [additional interventions or approaches].",
   },
   assessment: {
-    goals: "• Complete comprehensive mental health assessment\n• Gather background information\n• Identify presenting problems\n• Establish baseline functioning",
-    notes: "Initial assessment session. Patient presents with [primary concerns]. Background includes [relevant history]. Current functioning appears [level of functioning].",
-    interventions: "• Clinical interview\n• Mental status examination\n• Risk assessment\n• Standardized assessment tools",
-    progress: "Assessment phase - establishing baseline. No progress to report yet.",
-    planForNextSession: "Complete assessment if needed. Begin treatment planning. Schedule follow-up session."
+    goals:
+      "• Complete comprehensive mental health assessment\n• Gather background information\n• Identify presenting problems\n• Establish baseline functioning",
+    notes:
+      "Initial assessment session. Patient presents with [primary concerns]. Background includes [relevant history]. Current functioning appears [level of functioning].",
+    interventions:
+      "• Clinical interview\n• Mental status examination\n• Risk assessment\n• Standardized assessment tools",
+    progress:
+      "Assessment phase - establishing baseline. No progress to report yet.",
+    planForNextSession:
+      "Complete assessment if needed. Begin treatment planning. Schedule follow-up session.",
   },
   intake: {
-    goals: "• Complete intake process and paperwork\n• Establish therapeutic relationship\n• Gather initial information\n• Set expectations for treatment",
-    notes: "Initial intake session. Patient completed all required paperwork. Presenting concerns include [list concerns]. Patient appears [observations about presentation].",
-    interventions: "• Intake interview\n• Paperwork completion\n• Treatment orientation\n• Goal setting discussion",
+    goals:
+      "• Complete intake process and paperwork\n• Establish therapeutic relationship\n• Gather initial information\n• Set expectations for treatment",
+    notes:
+      "Initial intake session. Patient completed all required paperwork. Presenting concerns include [list concerns]. Patient appears [observations about presentation].",
+    interventions:
+      "• Intake interview\n• Paperwork completion\n• Treatment orientation\n• Goal setting discussion",
     progress: "Intake phase - establishing foundation for treatment.",
-    planForNextSession: "Begin formal treatment sessions. Focus on [primary treatment goals]."
-  }
+    planForNextSession:
+      "Begin formal treatment sessions. Focus on [primary treatment goals].",
+  },
 };
 
-export function TreatmentRecordForm({ 
-  initialData, 
-  onSubmit, 
+export function TreatmentRecordForm({
+  initialData,
+  onSubmit,
   isLoading = false,
   patients = [],
-  therapists = []
+  therapists = [],
 }: TreatmentRecordFormProps) {
   const { toast } = useToast();
-  const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  const [selectedTemplate, setSelectedTemplate] = useState<string>('');
+  const [autoSaveStatus, setAutoSaveStatus] = useState<
+    "idle" | "saving" | "saved" | "error"
+  >("idle");
+  const [selectedTemplate, setSelectedTemplate] = useState<string>("");
 
   const form = useForm<InsertTreatmentRecord>({
     resolver: zodResolver(insertTreatmentRecordSchema),
@@ -112,11 +141,11 @@ export function TreatmentRecordForm({
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       if (form.formState.isDirty && !form.formState.isSubmitting) {
-        setAutoSaveStatus('saving');
+        setAutoSaveStatus("saving");
         // Simulate auto-save
         setTimeout(() => {
-          setAutoSaveStatus('saved');
-          setTimeout(() => setAutoSaveStatus('idle'), 2000);
+          setAutoSaveStatus("saved");
+          setTimeout(() => setAutoSaveStatus("idle"), 2000);
         }, 1000);
       }
     }, 2000);
@@ -128,18 +157,22 @@ export function TreatmentRecordForm({
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       // Ctrl+S to save
-      if ((event.ctrlKey || event.metaKey) && event.key === 's') {
+      if ((event.ctrlKey || event.metaKey) && event.key === "s") {
         event.preventDefault();
         if (form.formState.isValid && !isLoading) {
           form.handleSubmit(handleSubmit)();
         }
       }
-      
+
       // Esc to cancel
-      if (event.key === 'Escape') {
+      if (event.key === "Escape") {
         event.preventDefault();
         if (form.formState.isDirty) {
-          if (confirm("You have unsaved changes. Are you sure you want to cancel?")) {
+          if (
+            confirm(
+              "You have unsaved changes. Are you sure you want to cancel?",
+            )
+          ) {
             form.reset();
             window.history.back();
           }
@@ -149,20 +182,24 @@ export function TreatmentRecordForm({
       }
     };
 
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
   }, [form, isLoading]);
 
   // Apply template when session type changes
   useEffect(() => {
-    if (selectedTemplate && SESSION_TEMPLATES[watchedSessionType as keyof typeof SESSION_TEMPLATES]) {
-      const template = SESSION_TEMPLATES[watchedSessionType as keyof typeof SESSION_TEMPLATES];
+    if (
+      selectedTemplate &&
+      SESSION_TEMPLATES[watchedSessionType as keyof typeof SESSION_TEMPLATES]
+    ) {
+      const template =
+        SESSION_TEMPLATES[watchedSessionType as keyof typeof SESSION_TEMPLATES];
       form.setValue("goals", template.goals);
       form.setValue("notes", template.notes);
       form.setValue("interventions", template.interventions);
       form.setValue("progress", template.progress);
       form.setValue("planForNextSession", template.planForNextSession);
-      setSelectedTemplate('');
+      setSelectedTemplate("");
       toast({
         title: "Template Applied",
         description: `${watchedSessionType} template has been applied to your form.`,
@@ -174,18 +211,18 @@ export function TreatmentRecordForm({
     // Convert sessionDate from Date to timestamp for the backend
     const submissionData: TreatmentRecordFormData = {
       ...data,
-      sessionDate: new Date(data.sessionDate).getTime()
+      sessionDate: new Date(data.sessionDate).getTime(),
     };
-    console.log('Treatment record form submission data:', submissionData);
+    console.log("Treatment record form submission data:", submissionData);
     onSubmit(submissionData);
   };
 
   const handleSaveClick = () => {
     if (form.formState.isValid) {
       // Show confirmation for important fields
-      const hasNotes = form.getValues('notes')?.trim();
-      const hasPatient = form.getValues('patientId');
-      
+      const hasNotes = form.getValues("notes")?.trim();
+      const hasPatient = form.getValues("patientId");
+
       if (!hasNotes) {
         toast({
           title: "Missing Required Field",
@@ -194,7 +231,7 @@ export function TreatmentRecordForm({
         });
         return;
       }
-      
+
       if (!hasPatient) {
         toast({
           title: "Missing Required Field",
@@ -203,7 +240,7 @@ export function TreatmentRecordForm({
         });
         return;
       }
-      
+
       // Submit the form
       form.handleSubmit(handleSubmit)();
     }
@@ -211,10 +248,10 @@ export function TreatmentRecordForm({
 
   const formatDateTimeLocal = (date: Date) => {
     const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
     return `${year}-${month}-${day}T${hours}:${minutes}`;
   };
 
@@ -228,11 +265,11 @@ export function TreatmentRecordForm({
 
   const getAutoSaveIcon = () => {
     switch (autoSaveStatus) {
-      case 'saving':
+      case "saving":
         return <Loader2 className="h-4 w-4 animate-spin text-blue-500" />;
-      case 'saved':
+      case "saved":
         return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case 'error':
+      case "error":
         return <AlertCircle className="h-4 w-4 text-red-500" />;
       default:
         return null;
@@ -241,42 +278,57 @@ export function TreatmentRecordForm({
 
   const getAutoSaveText = () => {
     switch (autoSaveStatus) {
-      case 'saving':
-        return 'Saving...';
-      case 'saved':
-        return 'Saved';
-      case 'error':
-        return 'Save failed';
+      case "saving":
+        return "Saving...";
+      case "saved":
+        return "Saved";
+      case "error":
+        return "Save failed";
       default:
-        return '';
+        return "";
     }
   };
 
   const getFormCompletionPercentage = () => {
-    const requiredFields = ['patientId', 'therapistId', 'sessionDate', 'sessionType', 'notes'];
-    const optionalFields = ['goals', 'interventions', 'progress', 'planForNextSession'];
-    
-    const requiredCompleted = requiredFields.filter(field => {
+    const requiredFields = [
+      "patientId",
+      "therapistId",
+      "sessionDate",
+      "sessionType",
+      "notes",
+    ];
+    const optionalFields = [
+      "goals",
+      "interventions",
+      "progress",
+      "planForNextSession",
+    ];
+
+    const requiredCompleted = requiredFields.filter((field) => {
       const value = form.getValues(field as any);
-      return value && (typeof value === 'string' ? value.trim() : true);
+      return value && (typeof value === "string" ? value.trim() : true);
     }).length;
-    
-    const optionalCompleted = optionalFields.filter(field => {
+
+    const optionalCompleted = optionalFields.filter((field) => {
       const value = form.getValues(field as any);
       return value && value.trim();
     }).length;
-    
+
     const totalRequired = requiredFields.length;
     const totalOptional = optionalFields.length;
-    
-    return Math.round(((requiredCompleted / totalRequired) * 0.7 + (optionalCompleted / totalOptional) * 0.3) * 100);
+
+    return Math.round(
+      ((requiredCompleted / totalRequired) * 0.7 +
+        (optionalCompleted / totalOptional) * 0.3) *
+        100,
+    );
   };
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
         {/* Auto-save indicator */}
-        {autoSaveStatus !== 'idle' && (
+        {autoSaveStatus !== "idle" && (
           <div className="flex items-center space-x-2 text-sm text-gray-600">
             {getAutoSaveIcon()}
             <span>{getAutoSaveText()}</span>
@@ -301,7 +353,10 @@ export function TreatmentRecordForm({
                       <User className="h-4 w-4" />
                       <span>Patient *</span>
                     </FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value?.toString() || ''}>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value?.toString() || ""}
+                    >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select patient" />
@@ -309,27 +364,31 @@ export function TreatmentRecordForm({
                       </FormControl>
                       <SelectContent>
                         {patients.map((patient) => (
-                          <SelectItem key={patient.id} value={patient.id.toString()}>
+                          <SelectItem
+                            key={patient.id}
+                            value={patient.id.toString()}
+                          >
                             {patient.firstName} {patient.lastName}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />
-                    {field.value && patients.some(p => p.id.toString() === field.value) && (
-                      <a
-                        href={`/patients/${field.value}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary-600 hover:underline text-sm ml-2"
-                      >
-                        View Patient
-                      </a>
-                    )}
+                    {field.value &&
+                      patients.some((p) => p.id.toString() === field.value) && (
+                        <a
+                          href={`/patients/${field.value}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary-600 hover:underline text-sm ml-2"
+                        >
+                          View Patient
+                        </a>
+                      )}
                   </FormItem>
                 )}
               />
-              
+
               <FormField
                 control={form.control}
                 name="therapistId"
@@ -339,7 +398,10 @@ export function TreatmentRecordForm({
                       <User className="h-4 w-4" />
                       <span>Therapist *</span>
                     </FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value?.toString() || ''}>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value?.toString() || ""}
+                    >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select therapist" />
@@ -347,7 +409,10 @@ export function TreatmentRecordForm({
                       </FormControl>
                       <SelectContent>
                         {therapists.map((therapist) => (
-                          <SelectItem key={therapist.id} value={therapist.id.toString()}>
+                          <SelectItem
+                            key={therapist.id}
+                            value={therapist.id.toString()}
+                          >
                             {therapist.firstName} {therapist.lastName}
                           </SelectItem>
                         ))}
@@ -376,11 +441,15 @@ export function TreatmentRecordForm({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="therapy">Individual Therapy</SelectItem>
+                        <SelectItem value="therapy">
+                          Individual Therapy
+                        </SelectItem>
                         <SelectItem value="group">Group Therapy</SelectItem>
                         <SelectItem value="family">Family Therapy</SelectItem>
                         <SelectItem value="assessment">Assessment</SelectItem>
-                        <SelectItem value="consultation">Consultation</SelectItem>
+                        <SelectItem value="consultation">
+                          Consultation
+                        </SelectItem>
                         <SelectItem value="intake">Initial Intake</SelectItem>
                       </SelectContent>
                     </Select>
@@ -403,7 +472,9 @@ export function TreatmentRecordForm({
                     <Input
                       type="datetime-local"
                       value={formatDateTimeLocal(new Date(field.value))}
-                      onChange={(e) => field.onChange(parseDateTimeLocal(e.target.value))}
+                      onChange={(e) =>
+                        field.onChange(parseDateTimeLocal(e.target.value))
+                      }
                     />
                   </FormControl>
                   <FormMessage />
@@ -437,7 +508,8 @@ export function TreatmentRecordForm({
               ))}
             </div>
             <p className="text-sm text-gray-600 mt-2">
-              Click a template to auto-fill common sections for that session type.
+              Click a template to auto-fill common sections for that session
+              type.
             </p>
           </CardContent>
         </Card>
@@ -457,9 +529,9 @@ export function TreatmentRecordForm({
                 <FormItem>
                   <FormLabel>Session Goals</FormLabel>
                   <FormControl>
-                    <Textarea 
+                    <Textarea
                       name={field.name}
-                      value={field.value ?? ''}
+                      value={field.value ?? ""}
                       onChange={field.onChange}
                       onBlur={field.onBlur}
                       placeholder="Describe the goals and objectives for this session..."
@@ -489,9 +561,9 @@ export function TreatmentRecordForm({
                 <FormItem>
                   <FormLabel>Session Notes *</FormLabel>
                   <FormControl>
-                    <Textarea 
+                    <Textarea
                       name={field.name}
-                      value={field.value ?? ''}
+                      value={field.value ?? ""}
                       onChange={field.onChange}
                       onBlur={field.onBlur}
                       placeholder="Document the session content, patient responses, and clinical observations..."
@@ -510,9 +582,9 @@ export function TreatmentRecordForm({
                 <FormItem>
                   <FormLabel>Interventions Used</FormLabel>
                   <FormControl>
-                    <Textarea 
+                    <Textarea
                       name={field.name}
-                      value={field.value ?? ''}
+                      value={field.value ?? ""}
                       onChange={field.onChange}
                       onBlur={field.onBlur}
                       placeholder="Describe the therapeutic interventions and techniques used during the session..."
@@ -541,9 +613,9 @@ export function TreatmentRecordForm({
                 <FormItem>
                   <FormLabel>Patient Progress</FormLabel>
                   <FormControl>
-                    <Textarea 
+                    <Textarea
                       name={field.name}
-                      value={field.value ?? ''}
+                      value={field.value ?? ""}
                       onChange={field.onChange}
                       onBlur={field.onBlur}
                       placeholder="Describe the patient's progress toward treatment goals..."
@@ -562,9 +634,9 @@ export function TreatmentRecordForm({
                 <FormItem>
                   <FormLabel>Plan for Next Session</FormLabel>
                   <FormControl>
-                    <Textarea 
+                    <Textarea
                       name={field.name}
-                      value={field.value ?? ''}
+                      value={field.value ?? ""}
                       onChange={field.onChange}
                       onBlur={field.onBlur}
                       placeholder="Outline the plan and focus areas for the next session..."
@@ -598,12 +670,12 @@ export function TreatmentRecordForm({
                     </div>
                   )}
                 </div>
-                
+
                 {/* Form completion progress */}
                 <div className="flex items-center space-x-2">
                   <div className="w-24 bg-gray-200 rounded-full h-2">
-                    <div 
-                      className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
+                    <div
+                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                       style={{ width: `${getFormCompletionPercentage()}%` }}
                     ></div>
                   </div>
@@ -611,10 +683,11 @@ export function TreatmentRecordForm({
                     {getFormCompletionPercentage()}% complete
                   </span>
                 </div>
-                
+
                 {Object.keys(form.formState.errors).length > 0 && (
                   <div className="text-sm text-red-600">
-                    {Object.keys(form.formState.errors).length} field(s) need attention
+                    {Object.keys(form.formState.errors).length} field(s) need
+                    attention
                   </div>
                 )}
               </div>
@@ -622,13 +695,17 @@ export function TreatmentRecordForm({
               {/* Right side - Action buttons */}
               <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
                 {/* Cancel Button */}
-                <Button 
-                  type="button" 
-                  variant="outline" 
+                <Button
+                  type="button"
+                  variant="outline"
                   disabled={isLoading}
                   onClick={() => {
                     if (form.formState.isDirty) {
-                      if (confirm("You have unsaved changes. Are you sure you want to cancel?")) {
+                      if (
+                        confirm(
+                          "You have unsaved changes. Are you sure you want to cancel?",
+                        )
+                      ) {
                         form.reset();
                         // Navigate back or close form
                         window.history.back();
@@ -644,9 +721,9 @@ export function TreatmentRecordForm({
                 </Button>
 
                 {/* Save Draft Button */}
-                <Button 
-                  type="button" 
-                  variant="secondary" 
+                <Button
+                  type="button"
+                  variant="secondary"
                   disabled={isLoading || !form.formState.isDirty}
                   onClick={() => {
                     // Save as draft (could be implemented later)
@@ -662,8 +739,8 @@ export function TreatmentRecordForm({
                 </Button>
 
                 {/* Submit Button */}
-                <Button 
-                  type="button" 
+                <Button
+                  type="button"
                   disabled={isLoading || !form.formState.isValid}
                   onClick={handleSaveClick}
                   className="min-w-[140px] bg-green-600 hover:bg-green-700"
@@ -687,13 +764,19 @@ export function TreatmentRecordForm({
             <div className="mt-4 pt-4 border-t border-gray-200">
               <div className="text-xs text-gray-500 flex flex-wrap gap-4">
                 <span className="flex items-center space-x-1">
-                  <kbd className="px-1.5 py-0.5 text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 rounded">Ctrl</kbd>
+                  <kbd className="px-1.5 py-0.5 text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 rounded">
+                    Ctrl
+                  </kbd>
                   <span>+</span>
-                  <kbd className="px-1.5 py-0.5 text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 rounded">S</kbd>
+                  <kbd className="px-1.5 py-0.5 text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 rounded">
+                    S
+                  </kbd>
                   <span>Save</span>
                 </span>
                 <span className="flex items-center space-x-1">
-                  <kbd className="px-1.5 py-0.5 text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 rounded">Esc</kbd>
+                  <kbd className="px-1.5 py-0.5 text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 rounded">
+                    Esc
+                  </kbd>
                   <span>Cancel</span>
                 </span>
               </div>

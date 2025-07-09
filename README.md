@@ -5,6 +5,7 @@ A comprehensive mental health practice management system built with React, TypeS
 ## 🚀 Features
 
 ### Authentication & User Management
+
 - **Role-based access control** (Admin, Therapist, Staff)
 - **Secure login/logout** with session management
 - **Password reset functionality** with default password display
@@ -12,6 +13,7 @@ A comprehensive mental health practice management system built with React, TypeS
 - **Staff invitation system** for admins
 
 ### Patient Management
+
 - **Complete patient profiles** with personal, contact, and medical information
 - **HIPAA compliance** with consent tracking
 - **Patient search and filtering**
@@ -19,6 +21,7 @@ A comprehensive mental health practice management system built with React, TypeS
 - **Patient dashboard** with treatment history
 
 ### Appointment Scheduling
+
 - **Flexible appointment booking** with multiple types (therapy, consultation, group, intake, follow-up)
 - **Duration tracking** (15-240 minutes)
 - **Status management** (scheduled, completed, cancelled, no-show)
@@ -26,6 +29,7 @@ A comprehensive mental health practice management system built with React, TypeS
 - **Today's appointments view**
 
 ### Treatment Records
+
 - **Session documentation** with detailed notes
 - **Progress tracking** and goal setting
 - **Intervention logging**
@@ -33,6 +37,7 @@ A comprehensive mental health practice management system built with React, TypeS
 - **Treatment history timeline**
 
 ### Dashboard & Analytics
+
 - **Real-time statistics** (patients, appointments, revenue)
 - **Today's schedule** overview
 - **Recent patient activity**
@@ -40,6 +45,7 @@ A comprehensive mental health practice management system built with React, TypeS
 - **Performance metrics**
 
 ### Staff Management
+
 - **Staff directory** with role management
 - **Password reset** functionality
 - **Staff invitation** system
@@ -48,6 +54,7 @@ A comprehensive mental health practice management system built with React, TypeS
 ## 🛠️ Tech Stack
 
 ### Frontend
+
 - **React 18** with TypeScript
 - **Vite** for fast development and building
 - **Tailwind CSS** for styling
@@ -56,6 +63,7 @@ A comprehensive mental health practice management system built with React, TypeS
 - **React Hook Form** for form management
 
 ### Backend
+
 - **Node.js** with Express
 - **TypeScript** for type safety
 - **MongoDB** with Mongoose ODM
@@ -63,6 +71,7 @@ A comprehensive mental health practice management system built with React, TypeS
 - **Email service** integration (configurable)
 
 ### Development Tools
+
 - **ESLint** and **Prettier** for code quality
 - **TypeScript** for type checking
 - **Hot module replacement** for development
@@ -71,22 +80,26 @@ A comprehensive mental health practice management system built with React, TypeS
 ## 📦 Installation
 
 1. **Clone the repository**
+
    ```bash
    git clone https://github.com/Nammm-1/mentalhealthCRM.git
    cd mentalhealthCRM
    ```
 
 2. **Install dependencies**
+
    ```bash
    npm install
    ```
 
 3. **Set up environment variables**
+
    ```bash
    cp env.template .env
    ```
-   
+
    Edit `.env` with your configuration:
+
    ```env
    MONGODB_URI=your_mongodb_connection_string
    SESSION_SECRET=your_session_secret
@@ -100,11 +113,13 @@ A comprehensive mental health practice management system built with React, TypeS
    - The application will automatically create collections and indexes
 
 5. **Create admin user**
+
    ```bash
    node create-admin.js
    ```
 
 6. **Start the development server**
+
    ```bash
    npm run dev
    ```
@@ -117,12 +132,12 @@ A comprehensive mental health practice management system built with React, TypeS
 
 ### Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `MONGODB_URI` | MongoDB connection string | Required |
-| `SESSION_SECRET` | Session encryption secret | Required |
-| `PORT` | Server port | 3000 |
-| `NODE_ENV` | Environment mode | development |
+| Variable         | Description               | Default     |
+| ---------------- | ------------------------- | ----------- |
+| `MONGODB_URI`    | MongoDB connection string | Required    |
+| `SESSION_SECRET` | Session encryption secret | Required    |
+| `PORT`           | Server port               | 3000        |
+| `NODE_ENV`       | Environment mode          | development |
 
 ### Email Configuration (Optional)
 
@@ -162,6 +177,7 @@ MentalHealthTracker/
 ### Production Build
 
 1. **Build the frontend**
+
    ```bash
    cd client
    npm run build
@@ -192,28 +208,33 @@ MentalHealthTracker/
 ## 📊 API Endpoints
 
 ### Authentication
+
 - `POST /api/login` - User login
 - `POST /api/logout` - User logout
 - `POST /api/auth/change-password` - Change password
 
 ### Patients
+
 - `GET /api/patients` - List patients
 - `POST /api/patients` - Create patient
 - `GET /api/patients/:id` - Get patient details
 - `PATCH /api/patients/:id` - Update patient
 
 ### Appointments
+
 - `GET /api/appointments` - List appointments
 - `POST /api/appointments` - Create appointment
 - `GET /api/appointments/:id` - Get appointment details
 - `PATCH /api/appointments/:id` - Update appointment
 
 ### Staff Management
+
 - `GET /api/staff` - List staff members
 - `POST /api/staff/invite` - Invite new staff
 - `POST /api/staff/:id/reset-password` - Reset password
 
 ### Dashboard
+
 - `GET /api/dashboard/stats` - Dashboard statistics
 - `GET /api/dashboard/today-appointments` - Today's appointments
 - `GET /api/dashboard/recent-patients` - Recent patients
@@ -233,6 +254,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🆘 Support
 
 For support and questions:
+
 - Create an issue in the GitHub repository
 - Check the documentation in the codebase
 - Review the `FIREBASE_SETUP.md` for additional setup instructions
@@ -240,6 +262,7 @@ For support and questions:
 ## 🔄 Version History
 
 ### v1.0.0 (Current)
+
 - Complete mental health practice management system
 - MongoDB integration
 - Role-based authentication
@@ -251,4 +274,4 @@ For support and questions:
 
 ---
 
-**Built with ❤️ for mental health professionals** 
+**Built with ❤️ for mental health professionals**

@@ -1,7 +1,7 @@
-import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
-import { getAnalytics } from 'firebase/analytics';
+import { initializeApp } from "firebase/app";
+import { getFirestore } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
+import { getAnalytics } from "firebase/analytics";
 
 // Your Firebase configuration
 // You'll need to replace these with your actual Firebase project config
@@ -13,7 +13,7 @@ const firebaseConfig = {
   storageBucket: "mentalhealthcrm.firebasestorage.app",
   messagingSenderId: "929079713021",
   appId: "1:929079713021:web:8ee461a479eeaceacf3294",
-  measurementId: "G-T8X4JQEB7N"
+  measurementId: "G-T8X4JQEB7N",
 };
 
 // Initialize Firebase
@@ -28,4 +28,4 @@ export const auth = getAuth(app);
 // Initialize Analytics (optional)
 export const analytics = getAnalytics(app);
 
-export default app; 
+export default app;

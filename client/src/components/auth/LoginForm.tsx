@@ -45,23 +45,27 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
       // Store authentication state in localStorage
       localStorage.setItem("isLoggedIn", "true");
       localStorage.setItem("user", JSON.stringify(data.user));
-      localStorage.setItem("forcePasswordChange", data.forcePasswordChange ? "true" : "false");
-      
+      localStorage.setItem(
+        "forcePasswordChange",
+        data.forcePasswordChange ? "true" : "false",
+      );
+
       toast({
         title: "Login Successful",
         description: `Welcome back, ${data.user.firstName}!`,
       });
-      
+
       // Redirect to dashboard instead of reloading
       window.location.href = "/dashboard";
-      
+
       // Call success callback
       onSuccess?.();
     },
     onError: (error: Error) => {
       toast({
         title: "Login Failed",
-        description: error.message || "Invalid email or password. Please try again.",
+        description:
+          error.message || "Invalid email or password. Please try again.",
         variant: "destructive",
       });
     },
@@ -69,7 +73,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Validation
     if (!formData.email || !formData.password) {
       toast({
@@ -84,13 +88,11 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
   };
 
   const handleInputChange = (field: keyof LoginData, value: string) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       [field]: value,
     }));
   };
-
-
 
   return (
     <Card className="w-full max-w-md mx-auto">
@@ -103,7 +105,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
           Enter your credentials to access your account
         </p>
       </CardHeader>
-      
+
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
@@ -175,4 +177,4 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
       </CardContent>
     </Card>
   );
-} 
+}

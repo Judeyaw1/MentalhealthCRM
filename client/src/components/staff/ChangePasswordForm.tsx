@@ -5,7 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Key, Eye, EyeOff, Loader2, CheckCircle } from "lucide-react";
 import { isUnauthorizedError } from "@/lib/authUtils";
 
@@ -21,13 +26,17 @@ interface ChangePasswordData {
   confirmPassword: string;
 }
 
-export function ChangePasswordForm({ isOpen, onClose, onSuccess }: ChangePasswordFormProps) {
+export function ChangePasswordForm({
+  isOpen,
+  onClose,
+  onSuccess,
+}: ChangePasswordFormProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  
+
   const [formData, setFormData] = useState<ChangePasswordData>({
     currentPassword: "",
     newPassword: "",
@@ -35,7 +44,10 @@ export function ChangePasswordForm({ isOpen, onClose, onSuccess }: ChangePasswor
   });
 
   const changePasswordMutation = useMutation({
-    mutationFn: async (data: { currentPassword: string; newPassword: string }) => {
+    mutationFn: async (data: {
+      currentPassword: string;
+      newPassword: string;
+    }) => {
       const response = await fetch("/api/auth/change-password", {
         method: "POST",
         headers: {
@@ -54,19 +66,20 @@ export function ChangePasswordForm({ isOpen, onClose, onSuccess }: ChangePasswor
     onSuccess: (data) => {
       toast({
         title: "Password Changed Successfully",
-        description: "Your password has been updated. You can now continue using the application.",
+        description:
+          "Your password has been updated. You can now continue using the application.",
       });
-      
+
       // Reset form
       setFormData({
         currentPassword: "",
         newPassword: "",
         confirmPassword: "",
       });
-      
+
       // Close dialog
       onClose();
-      
+
       // Call success callback
       onSuccess?.();
     },
@@ -85,7 +98,8 @@ export function ChangePasswordForm({ isOpen, onClose, onSuccess }: ChangePasswor
 
       toast({
         title: "Password Change Failed",
-        description: error.message || "Failed to change password. Please try again.",
+        description:
+          error.message || "Failed to change password. Please try again.",
         variant: "destructive",
       });
     },
@@ -93,9 +107,13 @@ export function ChangePasswordForm({ isOpen, onClose, onSuccess }: ChangePasswor
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Validation
-    if (!formData.currentPassword || !formData.newPassword || !formData.confirmPassword) {
+    if (
+      !formData.currentPassword ||
+      !formData.newPassword ||
+      !formData.confirmPassword
+    ) {
       toast({
         title: "Validation Error",
         description: "Please fill in all fields.",
@@ -137,8 +155,11 @@ export function ChangePasswordForm({ isOpen, onClose, onSuccess }: ChangePasswor
     });
   };
 
-  const handleInputChange = (field: keyof ChangePasswordData, value: string) => {
-    setFormData(prev => ({
+  const handleInputChange = (
+    field: keyof ChangePasswordData,
+    value: string,
+  ) => {
+    setFormData((prev) => ({
       ...prev,
       [field]: value,
     }));
@@ -146,21 +167,27 @@ export function ChangePasswordForm({ isOpen, onClose, onSuccess }: ChangePasswor
 
   const getPasswordStrength = (password: string) => {
     if (!password) return { strength: 0, label: "", color: "" };
-    
+
     let strength = 0;
     if (password.length >= 8) strength++;
     if (/[a-z]/.test(password)) strength++;
     if (/[A-Z]/.test(password)) strength++;
     if (/[0-9]/.test(password)) strength++;
     if (/[^A-Za-z0-9]/.test(password)) strength++;
-    
+
     const labels = ["Very Weak", "Weak", "Fair", "Good", "Strong"];
-    const colors = ["text-red-500", "text-orange-500", "text-yellow-500", "text-blue-500", "text-green-500"];
-    
+    const colors = [
+      "text-red-500",
+      "text-orange-500",
+      "text-yellow-500",
+      "text-blue-500",
+      "text-green-500",
+    ];
+
     return {
       strength: Math.min(strength, 5),
       label: labels[Math.min(strength - 1, 4)],
-      color: colors[Math.min(strength - 1, 4)]
+      color: colors[Math.min(strength - 1, 4)],
     };
   };
 
@@ -175,7 +202,7 @@ export function ChangePasswordForm({ isOpen, onClose, onSuccess }: ChangePasswor
             Change Password
           </DialogTitle>
         </DialogHeader>
-        
+
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Current Password */}
           <div className="space-y-2">
@@ -185,7 +212,9 @@ export function ChangePasswordForm({ isOpen, onClose, onSuccess }: ChangePasswor
                 id="currentPassword"
                 type={showCurrentPassword ? "text" : "password"}
                 value={formData.currentPassword}
-                onChange={(e) => handleInputChange("currentPassword", e.target.value)}
+                onChange={(e) =>
+                  handleInputChange("currentPassword", e.target.value)
+                }
                 placeholder="Enter your current password"
                 disabled={changePasswordMutation.isPending}
               />
@@ -214,7 +243,9 @@ export function ChangePasswordForm({ isOpen, onClose, onSuccess }: ChangePasswor
                 id="newPassword"
                 type={showNewPassword ? "text" : "password"}
                 value={formData.newPassword}
-                onChange={(e) => handleInputChange("newPassword", e.target.value)}
+                onChange={(e) =>
+                  handleInputChange("newPassword", e.target.value)
+                }
                 placeholder="Enter your new password"
                 disabled={changePasswordMutation.isPending}
               />
@@ -233,7 +264,7 @@ export function ChangePasswordForm({ isOpen, onClose, onSuccess }: ChangePasswor
                 )}
               </Button>
             </div>
-            
+
             {/* Password Strength Indicator */}
             {formData.newPassword && (
               <div className="space-y-2">
@@ -247,15 +278,20 @@ export function ChangePasswordForm({ isOpen, onClose, onSuccess }: ChangePasswor
                       } ${passwordStrength.strength >= 4 ? "bg-blue-500" : ""} ${
                         passwordStrength.strength >= 5 ? "bg-green-500" : ""
                       }`}
-                      style={{ width: `${(passwordStrength.strength / 5) * 100}%` }}
+                      style={{
+                        width: `${(passwordStrength.strength / 5) * 100}%`,
+                      }}
                     />
                   </div>
-                  <span className={`text-sm font-medium ${passwordStrength.color}`}>
+                  <span
+                    className={`text-sm font-medium ${passwordStrength.color}`}
+                  >
                     {passwordStrength.label}
                   </span>
                 </div>
                 <p className="text-xs text-gray-500">
-                  Password must be at least 8 characters long and include uppercase, lowercase, numbers, and special characters.
+                  Password must be at least 8 characters long and include
+                  uppercase, lowercase, numbers, and special characters.
                 </p>
               </div>
             )}
@@ -269,7 +305,9 @@ export function ChangePasswordForm({ isOpen, onClose, onSuccess }: ChangePasswor
                 id="confirmPassword"
                 type={showConfirmPassword ? "text" : "password"}
                 value={formData.confirmPassword}
-                onChange={(e) => handleInputChange("confirmPassword", e.target.value)}
+                onChange={(e) =>
+                  handleInputChange("confirmPassword", e.target.value)
+                }
                 placeholder="Confirm your new password"
                 disabled={changePasswordMutation.isPending}
               />
@@ -288,7 +326,7 @@ export function ChangePasswordForm({ isOpen, onClose, onSuccess }: ChangePasswor
                 )}
               </Button>
             </div>
-            
+
             {/* Password Match Indicator */}
             {formData.confirmPassword && (
               <div className="flex items-center gap-2">
@@ -297,13 +335,15 @@ export function ChangePasswordForm({ isOpen, onClose, onSuccess }: ChangePasswor
                 ) : (
                   <div className="h-4 w-4 rounded-full border-2 border-red-500" />
                 )}
-                <span className={`text-sm ${
-                  formData.newPassword === formData.confirmPassword 
-                    ? "text-green-600" 
-                    : "text-red-600"
-                }`}>
-                  {formData.newPassword === formData.confirmPassword 
-                    ? "Passwords match" 
+                <span
+                  className={`text-sm ${
+                    formData.newPassword === formData.confirmPassword
+                      ? "text-green-600"
+                      : "text-red-600"
+                  }`}
+                >
+                  {formData.newPassword === formData.confirmPassword
+                    ? "Passwords match"
                     : "Passwords do not match"}
                 </span>
               </div>
@@ -342,4 +382,4 @@ export function ChangePasswordForm({ isOpen, onClose, onSuccess }: ChangePasswor
       </DialogContent>
     </Dialog>
   );
-} 
+}

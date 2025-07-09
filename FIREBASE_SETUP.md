@@ -121,37 +121,37 @@ service cloud.firestore {
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
-    
+
     // Staff can read all users
     match /users/{userId} {
-      allow read: if request.auth != null && 
+      allow read: if request.auth != null &&
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'staff'];
     }
-    
+
     // Patients - therapists can read their assigned patients
     match /patients/{patientId} {
-      allow read, write: if request.auth != null && 
-        (resource.data.assignedTherapistId == request.auth.uid || 
+      allow read, write: if request.auth != null &&
+        (resource.data.assignedTherapistId == request.auth.uid ||
          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'staff']);
     }
-    
+
     // Appointments - therapists can manage their appointments
     match /appointments/{appointmentId} {
-      allow read, write: if request.auth != null && 
-        (resource.data.therapistId == request.auth.uid || 
+      allow read, write: if request.auth != null &&
+        (resource.data.therapistId == request.auth.uid ||
          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'staff']);
     }
-    
+
     // Treatment records - therapists can manage their records
     match /treatmentRecords/{recordId} {
-      allow read, write: if request.auth != null && 
-        (resource.data.therapistId == request.auth.uid || 
+      allow read, write: if request.auth != null &&
+        (resource.data.therapistId == request.auth.uid ||
          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'staff']);
     }
-    
+
     // Audit logs - only admins can read
     match /auditLogs/{logId} {
-      allow read: if request.auth != null && 
+      allow read: if request.auth != null &&
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
       allow write: if request.auth != null;
     }
@@ -164,6 +164,7 @@ service cloud.firestore {
 Once you've completed the setup:
 
 1. **Start your server:**
+
    ```bash
    npm run dev
    ```
@@ -180,7 +181,7 @@ Once you've completed the setup:
 ✅ **User Management** - Manage authentication users  
 ✅ **Analytics Dashboard** - Track app usage  
 ✅ **Performance Monitoring** - Monitor app performance  
-✅ **Crash Reporting** - Get error reports  
+✅ **Crash Reporting** - Get error reports
 
 ## 🔗 **Your Firebase Project Links:**
 
@@ -197,4 +198,4 @@ Once you've completed the setup:
 
 ---
 
-**🎉 Congratulations! Your Mental Health Tracker now has a professional, scalable Firebase backend!** 
+**🎉 Congratulations! Your Mental Health Tracker now has a professional, scalable Firebase backend!**

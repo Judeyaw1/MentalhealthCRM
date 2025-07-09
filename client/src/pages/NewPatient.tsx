@@ -12,10 +12,27 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ChevronLeft, UserPlus, Info, Shield, FileText, Phone, User as UserIcon, Plus, Clock } from "lucide-react";
+import {
+  ChevronLeft,
+  UserPlus,
+  Info,
+  Shield,
+  FileText,
+  Phone,
+  User as UserIcon,
+  Plus,
+  Clock,
+} from "lucide-react";
 import type { InsertPatient } from "@shared/schema";
 
 export default function NewPatient() {
@@ -54,13 +71,15 @@ export default function NewPatient() {
     onSuccess: (patient) => {
       queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/recent-patients"] });
-      
+      queryClient.invalidateQueries({
+        queryKey: ["/api/dashboard/recent-patients"],
+      });
+
       toast({
         title: "Patient Created Successfully",
         description: `${patient.firstName} ${patient.lastName} has been added to the system.`,
       });
-      
+
       setLocation(`/patients/${patient.id}`);
     },
     onError: (error) => {
@@ -75,7 +94,7 @@ export default function NewPatient() {
         }, 500);
         return;
       }
-      
+
       toast({
         title: "Error",
         description: "Failed to create patient. Please try again.",
@@ -92,13 +111,15 @@ export default function NewPatient() {
     onSuccess: (patient) => {
       queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/recent-patients"] });
-      
+      queryClient.invalidateQueries({
+        queryKey: ["/api/dashboard/recent-patients"],
+      });
+
       toast({
         title: "Patient Added Successfully",
         description: `${patient.firstName} ${patient.lastName} has been added with basic information.`,
       });
-      
+
       setShowQuickAdd(false);
       setQuickAddData({ firstName: "", lastName: "", phone: "", email: "" });
       setLocation(`/patients/${patient.id}`);
@@ -113,10 +134,15 @@ export default function NewPatient() {
   });
 
   const handleQuickAdd = () => {
-    if (!quickAddData.firstName || !quickAddData.lastName || !quickAddData.phone) {
+    if (
+      !quickAddData.firstName ||
+      !quickAddData.lastName ||
+      !quickAddData.phone
+    ) {
       toast({
         title: "Missing Information",
-        description: "Please fill in at least first name, last name, and phone number.",
+        description:
+          "Please fill in at least first name, last name, and phone number.",
         variant: "destructive",
       });
       return;
@@ -155,10 +181,10 @@ export default function NewPatient() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
-      
+
       <div className="flex">
         <Sidebar />
-        
+
         <main className="flex-1 overflow-y-auto">
           <div className="p-6">
             {/* Breadcrumbs */}
@@ -184,17 +210,23 @@ export default function NewPatient() {
                     <UserPlus className="w-6 h-6 text-primary" />
                   </div>
                   <div>
-                    <h1 className="text-3xl font-bold text-gray-900">New Patient Registration</h1>
+                    <h1 className="text-3xl font-bold text-gray-900">
+                      New Patient Registration
+                    </h1>
                     <p className="text-gray-600 mt-1">
-                      Create a comprehensive patient profile with complete medical and contact information.
+                      Create a comprehensive patient profile with complete
+                      medical and contact information.
                     </p>
                   </div>
                 </div>
-                
+
                 {/* Quick Add Button */}
                 <Dialog open={showQuickAdd} onOpenChange={setShowQuickAdd}>
                   <DialogTrigger asChild>
-                    <Button variant="outline" className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      className="flex items-center gap-2"
+                    >
                       <Clock className="w-4 h-4" />
                       Quick Add
                     </Button>
@@ -203,7 +235,8 @@ export default function NewPatient() {
                     <DialogHeader>
                       <DialogTitle>Quick Add Patient</DialogTitle>
                       <DialogDescription>
-                        Add a patient with basic information. You can complete the full profile later.
+                        Add a patient with basic information. You can complete
+                        the full profile later.
                       </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4">
@@ -213,7 +246,12 @@ export default function NewPatient() {
                           <Input
                             id="firstName"
                             value={quickAddData.firstName}
-                            onChange={(e) => setQuickAddData(prev => ({ ...prev, firstName: e.target.value }))}
+                            onChange={(e) =>
+                              setQuickAddData((prev) => ({
+                                ...prev,
+                                firstName: e.target.value,
+                              }))
+                            }
                             placeholder="First name"
                           />
                         </div>
@@ -222,7 +260,12 @@ export default function NewPatient() {
                           <Input
                             id="lastName"
                             value={quickAddData.lastName}
-                            onChange={(e) => setQuickAddData(prev => ({ ...prev, lastName: e.target.value }))}
+                            onChange={(e) =>
+                              setQuickAddData((prev) => ({
+                                ...prev,
+                                lastName: e.target.value,
+                              }))
+                            }
                             placeholder="Last name"
                           />
                         </div>
@@ -233,7 +276,12 @@ export default function NewPatient() {
                           id="phone"
                           type="tel"
                           value={quickAddData.phone}
-                          onChange={(e) => setQuickAddData(prev => ({ ...prev, phone: e.target.value }))}
+                          onChange={(e) =>
+                            setQuickAddData((prev) => ({
+                              ...prev,
+                              phone: e.target.value,
+                            }))
+                          }
                           placeholder="Phone number"
                         />
                       </div>
@@ -243,26 +291,36 @@ export default function NewPatient() {
                           id="email"
                           type="email"
                           value={quickAddData.email}
-                          onChange={(e) => setQuickAddData(prev => ({ ...prev, email: e.target.value }))}
+                          onChange={(e) =>
+                            setQuickAddData((prev) => ({
+                              ...prev,
+                              email: e.target.value,
+                            }))
+                          }
                           placeholder="Email address"
                         />
                       </div>
                       <div className="flex justify-end gap-2">
-                        <Button variant="outline" onClick={() => setShowQuickAdd(false)}>
+                        <Button
+                          variant="outline"
+                          onClick={() => setShowQuickAdd(false)}
+                        >
                           Cancel
                         </Button>
-                        <Button 
+                        <Button
                           onClick={handleQuickAdd}
                           disabled={quickAddMutation.isPending}
                         >
-                          {quickAddMutation.isPending ? "Adding..." : "Add Patient"}
+                          {quickAddMutation.isPending
+                            ? "Adding..."
+                            : "Add Patient"}
                         </Button>
                       </div>
                     </div>
                   </DialogContent>
                 </Dialog>
               </div>
-              
+
               <div className="flex items-center gap-4 mt-4">
                 <Badge variant="secondary">Step-by-step form</Badge>
                 <Badge variant="outline">HIPAA compliant</Badge>
@@ -300,7 +358,8 @@ export default function NewPatient() {
                     <div className="flex items-start gap-2">
                       <div className="w-2 h-2 bg-primary rounded-full mt-2 flex-shrink-0"></div>
                       <p className="text-sm text-gray-600">
-                        You can navigate between steps using Previous/Next buttons
+                        You can navigate between steps using Previous/Next
+                        buttons
                       </p>
                     </div>
                     <div className="flex items-start gap-2">
@@ -364,9 +423,9 @@ export default function NewPatient() {
                     <Alert>
                       <Info className="h-4 w-4" />
                       <AlertDescription className="text-xs">
-                        All patient information is protected under HIPAA regulations. 
-                        We maintain strict confidentiality and security measures to 
-                        protect your privacy.
+                        All patient information is protected under HIPAA
+                        regulations. We maintain strict confidentiality and
+                        security measures to protect your privacy.
                       </AlertDescription>
                     </Alert>
                   </CardContent>

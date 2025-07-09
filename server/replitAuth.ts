@@ -1,6 +1,7 @@
 import session from "express-session";
 import type { Express, RequestHandler } from "express";
 import { storage } from "./storage";
+import { hashPassword, comparePassword } from "./lib/passwordUtils";
 
 // Extend session interface for local development
 declare module "express-session" {
@@ -87,42 +88,63 @@ export async function setupAuth(app: Express) {
   // Simple login endpoint for local development
   app.post("/api/login", async (req, res) => {
     const { email, password } = req.body;
-    
+
     if (!email || !password) {
       return res.status(400).json({ message: "Email and password required" });
     }
-    
+
     try {
       // Check if user exists
       let user = await storage.getUserByEmail(email);
-      
+
       if (!user) {
         // Check if this is the first user (make them admin)
         const allUsers = await storage.getStaff();
         if (allUsers.length === 0) {
-          // First user, create as admin
+          // First user, create as admin with hashed password
+          const hashedPassword = await hashPassword(password);
           user = await storage.createUser({
             email: email,
             firstName: "Admin",
             lastName: "User",
             role: "admin",
-            password: password
+            password: hashedPassword,
           });
         } else {
           return res.status(401).json({ message: "Invalid email or password" });
         }
       } else {
         // User exists, verify password
-        if (user.password !== password) {
+        const isPasswordValid = await comparePassword(password, user.password);
+        if (!isPasswordValid) {
           return res.status(401).json({ message: "Invalid email or password" });
         }
       }
-      
+
       req.session.userId = user.id;
-      res.json({ 
-        success: true, 
+      
+      // Log successful login
+      await storage.createAuditLog({
+        userId: user.id,
+        action: "login",
+        resourceType: "session",
+        resourceId: `session_${Date.now()}`,
+        details: JSON.stringify({
+          loginMethod: "password",
+          userAgent: req.headers['user-agent'],
+          ipAddress: req.ip,
+          email: email
+        }),
+        timestamp: new Date(),
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+        sessionId: req.sessionID,
+      });
+      
+      res.json({
+        success: true,
         user,
-        forcePasswordChange: user.forcePasswordChange || false
+        forcePasswordChange: user.forcePasswordChange || false,
       });
     } catch (error) {
       console.error("Login error:", error);
@@ -130,10 +152,36 @@ export async function setupAuth(app: Express) {
     }
   });
 
-  app.post("/api/logout", (req, res) => {
-    req.session.destroy(() => {
-      res.json({ success: true });
-    });
+  app.post("/api/logout", async (req, res) => {
+    try {
+      // Log logout event if user is authenticated
+      if (req.session.userId) {
+        await storage.createAuditLog({
+          userId: req.session.userId,
+          action: "logout",
+          resourceType: "session",
+          resourceId: `session_${Date.now()}`,
+          details: JSON.stringify({
+            logoutMethod: "manual",
+            userAgent: req.headers['user-agent'],
+            ipAddress: req.ip,
+          }),
+          timestamp: new Date(),
+          ipAddress: req.ip,
+          userAgent: req.headers['user-agent'],
+          sessionId: req.sessionID,
+        });
+      }
+      
+      req.session.destroy(() => {
+        res.json({ success: true });
+      });
+    } catch (error) {
+      console.error("Logout error:", error);
+      req.session.destroy(() => {
+        res.json({ success: true });
+      });
+    }
   });
 
   app.get("/api/me", async (req, res) => {
@@ -154,7 +202,7 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
       return next();
     }
   }
-  
+
   // No valid session, require login
   return res.status(401).json({ message: "Authentication required" });
 };

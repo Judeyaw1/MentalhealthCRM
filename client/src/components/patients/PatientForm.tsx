@@ -4,9 +4,22 @@ import { insertPatientSchema, type InsertPatient } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { z } from "zod";
 
@@ -19,10 +32,11 @@ interface PatientFormProps {
 
 // Define a form schema that accepts dateOfBirth as a string
 const patientFormSchema = insertPatientSchema.extend({
-  dateOfBirth: z.string().refine(
-    (val) => !isNaN(new Date(val).getTime()),
-    { message: "Invalid date" }
-  ),
+  dateOfBirth: z
+    .string()
+    .refine((val) => !isNaN(new Date(val).getTime()), {
+      message: "Invalid date",
+    }),
 });
 
 type PatientFormValues = {
@@ -41,18 +55,20 @@ type PatientFormValues = {
   assignedTherapistId?: string;
 };
 
-export function PatientForm({ 
-  initialData, 
-  onSubmit, 
+export function PatientForm({
+  initialData,
+  onSubmit,
   isLoading = false,
-  submitLabel = "Create Patient Record"
+  submitLabel = "Create Patient Record",
 }: PatientFormProps) {
   const form = useForm<PatientFormValues>({
     resolver: zodResolver(patientFormSchema),
     defaultValues: {
       firstName: initialData?.firstName || "",
       lastName: initialData?.lastName || "",
-      dateOfBirth: initialData?.dateOfBirth ? new Date(initialData.dateOfBirth).toISOString().split('T')[0] : "",
+      dateOfBirth: initialData?.dateOfBirth
+        ? new Date(initialData.dateOfBirth).toISOString().split("T")[0]
+        : "",
       gender: initialData?.gender || "",
       email: initialData?.email || "",
       phone: initialData?.phone || "",
@@ -91,13 +107,17 @@ export function PatientForm({
                   <FormItem>
                     <FormLabel>First Name *</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="Enter first name" value={field.value ?? ""} />
+                      <Input
+                        {...field}
+                        placeholder="Enter first name"
+                        value={field.value ?? ""}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              
+
               <FormField
                 control={form.control}
                 name="lastName"
@@ -105,7 +125,11 @@ export function PatientForm({
                   <FormItem>
                     <FormLabel>Last Name *</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="Enter last name" value={field.value ?? ""} />
+                      <Input
+                        {...field}
+                        placeholder="Enter last name"
+                        value={field.value ?? ""}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -127,14 +151,17 @@ export function PatientForm({
                   </FormItem>
                 )}
               />
-              
+
               <FormField
                 control={form.control}
                 name="gender"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Gender</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                    >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select gender" />
@@ -144,7 +171,9 @@ export function PatientForm({
                         <SelectItem value="male">Male</SelectItem>
                         <SelectItem value="female">Female</SelectItem>
                         <SelectItem value="non-binary">Non-binary</SelectItem>
-                        <SelectItem value="prefer-not-to-say">Prefer not to say</SelectItem>
+                        <SelectItem value="prefer-not-to-say">
+                          Prefer not to say
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -167,7 +196,12 @@ export function PatientForm({
                 <FormItem>
                   <FormLabel>Email Address</FormLabel>
                   <FormControl>
-                    <Input type="email" {...field} placeholder="Enter email address" value={field.value ?? ""} />
+                    <Input
+                      type="email"
+                      {...field}
+                      placeholder="Enter email address"
+                      value={field.value ?? ""}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -182,13 +216,18 @@ export function PatientForm({
                   <FormItem>
                     <FormLabel>Phone Number</FormLabel>
                     <FormControl>
-                      <Input type="tel" {...field} placeholder="Enter phone number" value={field.value ?? ""} />
+                      <Input
+                        type="tel"
+                        {...field}
+                        placeholder="Enter phone number"
+                        value={field.value ?? ""}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              
+
               <FormField
                 control={form.control}
                 name="emergencyContact"
@@ -196,7 +235,12 @@ export function PatientForm({
                   <FormItem>
                     <FormLabel>Emergency Contact</FormLabel>
                     <FormControl>
-                      <Input type="tel" {...field} placeholder="Enter emergency contact" value={field.value ?? ""} />
+                      <Input
+                        type="tel"
+                        {...field}
+                        placeholder="Enter emergency contact"
+                        value={field.value ?? ""}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -211,7 +255,12 @@ export function PatientForm({
                 <FormItem>
                   <FormLabel>Address</FormLabel>
                   <FormControl>
-                    <Textarea {...field} placeholder="Enter full address" rows={3} value={field.value ?? ""} />
+                    <Textarea
+                      {...field}
+                      placeholder="Enter full address"
+                      rows={3}
+                      value={field.value ?? ""}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -232,7 +281,11 @@ export function PatientForm({
                 <FormItem>
                   <FormLabel>Insurance Provider</FormLabel>
                   <FormControl>
-                    <Input {...field} placeholder="Enter insurance provider" value={field.value ?? ""} />
+                    <Input
+                      {...field}
+                      placeholder="Enter insurance provider"
+                      value={field.value ?? ""}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -246,8 +299,8 @@ export function PatientForm({
                 <FormItem>
                   <FormLabel>Reason for Visit</FormLabel>
                   <FormControl>
-                    <Textarea 
-                      {...field} 
+                    <Textarea
+                      {...field}
                       placeholder="Please describe the primary concerns or reasons for seeking mental health services..."
                       rows={4}
                       value={field.value ?? ""}
@@ -264,7 +317,10 @@ export function PatientForm({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Status</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                  >
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select patient status" />
@@ -300,11 +356,10 @@ export function PatientForm({
                     />
                   </FormControl>
                   <div className="space-y-1 leading-none">
-                    <FormLabel>
-                      HIPAA Consent *
-                    </FormLabel>
+                    <FormLabel>HIPAA Consent *</FormLabel>
                     <p className="text-sm text-gray-600">
-                      I acknowledge that I have received and understand the HIPAA Notice of Privacy Practices
+                      I acknowledge that I have received and understand the
+                      HIPAA Notice of Privacy Practices
                     </p>
                   </div>
                   <FormMessage />
