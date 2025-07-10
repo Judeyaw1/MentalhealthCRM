@@ -7,6 +7,8 @@ import { insertPatientSchema, insertAuditLogSchema } from "@shared/schema";
 import { z } from "zod";
 import { Patient } from "./models/Patient";
 import { hashPassword, generateSecurePassword, comparePassword } from "./lib/passwordUtils";
+import * as XLSX from 'xlsx';
+import { createObjectCsvWriter } from 'csv-writer';
 
 // Custom schema for MongoDB treatment records
 const insertTreatmentRecordSchema = z.object({
@@ -306,6 +308,142 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: error.message });
       }
       res.status(500).json({ message: "Failed to delete patient" });
+    }
+  });
+
+  // Patient export endpoint
+  app.post("/api/patients/export", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const { format = "csv", patientIds } = req.body;
+
+      // Get patients data
+      let patients;
+      if (patientIds && patientIds.length > 0) {
+        // Export specific patients
+        patients = await Promise.all(
+          patientIds.map((id: string) => storage.getPatient(id))
+        );
+        patients = patients.filter(Boolean); // Remove any null results
+      } else {
+        // Export all patients
+        const result = await storage.getPatients(10000, 0); // Get all patients
+        patients = result.patients;
+      }
+
+      if (!patients || patients.length === 0) {
+        return res.status(404).json({ message: "No patients found to export" });
+      }
+
+      // Transform data for export
+      const exportData = patients.map((patient: any) => ({
+        ID: patient.id,
+        "First Name": patient.firstName,
+        "Last Name": patient.lastName,
+        "Date of Birth": new Date(patient.dateOfBirth).toLocaleDateString(),
+        Age: getAge(patient.dateOfBirth),
+        Gender: patient.gender,
+        Email: patient.email || "",
+        Phone: patient.phone || "",
+        Address: patient.address || "",
+        Status: patient.status,
+        "Assigned Therapist": patient.assignedTherapist ? `${patient.assignedTherapist.firstName} ${patient.assignedTherapist.lastName}` : "",
+        "Emergency Contact": patient.emergencyContact ? `${patient.emergencyContact.name} (${patient.emergencyContact.phone})` : "",
+        "Created Date": new Date(patient.createdAt).toLocaleDateString(),
+        "Last Updated": new Date(patient.updatedAt).toLocaleDateString(),
+      }));
+
+      // Helper function to calculate age
+      function getAge(dateOfBirth: string | number | Date) {
+        const today = new Date();
+        const birthDate = new Date(dateOfBirth);
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const monthDiff = today.getMonth() - birthDate.getMonth();
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+          age--;
+        }
+        return age;
+      }
+
+      if (format === "csv") {
+        // Export as CSV - generate directly in memory
+        const csvHeaders = [
+          'ID',
+          'First Name',
+          'Last Name',
+          'Date of Birth',
+          'Age',
+          'Gender',
+          'Email',
+          'Phone',
+          'Address',
+          'Status',
+          'Assigned Therapist',
+          'Emergency Contact',
+          'Created Date',
+          'Last Updated'
+        ];
+
+        const csvRows = exportData.map(row => [
+          row.ID,
+          `"${row['First Name']}"`,
+          `"${row['Last Name']}"`,
+          `"${row['Date of Birth']}"`,
+          row.Age,
+          `"${row.Gender}"`,
+          `"${row.Email}"`,
+          `"${row.Phone}"`,
+          `"${row.Address}"`,
+          `"${row.Status}"`,
+          `"${row['Assigned Therapist']}"`,
+          `"${row['Emergency Contact']}"`,
+          `"${row['Created Date']}"`,
+          `"${row['Last Updated']}"`
+        ].join(','));
+
+        const csvContent = [csvHeaders.join(','), ...csvRows].join('\n');
+
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename="patients-export-${new Date().toISOString().split('T')[0]}.csv"`);
+        res.send(csvContent);
+
+      } else if (format === "excel") {
+        // Export as Excel
+        const workbook = XLSX.utils.book_new();
+        const worksheet = XLSX.utils.json_to_sheet(exportData);
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Patients');
+
+        const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="patients-export-${new Date().toISOString().split('T')[0]}.xlsx"`);
+        res.send(excelBuffer);
+
+      } else if (format === "pdf") {
+        // For PDF, we'll return a simple text representation for now
+        // In a production app, you'd use a proper PDF library like pdfkit
+        const pdfContent = exportData.map(row => 
+          Object.entries(row).map(([key, value]) => `${key}: ${value}`).join('\n')
+        ).join('\n\n');
+
+        res.setHeader('Content-Type', 'text/plain');
+        res.setHeader('Content-Disposition', `attachment; filename="patients-export-${new Date().toISOString().split('T')[0]}.txt"`);
+        res.send(pdfContent);
+
+      } else {
+        return res.status(400).json({ message: "Unsupported export format" });
+      }
+
+      // Log the export activity
+      await logActivity(userId, "export", "patients", "list", {
+        format,
+        patientCount: patients.length,
+        patientIds: patientIds || "all"
+      });
+
+    } catch (error) {
+      console.error("Error exporting patients:", error);
+      res.status(500).json({ message: "Failed to export patients" });
     }
   });
 
@@ -834,12 +972,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get therapists endpoint
   app.get("/api/therapists", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
       const therapists = await storage.getTherapists();
+      
       await logActivity(userId, "view", "therapists", "list");
-
       res.json(therapists);
     } catch (error) {
       console.error("Error fetching therapists:", error);

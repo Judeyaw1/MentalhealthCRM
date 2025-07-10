@@ -151,6 +151,7 @@ export default function Patients() {
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: "include",
         body: JSON.stringify({ format, patientIds }),
       });
 

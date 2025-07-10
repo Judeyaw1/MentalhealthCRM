@@ -115,6 +115,9 @@ export async function setupAuth(app: Express) {
         }
       } else {
         // User exists, verify password
+        if (!user.password) {
+          return res.status(401).json({ message: "Invalid email or password" });
+        }
         const isPasswordValid = await comparePassword(password, user.password);
         if (!isPasswordValid) {
           return res.status(401).json({ message: "Invalid email or password" });
