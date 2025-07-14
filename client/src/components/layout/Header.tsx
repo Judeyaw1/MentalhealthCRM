@@ -133,7 +133,7 @@ export function Header({ onSearch }: HeaderProps) {
       title: "Dashboard",
       subtitle: "Overview and quick stats",
       icon: <Brain className="h-4 w-4" />,
-      href: "/",
+      href: "/dashboard",
       keywords: ["dashboard", "home", "overview", "main"],
     },
     {

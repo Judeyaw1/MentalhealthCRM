@@ -37,9 +37,9 @@ export function Sidebar({
       items: [
         {
           name: "Dashboard",
-          href: "/",
+          href: "/dashboard",
           icon: LayoutDashboard,
-          current: location === "/",
+          current: location === "/dashboard",
         },
         {
           name: "Patients",
