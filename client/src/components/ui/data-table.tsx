@@ -107,29 +107,21 @@ export function DataTable<T>({
   viewMode = "list",
   onViewModeChange,
   showQuickActions = true,
-}: DataTableProps<T>) {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+  searchQuery: externalSearchQuery,
+}: DataTableProps<T> & { searchQuery?: string }) {
+  const [searchQuery, setSearchQuery] = useState(externalSearchQuery || "");
   const [showFilters, setShowFilters] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
   const totalPages = Math.ceil(totalItems / pageSize);
 
-  // Debounce search query
+  // Sync internal state with external prop
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearchQuery(searchQuery);
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
-
-  // Call onSearch when debounced query changes
-  useEffect(() => {
-    onSearch?.(debouncedSearchQuery);
-  }, [debouncedSearchQuery, onSearch]);
+    setSearchQuery(externalSearchQuery || "");
+  }, [externalSearchQuery]);
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
+    onSearch?.(query);
   };
 
   const handleFilterChange = (filterKey: string, value: string) => {
@@ -138,7 +130,7 @@ export function DataTable<T>({
 
   const clearSearch = () => {
     setSearchQuery("");
-    setDebouncedSearchQuery("");
+    onSearch?.("");
   };
 
   const handleRefresh = () => {
@@ -162,21 +154,56 @@ export function DataTable<T>({
     // Add common search suggestions based on the data
     if (data.length > 0) {
       const firstRow = data[0] as any;
-      if (firstRow.firstName && query.includes("name")) {
-        suggestions.push("Search by first name");
+      
+      // Patient-related suggestions
+      if (firstRow.patient?.firstName && query.includes("name")) {
+        suggestions.push("Search by patient name");
       }
-      if (firstRow.email && query.includes("email")) {
-        suggestions.push("Search by email");
+      if (firstRow.patient?.email && query.includes("email")) {
+        suggestions.push("Search by patient email");
       }
-      if (firstRow.phone && query.includes("phone")) {
-        suggestions.push("Search by phone");
+      if (firstRow.patient?.phone && query.includes("phone")) {
+        suggestions.push("Search by patient phone");
+      }
+      
+      // Therapist-related suggestions
+      if (firstRow.therapist?.firstName && query.includes("therapist")) {
+        suggestions.push("Search by therapist name");
+      }
+      
+      // Appointment-related suggestions
+      if (firstRow.sessionType && query.includes("session")) {
+        suggestions.push("Search by session type");
       }
       if (firstRow.status && query.includes("status")) {
         suggestions.push("Filter by status");
       }
+      if (firstRow.appointmentDate && query.includes("date")) {
+        suggestions.push("Search by appointment date");
+      }
+      
+      // Common search patterns
+      if (query.includes("today")) {
+        suggestions.push("Show today's appointments");
+      }
+      if (query.includes("week")) {
+        suggestions.push("Show this week's appointments");
+      }
+      if (query.includes("month")) {
+        suggestions.push("Show this month's appointments");
+      }
+      if (query.includes("completed")) {
+        suggestions.push("Show completed appointments");
+      }
+      if (query.includes("scheduled")) {
+        suggestions.push("Show scheduled appointments");
+      }
+      if (query.includes("cancelled")) {
+        suggestions.push("Show cancelled appointments");
+      }
     }
 
-    return suggestions.slice(0, 3);
+    return suggestions.slice(0, 5);
   };
 
   return (
@@ -194,7 +221,16 @@ export function DataTable<T>({
                 onChange={(e) => handleSearch(e.target.value)}
                 onFocus={() => setSearchFocused(true)}
                 onBlur={() => setTimeout(() => setSearchFocused(false), 200)}
-                className="pl-10 pr-10"
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    clearSearch();
+                    e.currentTarget.blur();
+                  }
+                  if (e.key === 'Enter' && searchQuery.trim()) {
+                    e.currentTarget.blur();
+                  }
+                }}
+                className="pl-10 pr-10 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
               />
               {searchQuery && (
                 <Button
@@ -207,6 +243,13 @@ export function DataTable<T>({
                 </Button>
               )}
 
+              {/* Search Results Counter */}
+              {searchQuery && (
+                <div className="absolute -bottom-6 left-0 text-xs text-gray-500">
+                  {totalItems} result{totalItems !== 1 ? 's' : ''} found
+                </div>
+              )}
+
               {/* Search Suggestions */}
               {searchFocused &&
                 searchQuery &&
@@ -215,9 +258,10 @@ export function DataTable<T>({
                     {getSearchSuggestions().map((suggestion, index) => (
                       <div
                         key={index}
-                        className="px-3 py-2 hover:bg-gray-50 cursor-pointer text-sm text-gray-600"
+                        className="px-3 py-2 hover:bg-gray-50 cursor-pointer text-sm text-gray-600 flex items-center gap-2"
                         onClick={() => handleSearch(suggestion)}
                       >
+                        <Search className="h-3 w-3 text-gray-400" />
                         {suggestion}
                       </div>
                     ))}
@@ -352,7 +396,7 @@ export function DataTable<T>({
         {/* Filters Section */}
         {showFilters && filters.length > 0 && (
           <div className="mt-4 pt-4 border-t border-gray-200">
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-3 items-center">
               {filters.map((filter) => (
                 <Select
                   key={filter.key}
@@ -372,6 +416,16 @@ export function DataTable<T>({
                   </SelectContent>
                 </Select>
               ))}
+              <Button
+                variant="outline"
+                size="sm"
+                className="ml-2"
+                onClick={() => {
+                  filters.forEach((filter) => handleFilterChange(filter.key, 'all'));
+                }}
+              >
+                Clear Filters
+              </Button>
             </div>
           </div>
         )}

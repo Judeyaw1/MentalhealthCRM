@@ -9,6 +9,7 @@ import { Patient } from "./models/Patient";
 import { hashPassword, generateSecurePassword, comparePassword } from "./lib/passwordUtils";
 import * as XLSX from 'xlsx';
 import { createObjectCsvWriter } from 'csv-writer';
+import { TreatmentCompletionService } from "./treatmentCompletionService";
 
 // Custom schema for MongoDB treatment records
 const insertTreatmentRecordSchema = z.object({
@@ -264,13 +265,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const patientId = req.params.id;
       const updates = insertPatientSchema.partial().parse(req.body);
 
-      const patient = await storage.updatePatient(patientId, updates);
+      // Clean up ObjectId fields - convert empty strings to null
+      const cleanedUpdates = {
+        ...updates,
+        assignedTherapistId:
+          updates.assignedTherapistId === "" || !updates.assignedTherapistId
+            ? null
+            : updates.assignedTherapistId,
+      };
+
+      const patient = await storage.updatePatient(patientId, cleanedUpdates);
       await logActivity(
         userId,
         "update",
         "patient",
         patientId.toString(),
-        updates,
+        cleanedUpdates,
       );
 
       res.json(patient);
@@ -1430,6 +1440,119 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error fetching unique logins:', error);
       res.status(500).json({ message: 'Failed to fetch unique logins' });
+    }
+  });
+
+  // Treatment completion endpoints
+  app.post("/api/patients/:id/check-discharge", isAuthenticated, async (req: any, res) => {
+    try {
+      const patientId = req.params.id;
+      const dischargeCheck = await TreatmentCompletionService.checkForAutoDischarge(patientId);
+      
+      res.json({
+        shouldDischarge: dischargeCheck.shouldDischarge,
+        reason: dischargeCheck.reason,
+        criteria: dischargeCheck.criteria
+      });
+    } catch (error) {
+      console.error("Error checking discharge criteria:", error);
+      res.status(500).json({ message: "Failed to check discharge criteria" });
+    }
+  });
+
+  app.post("/api/patients/:id/auto-discharge", isAuthenticated, async (req: any, res) => {
+    try {
+      const patientId = req.params.id;
+      const result = await TreatmentCompletionService.autoDischargePatient(patientId);
+      
+      if (result.success) {
+        // Log the auto-discharge
+        await logActivity(req.user.id, "auto_discharge", "patient", patientId, {
+          reason: result.reason,
+          criteria: result.criteria
+        });
+        
+        res.json({
+          success: true,
+          message: "Patient automatically discharged",
+          reason: result.reason,
+          criteria: result.criteria
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          message: "Discharge criteria not met",
+          criteria: result.criteria
+        });
+      }
+    } catch (error) {
+      console.error("Error auto-discharging patient:", error);
+      res.status(500).json({ message: "Failed to auto-discharge patient" });
+    }
+  });
+
+  app.post("/api/patients/:id/treatment-goals", isAuthenticated, async (req: any, res) => {
+    try {
+      const patientId = req.params.id;
+      const { goals } = req.body;
+
+      const patient = await storage.getPatient(patientId);
+      if (!patient) {
+        return res.status(404).json({ message: "Patient not found" });
+      }
+
+      // Update treatment goals
+      await Patient.findByIdAndUpdate(patientId, {
+        treatmentGoals: goals
+      });
+
+      // Log the update
+      await logActivity(req.user.id, "update_treatment_goals", "patient", patientId, {
+        goalsCount: goals.length
+      });
+
+      res.json({ success: true, message: "Treatment goals updated" });
+    } catch (error) {
+      console.error("Error updating treatment goals:", error);
+      res.status(500).json({ message: "Failed to update treatment goals" });
+    }
+  });
+
+  app.patch("/api/patients/:id/treatment-goals/:goalIndex", isAuthenticated, async (req: any, res) => {
+    try {
+      const patientId = req.params.id;
+      const goalIndex = parseInt(req.params.goalIndex);
+      const updates = req.body;
+
+      const result = await TreatmentCompletionService.updateTreatmentGoal(patientId, goalIndex, updates);
+
+      // Log the goal update
+      await logActivity(req.user.id, "update_treatment_goal", "patient", patientId, {
+        goalIndex,
+        status: updates.status
+      });
+
+      // Check for auto-discharge if goal was achieved
+      if (result.shouldCheckDischarge) {
+        const dischargeCheck = await TreatmentCompletionService.checkForAutoDischarge(patientId);
+        if (dischargeCheck.shouldDischarge) {
+          await TreatmentCompletionService.autoDischargePatient(patientId);
+          
+          await logActivity(req.user.id, "auto_discharge", "patient", patientId, {
+            reason: "Goal achievement triggered discharge",
+            criteria: dischargeCheck.criteria
+          });
+        }
+      }
+
+      res.json({ 
+        success: true, 
+        message: "Treatment goal updated",
+        shouldCheckDischarge: result.shouldCheckDischarge
+      });
+    } catch (error) {
+      console.error("Error updating treatment goal:", error);
+      res.status(500).json({ message: "Failed to update treatment goal" });
     }
   });
 

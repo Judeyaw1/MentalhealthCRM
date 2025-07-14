@@ -22,6 +22,21 @@ import {
   XCircle,
   FileText,
   MoreHorizontal,
+  Search,
+  Filter,
+  RefreshCw,
+  Download,
+  Settings,
+  Grid3X3,
+  List,
+  Bell,
+  Trash2,
+  User,
+  Phone,
+  Mail,
+  CalendarDays,
+  MapPin,
+  Stethoscope,
 } from "lucide-react";
 import { Link } from "wouter";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -33,8 +48,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Bell } from "lucide-react";
-import { Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
 export default function Appointments() {
@@ -44,9 +57,10 @@ export default function Appointments() {
   const [, setLocation] = useLocation();
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(10);
-  const [statusFilter, setStatusFilter] = useState<string>("");
-  const [dateFilter, setDateFilter] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [dateFilter, setDateFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
 
   // Redirect to home if not authenticated
   useEffect(() => {
@@ -65,7 +79,7 @@ export default function Appointments() {
 
   // Get date range for filtering
   const getDateRange = () => {
-    if (!dateFilter) return {};
+    if (!dateFilter || dateFilter === "all") return {};
 
     const today = new Date();
     let startDate: Date;
@@ -117,10 +131,22 @@ export default function Appointments() {
       "/api/appointments",
       {
         ...getDateRange(),
-        status: statusFilter || undefined,
+        status: statusFilter && statusFilter !== "all" ? statusFilter : undefined,
         search: searchQuery || undefined,
       },
     ],
+    queryFn: async ({ queryKey }) => {
+      const [url, params] = queryKey;
+      const searchParams = new URLSearchParams();
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined) searchParams.append(key, value);
+      });
+      const res = await fetch(`${url}?${searchParams.toString()}`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch appointments");
+      return res.json();
+    },
     retry: false,
     onSuccess: (data) => {
       console.log("Appointments fetched:", data?.length || 0, "appointments");
@@ -146,16 +172,28 @@ export default function Appointments() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "scheduled":
-        return <Badge variant="secondary">Scheduled</Badge>;
+        return <Badge variant="secondary" className="flex items-center gap-1">
+          <Clock className="h-3 w-3" />
+          Scheduled
+        </Badge>;
       case "completed":
         return (
-          <Badge className="bg-success-100 text-success-500">Completed</Badge>
+          <Badge className="bg-success-100 text-success-500 flex items-center gap-1">
+            <CheckCircle className="h-3 w-3" />
+            Completed
+          </Badge>
         );
       case "cancelled":
-        return <Badge className="bg-error-100 text-error-500">Cancelled</Badge>;
+        return <Badge className="bg-error-100 text-error-500 flex items-center gap-1">
+          <XCircle className="h-3 w-3" />
+          Cancelled
+        </Badge>;
       case "no-show":
         return (
-          <Badge className="bg-warning-100 text-warning-500">No Show</Badge>
+          <Badge className="bg-warning-100 text-warning-500 flex items-center gap-1">
+            <User className="h-3 w-3" />
+            No Show
+          </Badge>
         );
       default:
         return <Badge variant="secondary">{status}</Badge>;
@@ -198,8 +236,13 @@ export default function Appointments() {
               {row.patient?.firstName || "Unknown"}{" "}
               {row.patient?.lastName || "Patient"}
             </div>
-            <div className="text-xs text-gray-500">
-              #P-{row.patient?.id?.toString().padStart(4, "0") || "0000"}
+            <div className="text-xs text-gray-500 flex items-center gap-1">
+              <Mail className="h-3 w-3" />
+              {row.patient?.email || "No email"}
+            </div>
+            <div className="text-xs text-gray-500 flex items-center gap-1">
+              <Phone className="h-3 w-3" />
+              {row.patient?.phone || "No phone"}
             </div>
           </div>
         </div>
@@ -209,180 +252,116 @@ export default function Appointments() {
       key: "therapist",
       label: "Therapist",
       render: (_, row: AppointmentWithDetails) => (
-        <div className="text-sm text-gray-900">
-          {row.therapist?.firstName || "Unknown"}{" "}
-          {row.therapist?.lastName || "Therapist"}
+        <div className="flex items-center">
+          <Avatar className="h-6 w-6">
+            <AvatarFallback className="bg-blue-100 text-blue-600 text-xs">
+              {getInitials(
+                row.therapist?.firstName || "",
+                row.therapist?.lastName || "",
+              )}
+            </AvatarFallback>
+          </Avatar>
+          <div className="ml-2">
+            <div className="text-sm font-medium text-gray-900">
+              {row.therapist?.firstName || "Unknown"}{" "}
+              {row.therapist?.lastName || "Therapist"}
+            </div>
+            <div className="text-xs text-gray-500 flex items-center gap-1">
+              <Stethoscope className="h-3 w-3" />
+              {row.therapist?.role || "Therapist"}
+            </div>
+          </div>
         </div>
       ),
     },
     {
       key: "appointmentDate",
       label: "Date & Time",
-      render: (value: string) => (
-        <div className="text-sm text-gray-900">{formatDateTime(value)}</div>
-      ),
-    },
-    {
-      key: "type",
-      label: "Type",
-      render: (value: string) => (
-        <div className="text-sm text-gray-900 capitalize">
-          {value.replace("-", " ")}
+      render: (_, row: AppointmentWithDetails) => (
+        <div className="flex items-center">
+          <div className="flex items-center gap-2">
+            <CalendarDays className="h-4 w-4 text-gray-500" />
+            <div>
+              <div className="text-sm font-medium text-gray-900">
+                {formatDateTime(row.appointmentDate)}
+              </div>
+              <div className="text-xs text-gray-500">
+                Duration: {row.duration || "60"} min
+              </div>
+            </div>
+          </div>
         </div>
       ),
     },
     {
-      key: "duration",
-      label: "Duration",
-      render: (value: number) => (
-        <div className="text-sm text-gray-900">{value} min</div>
+      key: "sessionType",
+      label: "Session Type",
+      render: (_, row: AppointmentWithDetails) => (
+        <div className="flex items-center gap-2">
+          <FileText className="h-4 w-4 text-gray-500" />
+          <span className="text-sm text-gray-900">
+            {row.sessionType || "General"}
+          </span>
+        </div>
       ),
     },
     {
       key: "status",
       label: "Status",
-      render: (value: string) => getStatusBadge(value),
+      render: (_, row: AppointmentWithDetails) => getStatusBadge(row.status),
     },
     {
       key: "actions",
       label: "Actions",
       render: (_, row: AppointmentWithDetails) => (
-        <div className="flex items-center space-x-1">
-          {/* View Details */}
-          <Link to={`/appointments/${row.id}`}>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 w-8 p-0 hover:bg-blue-50 hover:text-blue-600"
-              title="View Details"
-            >
-              <Eye className="h-4 w-4" />
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+              <MoreHorizontal className="h-4 w-4" />
             </Button>
-          </Link>
-
-          {/* Edit Appointment */}
-          <Link to={`/appointments/${row.id}/edit`}>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 w-8 p-0 hover:bg-green-50 hover:text-green-600"
-              title="Edit Appointment"
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuItem onClick={() => setLocation(`/appointments/${row.id}`)}>
+              <Eye className="h-4 w-4 mr-2" />
+              View Details
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleReschedule(row.id)}>
+              <Edit className="h-4 w-4 mr-2" />
+              Edit/Reschedule
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleViewRecord(row.id)}>
+              <FileText className="h-4 w-4 mr-2" />
+              View Records
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleSendReminder(row.id)}>
+              <Bell className="h-4 w-4 mr-2" />
+              Send Reminder
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => handleStatusChange(row.id, "completed")}
+              className="text-green-600"
             >
-              <Edit className="h-4 w-4" />
-            </Button>
-          </Link>
-
-          {/* Add Treatment Record Button */}
-          <Link to={`/records/new?patientId=${row.patient?.id}&appointmentId=${row.id}`}>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 w-8 p-0 hover:bg-emerald-50 hover:text-emerald-600"
-              title="Add Treatment Record"
+              <CheckCircle className="h-4 w-4 mr-2" />
+              Mark Complete
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => handleStatusChange(row.id, "cancelled")}
+              className="text-red-600"
             >
-              <Plus className="h-4 w-4" />
-            </Button>
-          </Link>
-
-          {/* Status-based actions */}
-          {row.status === "scheduled" && (
-            <>
-              {/* Complete Appointment */}
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 w-8 p-0 hover:bg-emerald-50 hover:text-emerald-600"
-                title="Mark as Completed"
-                onClick={() => handleStatusChange(row.id, "completed")}
-                disabled={updateStatusMutation.isPending}
-              >
-                {updateStatusMutation.isPending ? (
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                ) : (
-                  <CheckCircle className="h-4 w-4" />
-                )}
-              </Button>
-
-              {/* Cancel Appointment */}
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600"
-                title="Cancel Appointment"
-                onClick={() => handleStatusChange(row.id, "cancelled")}
-                disabled={updateStatusMutation.isPending}
-              >
-                {updateStatusMutation.isPending ? (
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                ) : (
-                  <XCircle className="h-4 w-4" />
-                )}
-              </Button>
-            </>
-          )}
-
-          {row.status === "completed" && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 w-8 p-0 hover:bg-blue-50 hover:text-blue-600"
-              title="View Treatment Record"
-              onClick={() => handleViewRecord(row.id)}
+              <XCircle className="h-4 w-4 mr-2" />
+              Cancel
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => handleDelete(row.id)}
+              className="text-red-600"
             >
-              <FileText className="h-4 w-4" />
-            </Button>
-          )}
-
-          {/* Delete Appointment - Standalone button for better visibility */}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600"
-            title="Delete Appointment"
-            onClick={() => handleDelete(row.id)}
-            disabled={deleteMutation.isPending}
-          >
-            {deleteMutation.isPending ? (
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-            ) : (
-              <Trash2 className="h-4 w-4" />
-            )}
-          </Button>
-
-          {/* Quick Actions Menu */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 w-8 p-0 hover:bg-gray-50"
-                title="More Actions"
-                disabled={sendReminderMutation.isPending}
-              >
-                {sendReminderMutation.isPending ? (
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                ) : (
-                  <MoreHorizontal className="h-4 w-4" />
-                )}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => handleReschedule(row.id)}>
-                <Clock className="mr-2 h-4 w-4" />
-                Reschedule
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => handleSendReminder(row.id)}
-                disabled={sendReminderMutation.isPending}
-              >
-                <Bell className="mr-2 h-4 w-4" />
-                {sendReminderMutation.isPending
-                  ? "Sending..."
-                  : "Send Reminder"}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       ),
     },
   ];
@@ -392,6 +371,7 @@ export default function Appointments() {
       key: "status",
       label: "Status",
       options: [
+        { value: "all", label: "All Statuses" },
         { value: "scheduled", label: "Scheduled" },
         { value: "completed", label: "Completed" },
         { value: "cancelled", label: "Cancelled" },
@@ -402,6 +382,7 @@ export default function Appointments() {
       key: "date",
       label: "Time Period",
       options: [
+        { value: "all", label: "All Dates" },
         { value: "today", label: "Today" },
         { value: "week", label: "This Week" },
         { value: "month", label: "This Month" },
@@ -489,7 +470,7 @@ export default function Appointments() {
         "/api/appointments",
         {
           ...getDateRange(),
-          status: statusFilter || undefined,
+          status: statusFilter && statusFilter !== "all" ? statusFilter : undefined,
         },
       ]);
 
@@ -499,7 +480,7 @@ export default function Appointments() {
           "/api/appointments",
           {
             ...getDateRange(),
-            status: statusFilter || undefined,
+            status: statusFilter && statusFilter !== "all" ? statusFilter : undefined,
           },
         ],
         (old: any) => {
@@ -519,7 +500,7 @@ export default function Appointments() {
             "/api/appointments",
             {
               ...getDateRange(),
-              status: statusFilter || undefined,
+              status: statusFilter && statusFilter !== "all" ? statusFilter : undefined,
             },
           ],
           context.previousAppointments,
@@ -610,6 +591,25 @@ export default function Appointments() {
       return;
     }
     deleteMutation.mutate(appointmentId);
+  };
+
+  const handleRefresh = () => {
+    queryClient.invalidateQueries({
+      queryKey: ["/api/appointments"],
+      exact: false,
+    });
+    queryClient.invalidateQueries({
+      queryKey: ["/api/dashboard/today-appointments"],
+      exact: false,
+    });
+  };
+
+  const handleExport = () => {
+    // TODO: Implement export functionality
+    toast({
+      title: "Export",
+      description: "Export functionality coming soon!",
+    });
   };
 
   if (authLoading) {
@@ -728,11 +728,17 @@ export default function Appointments() {
                 currentPage={currentPage}
                 pageSize={pageSize}
                 onPageChange={setCurrentPage}
+                searchQuery={searchQuery}
                 onSearch={setSearchQuery}
-                searchPlaceholder="Search appointments by patient, therapist, or type..."
+                searchPlaceholder="Search by patient name, email, phone, therapist, or session type..."
                 onFilter={handleFilter}
                 filters={filters}
                 isLoading={isLoading}
+                onRefresh={handleRefresh}
+                onExport={handleExport}
+                viewMode={viewMode}
+                onViewModeChange={setViewMode}
+                showQuickActions={true}
               />
             </div>
           </div>

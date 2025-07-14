@@ -47,10 +47,13 @@ function RouterComponent() {
   return (
     <>
       <Switch>
+        {/* Always show Landing page at root, regardless of auth status */}
+        <Route path="/" component={Landing} />
         <Route path="/login" component={Login} />
+        
+        {/* Protected routes - only accessible when authenticated */}
         {isAuthenticated ? (
           <>
-            <Route path="/" component={Dashboard} />
             <Route path="/dashboard" component={Dashboard} />
             <Route path="/patients" component={Patients} />
             <Route path="/patients/new" component={NewPatient} />
@@ -69,7 +72,7 @@ function RouterComponent() {
           </>
         ) : (
           <>
-            <Route path="/" component={Landing} />
+            {/* Redirect unauthenticated users to login for protected routes */}
             <Route
               path="*"
               component={() => {

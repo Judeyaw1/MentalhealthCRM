@@ -82,7 +82,10 @@ export default function Inquiries() {
   const { data: inquiries, isLoading } = useQuery<Inquiry[]>({
     queryKey: [
       "/api/inquiries",
-      { status: statusFilter, priority: priorityFilter },
+      { 
+        status: statusFilter !== "all" ? statusFilter : undefined, 
+        priority: priorityFilter !== "all" ? priorityFilter : undefined 
+      },
     ],
     retry: false,
   });
@@ -96,9 +99,9 @@ export default function Inquiries() {
         inquiry.contactInfo.toLowerCase().includes(searchQuery.toLowerCase());
 
       const matchesStatus =
-        statusFilter === "" || inquiry.status === statusFilter;
+        statusFilter === "all" || inquiry.status === statusFilter;
       const matchesPriority =
-        priorityFilter === "" || inquiry.priority === priorityFilter;
+        priorityFilter === "all" || inquiry.priority === priorityFilter;
 
       return matchesSearch && matchesStatus && matchesPriority;
     }) || [];
@@ -317,7 +320,7 @@ export default function Inquiries() {
                         <SelectValue placeholder="All statuses" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">All statuses</SelectItem>
+                        <SelectItem value="all">All statuses</SelectItem>
                         <SelectItem value="pending">Pending</SelectItem>
                         <SelectItem value="in_progress">In Progress</SelectItem>
                         <SelectItem value="completed">Completed</SelectItem>
@@ -338,7 +341,7 @@ export default function Inquiries() {
                         <SelectValue placeholder="All priorities" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">All priorities</SelectItem>
+                        <SelectItem value="all">All priorities</SelectItem>
                         <SelectItem value="urgent">Urgent</SelectItem>
                         <SelectItem value="high">High</SelectItem>
                         <SelectItem value="medium">Medium</SelectItem>

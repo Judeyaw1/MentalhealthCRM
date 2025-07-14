@@ -3,7 +3,7 @@ import {
   Users,
   Calendar,
   Heart,
-  DollarSign,
+  CheckCircle,
   ArrowUp,
   Clock,
 } from "lucide-react";
@@ -12,7 +12,12 @@ export interface DashboardStats {
   totalPatients: number;
   todayAppointments: number;
   activeTreatments: number;
-  monthlyRevenue: number;
+  treatmentCompletionRate: number;
+  treatmentCompletionBreakdown?: {
+    manuallyDischarged: number;
+    autoDischarged: number;
+    eligibleForDischarge: number;
+  };
   monthlyAppointments: number;
   completedAppointments: number;
   upcomingAppointments: number;
@@ -75,11 +80,13 @@ export function StatsCards({ stats, isLoading }: StatsCardsProps) {
       iconColor: "text-warning-500",
     },
     {
-      title: "Monthly Revenue",
-      value: `$${stats.monthlyRevenue.toLocaleString()}`,
-      change: "+8.2% vs last month",
+      title: "Treatment Completion Rate",
+      value: `${stats.treatmentCompletionRate}%`,
+      change: stats.treatmentCompletionBreakdown 
+        ? `${stats.treatmentCompletionBreakdown.autoDischarged} auto, ${stats.treatmentCompletionBreakdown.manuallyDischarged} manual`
+        : "Patients who completed treatment",
       changeType: "positive" as const,
-      icon: DollarSign,
+      icon: CheckCircle,
       iconBg: "bg-green-50",
       iconColor: "text-green-500",
     },

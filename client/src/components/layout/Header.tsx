@@ -90,6 +90,8 @@ export function Header({ onSearch }: HeaderProps) {
         return "Licensed Therapist";
       case "staff":
         return "Staff Member";
+      case "frontdesk":
+        return "Front Desk";
       default:
         return "User";
     }

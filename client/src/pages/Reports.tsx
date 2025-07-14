@@ -80,11 +80,11 @@ export default function Reports() {
       metric: `${stats?.activeTreatments || 0} active`,
     },
     {
-      title: "Revenue Analysis",
-      description: "Monthly income, insurance claims, and billing performance",
+      title: "Treatment Completion Rate",
+      description: "Percentage of patients who successfully completed their treatment plans",
       icon: BarChart3,
       color: "bg-orange-50 text-orange-700 hover:bg-orange-100",
-      metric: `$${stats?.monthlyRevenue?.toLocaleString() || 0}`,
+      metric: `${stats?.treatmentCompletionRate || 0}%`,
     },
     {
       title: "Staff Performance",
@@ -176,17 +176,18 @@ export default function Reports() {
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Revenue</CardTitle>
+                  <CardTitle className="text-sm font-medium">
+                    Treatment Completion Rate
+                  </CardTitle>
                   <BarChart3 className="h-4 w-4 text-gray-600" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    $
                     {statsLoading
                       ? "..."
-                      : stats?.monthlyRevenue?.toLocaleString() || 0}
+                      : `${stats?.treatmentCompletionRate || 0}%`}
                   </div>
-                  <p className="text-xs text-gray-600">This month</p>
+                  <p className="text-xs text-gray-600">Patients who completed treatment</p>
                 </CardContent>
               </Card>
 

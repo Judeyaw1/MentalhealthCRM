@@ -227,12 +227,70 @@ export default function Records() {
     });
   };
 
-  const handleExport = () => {
-    // TODO: Implement export functionality
-    toast({
-      title: "Export",
-      description: "Export functionality coming soon.",
-    });
+  const handleExport = async () => {
+    try {
+      // Show loading toast
+      toast({
+        title: "Exporting...",
+        description: "Preparing your export file.",
+      });
+
+      // Get current filter values
+      const exportData = {
+        format: "csv", // Default to CSV
+        patientIds: selectedPatient !== "all" ? [selectedPatient] : undefined,
+        startDate: dateRange === "week" 
+          ? new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+          : dateRange === "month"
+            ? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+            : undefined,
+        endDate: undefined,
+        sessionType: selectedSessionType !== "all" ? selectedSessionType : undefined
+      };
+
+      // Make the export request
+      const response = await fetch("/api/records/export", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify(exportData),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Export failed: ${response.statusText}`);
+      }
+
+      // Get the filename from the response headers
+      const contentDisposition = response.headers.get("Content-Disposition");
+      const filename = contentDisposition
+        ? contentDisposition.split("filename=")[1]?.replace(/"/g, "")
+        : "treatment-records-export.csv";
+
+      // Create blob and download
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({
+        title: "Export Successful",
+        description: "Your treatment records have been exported.",
+      });
+    } catch (error) {
+      console.error("Export error:", error);
+      toast({
+        title: "Export Failed",
+        description: "Failed to export treatment records. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handlePageChange = (page: number) => {

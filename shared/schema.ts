@@ -181,6 +181,21 @@ export const insertPatientSchema = z.object({
   status: z.string().optional(),
   hipaaConsent: z.boolean().optional(),
   assignedTherapistId: z.string().optional(),
+  // New treatment completion fields (optional for backward compatibility)
+  treatmentGoals: z.array(z.object({
+    goal: z.string(),
+    targetDate: z.date().optional(),
+    status: z.enum(["pending", "in_progress", "achieved", "not_achieved"]).optional(),
+    achievedDate: z.date().optional(),
+    notes: z.string().optional()
+  })).optional(),
+  dischargeCriteria: z.object({
+    targetSessions: z.number().optional(),
+    targetDate: z.date().optional(),
+    autoDischarge: z.boolean().optional(),
+    dischargeReason: z.string().optional(),
+    dischargeDate: z.date().optional()
+  }).optional(),
 });
 
 export const insertAppointmentSchema = createInsertSchema(appointments).omit({

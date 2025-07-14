@@ -3,6 +3,7 @@ import { Appointment } from "./models/Appointment";
 import { User } from "./models/User";
 import mongoose from "mongoose";
 import { TreatmentRecord } from "./models/TreatmentRecord";
+import { TreatmentCompletionService } from "./treatmentCompletionService";
 
 // Simplified MongoDB-only storage for now
 export class DatabaseStorage {
@@ -177,7 +178,16 @@ export class DatabaseStorage {
   }
 
   async updatePatient(id: string, patient: any) {
-    const updatedPatient = await PatientModel.findByIdAndUpdate(id, patient, {
+    // Clean up ObjectId fields - convert empty strings to null
+    const cleanedPatient = {
+      ...patient,
+      assignedTherapistId:
+        patient.assignedTherapistId === "" || !patient.assignedTherapistId
+          ? null
+          : patient.assignedTherapistId,
+    };
+
+    const updatedPatient = await PatientModel.findByIdAndUpdate(id, cleanedPatient, {
       new: true,
     }).lean();
     if (!updatedPatient) return undefined;
@@ -308,32 +318,20 @@ export class DatabaseStorage {
     if (search) {
       const searchLower = search.toLowerCase();
       appointments = appointments.filter((apt: any) => {
-        const patientName =
+        let patientName = "";
+        if (
           apt.patientId &&
           typeof apt.patientId === "object" &&
-          "firstName" in apt.patientId
-            ? (
-                apt.patientId.firstName +
-                " " +
-                apt.patientId.lastName
-              ).toLowerCase()
-            : "";
-        const therapistName =
-          apt.therapistId &&
-          typeof apt.therapistId === "object" &&
-          "firstName" in apt.therapistId
-            ? (
-                apt.therapistId.firstName +
-                " " +
-                apt.therapistId.lastName
-              ).toLowerCase()
-            : "";
-        const type = (apt.type || "").toLowerCase();
-        return (
-          patientName.includes(searchLower) ||
-          therapistName.includes(searchLower) ||
-          type.includes(searchLower)
-        );
+          "firstName" in apt.patientId &&
+          "lastName" in apt.patientId
+        ) {
+          patientName = (
+            apt.patientId.firstName + " " + apt.patientId.lastName
+          ).toLowerCase();
+        }
+        const match = patientName.includes(searchLower);
+        console.log(`[search filter] search='${searchLower}' patientName='${patientName}' match=${match}`);
+        return match;
       });
       console.log(
         "[getAppointments] appointments after filter:",
@@ -663,8 +661,29 @@ export class DatabaseStorage {
       return aptDate >= startOfMonth && aptDate < endOfMonth;
     }).length;
 
-    // Calculate monthly revenue (assuming $100 per appointment for now)
-    const monthlyRevenue = monthlyAppointments * 100;
+    // Calculate enhanced treatment completion rate
+    let completionStats;
+    try {
+      const { TreatmentCompletionService } = await import('./treatmentCompletionService');
+      completionStats = await TreatmentCompletionService.calculateTreatmentCompletionRate();
+    } catch (error) {
+      console.error('Error calculating treatment completion rate:', error);
+      // Fallback to simple calculation for existing patients
+      const dischargedPatients = await PatientModel.countDocuments({ status: "discharged" });
+      const totalPatientsEver = await PatientModel.countDocuments();
+      const treatmentCompletionRate = totalPatientsEver > 0 
+        ? Math.round((dischargedPatients / totalPatientsEver) * 100) 
+        : 0;
+      
+      completionStats = {
+        rate: treatmentCompletionRate,
+        breakdown: {
+          manuallyDischarged: dischargedPatients,
+          autoDischarged: 0,
+          eligibleForDischarge: 0
+        }
+      };
+    }
 
     // Count active treatments (treatment records created this month)
     const activeTreatments = await TreatmentRecord.countDocuments({
@@ -675,7 +694,8 @@ export class DatabaseStorage {
       totalPatients,
       todayAppointments: todayAppointmentsCount,
       activeTreatments,
-      monthlyRevenue,
+      treatmentCompletionRate: completionStats.rate,
+      treatmentCompletionBreakdown: completionStats.breakdown,
       monthlyAppointments,
       completedAppointments,
       upcomingAppointments,
@@ -960,12 +980,72 @@ export class DatabaseStorage {
   ) {
     if (filters.status && inquiry.status !== filters.status) return false;
     if (filters.priority && inquiry.priority !== filters.priority) return false;
-    if (
-      filters.assignedTo &&
-      inquiry.assignedTo?.toString() !== filters.assignedTo
-    )
-      return false;
+    if (filters.assignedTo && inquiry.assignedTo !== filters.assignedTo) return false;
     return true;
+  }
+
+  // Settings operations
+  async getPracticeSettings() {
+    try {
+      // For now, we'll use a simple approach - store settings in a collection
+      // In a real app, you might want to use a more sophisticated approach
+      const settings = await this.db.collection('practice_settings').findOne({});
+      
+      if (!settings) {
+        // Return default settings if none exist
+        return {
+          practiceName: "New Life Mental Health",
+          address: "123 Main Street, City, State 12345",
+          phone: "(555) 123-4567",
+          email: "info@newlife.com",
+          businessHours: "Monday - Friday: 9:00 AM - 6:00 PM\nSaturday: 10:00 AM - 2:00 PM\nSunday: Closed",
+          updatedAt: new Date(),
+          updatedBy: null
+        };
+      }
+      
+      return {
+        practiceName: settings.practiceName || "",
+        address: settings.address || "",
+        phone: settings.phone || "",
+        email: settings.email || "",
+        businessHours: settings.businessHours || "",
+        updatedAt: settings.updatedAt || new Date(),
+        updatedBy: settings.updatedBy || null
+      };
+    } catch (error) {
+      console.error("Error fetching practice settings:", error);
+      throw error;
+    }
+  }
+
+  async updatePracticeSettings(settings: any, userId: string) {
+    try {
+      const updateData = {
+        practiceName: settings.practiceName,
+        address: settings.address,
+        phone: settings.phone,
+        email: settings.email,
+        businessHours: settings.businessHours,
+        updatedAt: new Date(),
+        updatedBy: userId
+      };
+
+      // Use upsert to create if doesn't exist, update if it does
+      const result = await this.db.collection('practice_settings').updateOne(
+        {}, // empty filter to match any document
+        { $set: updateData },
+        { upsert: true }
+      );
+
+      return {
+        ...updateData,
+        _id: result.upsertedId || "existing"
+      };
+    } catch (error) {
+      console.error("Error updating practice settings:", error);
+      throw error;
+    }
   }
 }
 

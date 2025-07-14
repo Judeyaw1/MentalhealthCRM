@@ -103,6 +103,34 @@ const patientSchema = new mongoose.Schema({
     ref: "User",
     required: false,
   },
+  // Treatment goals and completion tracking
+  treatmentGoals: {
+    type: [{
+      goal: { type: String, required: true },
+      targetDate: { type: Date },
+      status: { 
+        type: String, 
+        enum: ["pending", "in_progress", "achieved", "not_achieved"],
+        default: "pending"
+      },
+      achievedDate: { type: Date },
+      notes: { type: String }
+    }],
+    default: []
+  },
+  dischargeCriteria: {
+    type: {
+      targetSessions: { type: Number, default: 12 },
+      targetDate: { type: Date },
+      autoDischarge: { type: Boolean, default: false },
+      dischargeReason: { type: String },
+      dischargeDate: { type: Date }
+    },
+    default: {
+      targetSessions: 12,
+      autoDischarge: false
+    }
+  },
   inquiries: [inquirySchema],
   createdAt: {
     type: Date,
