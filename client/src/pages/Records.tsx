@@ -135,7 +135,7 @@ export default function Records() {
 
   // Delete record mutation
   const deleteRecordMutation = useMutation({
-    mutationFn: async (recordId: number) => {
+    mutationFn: async (recordId: string) => {
       const response = await apiRequest("DELETE", `/api/records/${recordId}`);
       return response.json();
     },
@@ -209,7 +209,7 @@ export default function Records() {
     );
   };
 
-  const handleDeleteRecord = (recordId: number) => {
+  const handleDeleteRecord = (recordId: string) => {
     if (
       confirm(
         "Are you sure you want to delete this treatment record? This action cannot be undone.",

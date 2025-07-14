@@ -22,9 +22,6 @@ export function RecentPatients({
     isLoading,
     hasOnViewAll: !!onViewAll,
   });
-  if (onViewAll) {
-    console.log("Rendering button, onViewAll:", !!onViewAll);
-  }
 
   if (isLoading) {
     return (
@@ -80,30 +77,17 @@ export function RecentPatients({
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">
-            Recent Patients
-          </h2>
-          {console.log("Rendering button, onViewAll:", !!onViewAll)}
-          {onViewAll ? (
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">Recent Patients</h3>
+          {onViewAll && (
             <Button
               variant="ghost"
               size="sm"
-              className="text-primary-500 hover:text-primary-600"
               onClick={onViewAll}
+              className="text-primary-600 hover:text-primary-700"
             >
               View All
             </Button>
-          ) : (
-            <Link href="/patients">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-primary-500 hover:text-primary-600"
-              >
-                View All
-              </Button>
-            </Link>
           )}
         </div>
       </CardHeader>

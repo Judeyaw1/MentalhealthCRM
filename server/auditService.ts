@@ -12,6 +12,19 @@ export interface AuditLogEntry {
   sessionId?: string;
 }
 
+export interface AuditLog {
+  id: string;
+  userId: string;
+  action: AuditAction;
+  resourceType: ResourceType;
+  resourceId: string;
+  details?: string;
+  timestamp: Date;
+  ipAddress?: string;
+  userAgent?: string;
+  sessionId?: string;
+}
+
 export type AuditAction = 
   | "create" | "read" | "update" | "delete"
   | "login" | "logout" | "password_reset" | "password_change"
@@ -221,12 +234,12 @@ export class AuditService {
     endDate?: Date;
     limit?: number;
     offset?: number;
-  }): Promise<any[]> {
+  }): Promise<AuditLog[]> {
     try {
       const logs = await storage.getAuditLogs();
       
       // Apply filters
-      let filteredLogs = logs.filter(log => {
+      let filteredLogs = logs.filter((log: AuditLog) => {
         if (filters?.userId && log.userId !== filters.userId) return false;
         if (filters?.action && log.action !== filters.action) return false;
         if (filters?.resourceType && log.resourceType !== filters.resourceType) return false;
@@ -237,7 +250,7 @@ export class AuditService {
       });
 
       // Sort by timestamp (newest first)
-      filteredLogs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      filteredLogs.sort((a: AuditLog, b: AuditLog) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
       // Apply pagination
       if (filters?.offset) {
@@ -259,19 +272,19 @@ export class AuditService {
     totalActions: number;
     actionsByType: Record<string, number>;
     actionsByUser: Record<string, number>;
-    recentActivity: any[];
+    recentActivity: AuditLog[];
   }> {
     try {
       const logs = await storage.getAuditLogs();
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - days);
 
-      const recentLogs = logs.filter(log => new Date(log.timestamp) >= cutoffDate);
+      const recentLogs = logs.filter((log: AuditLog) => new Date(log.timestamp) >= cutoffDate);
 
       const actionsByType: Record<string, number> = {};
       const actionsByUser: Record<string, number> = {};
 
-      recentLogs.forEach(log => {
+      recentLogs.forEach((log: AuditLog) => {
         actionsByType[log.action] = (actionsByType[log.action] || 0) + 1;
         actionsByUser[log.userId] = (actionsByUser[log.userId] || 0) + 1;
       });

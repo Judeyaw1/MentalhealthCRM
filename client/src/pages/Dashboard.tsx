@@ -57,7 +57,7 @@ export default function Dashboard() {
     totalPatients: 0,
     todayAppointments: 0,
     activeTreatments: 0,
-    monthlyRevenue: 0,
+    treatmentCompletionRate: 0,
     monthlyAppointments: 0,
     completedAppointments: 0,
     upcomingAppointments: 0,
