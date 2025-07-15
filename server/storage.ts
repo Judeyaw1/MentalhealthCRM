@@ -868,15 +868,35 @@ export class DatabaseStorage {
   }
 
   async updateUser(id: string, userData: any) {
-    const updatedUser = await User.findByIdAndUpdate(id, userData, {
-      new: true,
-    }).lean();
-    if (!updatedUser) return undefined;
-    const { _id, ...rest } = updatedUser;
-    return {
-      ...rest,
-      id: _id.toString(),
-    };
+    try {
+      // Remove updatedAt from userData if it exists, let Mongoose handle it
+      const { updatedAt, ...dataToUpdate } = userData;
+      
+      console.log("Storage updateUser called with:", { id, dataToUpdate });
+      
+      const updatedUser = await User.findByIdAndUpdate(
+        id, 
+        { ...dataToUpdate, updatedAt: new Date() }, 
+        { 
+          new: true,
+          runValidators: true 
+        }
+      ).lean();
+      
+      if (!updatedUser) {
+        console.log("No user found with id:", id);
+        return undefined;
+      }
+      
+      const { _id, ...rest } = updatedUser;
+      return {
+        ...rest,
+        id: _id.toString(),
+      };
+    } catch (error) {
+      console.error("Error in updateUser:", error);
+      throw error;
+    }
   }
 
   async deleteUser(id: string) {

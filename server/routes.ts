@@ -1132,6 +1132,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const userId = req.user.id;
         const { firstName, lastName, email } = req.body;
 
+        console.log("Update profile request:", { userId, firstName, lastName, email });
+
         if (!firstName || !lastName || !email) {
           return res
             .status(400)
@@ -1161,15 +1163,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         // Update user profile
-        const updatedUser = await storage.updateUser(userId, {
+        const updateData = {
           firstName,
           lastName,
           email,
-        });
+        };
+
+        console.log("Updating user with data:", updateData);
+
+        const updatedUser = await storage.updateUser(userId, updateData);
 
         if (!updatedUser) {
           return res.status(500).json({ message: "Failed to update profile" });
         }
+
+        console.log("User updated successfully:", updatedUser);
 
         await logActivity(userId, "update", "user", userId, {
           updatedFields: ["firstName", "lastName", "email"],
@@ -1189,6 +1197,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       } catch (error: any) {
         console.error("Error updating profile:", error);
+        console.error("Error details:", error.message, error.stack);
         res.status(500).json({ message: "Failed to update profile" });
       }
     },

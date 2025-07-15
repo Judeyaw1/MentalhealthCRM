@@ -24,4 +24,21 @@ const UserSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now },
 });
 
+// Pre-save middleware to automatically update the updatedAt field
+UserSchema.pre('save', function(next) {
+  this.updatedAt = new Date();
+  next();
+});
+
+// Pre-update middleware to automatically update the updatedAt field
+UserSchema.pre('findOneAndUpdate', function(next) {
+  this.set({ updatedAt: new Date() });
+  next();
+});
+
+UserSchema.pre('findByIdAndUpdate', function(next) {
+  this.set({ updatedAt: new Date() });
+  next();
+});
+
 export const User = mongoose.model("User", UserSchema);
