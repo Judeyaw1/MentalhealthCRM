@@ -1123,6 +1123,201 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
+  // Update profile endpoint
+  app.put(
+    "/api/auth/update-profile",
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const userId = req.user.id;
+        const { firstName, lastName, email } = req.body;
+
+        if (!firstName || !lastName || !email) {
+          return res
+            .status(400)
+            .json({
+              message: "First name, last name, and email are required",
+            });
+        }
+
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+          return res
+            .status(400)
+            .json({
+              message: "Please provide a valid email address",
+            });
+        }
+
+        // Check if email is already taken by another user
+        const existingUser = await storage.getUserByEmail(email);
+        if (existingUser && existingUser.id !== userId) {
+          return res
+            .status(400)
+            .json({
+              message: "Email address is already in use by another account",
+            });
+        }
+
+        // Update user profile
+        const updatedUser = await storage.updateUser(userId, {
+          firstName,
+          lastName,
+          email,
+        });
+
+        if (!updatedUser) {
+          return res.status(500).json({ message: "Failed to update profile" });
+        }
+
+        await logActivity(userId, "update", "user", userId, {
+          updatedFields: ["firstName", "lastName", "email"],
+        });
+
+        res.json({
+          message: "Profile updated successfully",
+          user: {
+            id: updatedUser.id,
+            firstName: updatedUser.firstName,
+            lastName: updatedUser.lastName,
+            email: updatedUser.email,
+            role: updatedUser.role,
+            createdAt: updatedUser.createdAt,
+            updatedAt: updatedUser.updatedAt,
+          },
+        });
+      } catch (error: any) {
+        console.error("Error updating profile:", error);
+        res.status(500).json({ message: "Failed to update profile" });
+      }
+    },
+  );
+
+  // Update settings endpoint
+  app.put(
+    "/api/auth/update-settings",
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const userId = req.user.id;
+        const { notifications, appearance } = req.body;
+
+        // Validate notification settings
+        if (notifications) {
+          const validNotificationKeys = [
+            "emailNotifications",
+            "appointmentReminders",
+            "patientUpdates",
+            "systemAlerts",
+          ];
+          
+          for (const key of validNotificationKeys) {
+            if (typeof notifications[key] !== "boolean") {
+              return res
+                .status(400)
+                .json({
+                  message: `Invalid notification setting: ${key}`,
+                });
+            }
+          }
+        }
+
+        // Validate appearance settings
+        if (appearance) {
+          if (appearance.theme && !["light", "dark", "system"].includes(appearance.theme)) {
+            return res
+              .status(400)
+              .json({
+                message: "Invalid theme setting",
+              });
+          }
+
+          if (typeof appearance.compactMode !== "boolean") {
+            return res
+              .status(400)
+              .json({
+                message: "Invalid compact mode setting",
+              });
+          }
+
+          if (typeof appearance.showAnimations !== "boolean") {
+            return res
+              .status(400)
+              .json({
+                message: "Invalid animation setting",
+              });
+          }
+        }
+
+        // Store settings in user document or separate settings collection
+        // For now, we'll store them in the user document as a settings field
+        const settingsData = {
+          notifications: notifications || {},
+          appearance: appearance || {},
+          updatedAt: new Date(),
+        };
+
+        const updatedUser = await storage.updateUser(userId, {
+          settings: settingsData,
+        });
+
+        if (!updatedUser) {
+          return res.status(500).json({ message: "Failed to update settings" });
+        }
+
+        await logActivity(userId, "update", "user", userId, {
+          updatedFields: ["settings"],
+        });
+
+        res.json({
+          message: "Settings updated successfully",
+        });
+      } catch (error: any) {
+        console.error("Error updating settings:", error);
+        res.status(500).json({ message: "Failed to update settings" });
+      }
+    },
+  );
+
+  // Get user settings endpoint
+  app.get(
+    "/api/auth/settings",
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const userId = req.user.id;
+        const user = await storage.getUser(userId);
+
+        if (!user) {
+          return res.status(404).json({ message: "User not found" });
+        }
+
+        // Return default settings if none exist
+        const defaultSettings = {
+          notifications: {
+            emailNotifications: true,
+            appointmentReminders: true,
+            patientUpdates: true,
+            systemAlerts: true,
+          },
+          appearance: {
+            theme: "system",
+            compactMode: false,
+            showAnimations: true,
+          },
+        };
+
+        const settings = user.settings || defaultSettings;
+
+        res.json(settings);
+      } catch (error: any) {
+        console.error("Error fetching settings:", error);
+        res.status(500).json({ message: "Failed to fetch settings" });
+      }
+    },
+  );
+
   // Migration endpoint to populate createdBy for existing patients
   app.post(
     "/api/migrate/patients-created-by",
