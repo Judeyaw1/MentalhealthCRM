@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import express, { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
@@ -10,6 +10,8 @@ import { hashPassword, generateSecurePassword, comparePassword } from "./lib/pas
 import * as XLSX from 'xlsx';
 import { createObjectCsvWriter } from 'csv-writer';
 import { TreatmentCompletionService } from "./treatmentCompletionService";
+import { notificationService } from "./notificationService";
+import mongoose from "mongoose";
 
 // Custom schema for MongoDB treatment records
 const insertTreatmentRecordSchema = z.object({
@@ -479,7 +481,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Build query object
       const query: any = {};
       if (search) query.$text = { $search: search };
-      if (patientId) query.patientId = String(Array.isArray(patientId) ? patientId[0] : patientId);
+      if (patientId) {
+        const patientIdStr = String(Array.isArray(patientId) ? patientId[0] : patientId);
+        query.patientId = patientIdStr;
+        console.log('🔍 Records API - Filtering by patientId:', {
+          originalPatientId: patientId,
+          convertedPatientId: patientIdStr,
+          query: query
+        });
+      }
       if (therapistFilter) query.therapistId = String(Array.isArray(therapistFilter) ? therapistFilter[0] : therapistFilter);
       if (sessionType) query.sessionType = sessionType;
       if (startDate || endDate) {
@@ -914,21 +924,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const inviteUrl = `${req.protocol}://${req.get("host")}/login`;
 
       // Send invitation email
-      const emailSent = await emailService.sendStaffInvitation({
-        to: email,
+      const emailSent = await emailService.sendStaffInvitation(
+        email,
         firstName,
         lastName,
         role,
-        message,
         inviteUrl,
-      });
-
-      if (!emailSent) {
-        // If email fails, still create the user but warn about it
-        console.warn(
-          `Failed to send invitation email to ${email}, but user was created`,
-        );
-      }
+        defaultPassword,
+        message
+      );
 
       await logActivity(userId, "invite", "staff", newUser.id.toString(), {
         email,
@@ -937,6 +941,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         role,
         emailSent,
       });
+
+      if (!emailSent) {
+        // If email fails, still create the user but warn about it
+        console.warn(
+          `Failed to send invitation email to ${email}, but user was created`,
+        );
+        return res.status(201).json({
+          message: "User created, but invitation email failed.",
+          user: {
+            id: newUser.id,
+            email: newUser.email,
+            firstName: newUser.firstName,
+            lastName: newUser.lastName,
+            role: newUser.role,
+          },
+          emailSent: false,
+        });
+      }
 
       res.status(201).json({
         message: "Staff invitation sent successfully",
@@ -947,7 +969,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           lastName: newUser.lastName,
           role: newUser.role,
         },
-        emailSent,
+        emailSent: true,
       });
     } catch (error: any) {
       console.error("Error inviting staff:", error);
@@ -979,6 +1001,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       res.status(500).json({ message: "Failed to invite staff member" });
+    }
+  });
+
+  // Staff deletion endpoint
+  app.delete("/api/staff/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+
+      // Only admins can delete staff
+      if (user?.role !== "admin") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const staffId = req.params.id;
+      if (!mongoose.Types.ObjectId.isValid(staffId)) {
+        return res.status(400).json({ message: "Invalid staff ID format" });
+      }
+      const staff = await storage.getUser(staffId);
+
+      if (!staff) {
+        return res.status(404).json({ message: "Staff member not found" });
+      }
+
+      await storage.deleteUser(staffId);
+      await logActivity(userId, "delete", "staff", staffId);
+
+      res.json({ message: "Staff member deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting staff member:", error);
+      res.status(500).json({ message: "Failed to delete staff member" });
     }
   });
 
@@ -1474,16 +1527,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json([]);
       }
 
+      // Helper function to calculate age
+      function getAge(dateOfBirth: string | number | Date) {
+        const today = new Date();
+        const birthDate = new Date(dateOfBirth);
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const monthDiff = today.getMonth() - birthDate.getMonth();
+        if (
+          monthDiff < 0 ||
+          (monthDiff === 0 && today.getDate() < birthDate.getDate())
+        ) {
+          age--;
+        }
+        return age;
+      }
+
       console.log("Searching patients...");
       // Search patients
       const patientResult = await storage.getPatients(10, 0, q);
-      const patients = (patientResult.patients || []).map((p: any) => ({
-        id: p.id,
-        type: "patient",
-        title: `${p.firstName} ${p.lastName}`.trim(),
-        subtitle: `${p.email || ""}${p.phone ? ` | ${p.phone}` : ""}`.trim(),
-        href: `/patients/${p.id}`,
-      }));
+      const patients = (patientResult.patients || []).map((p: any) => {
+        const age = getAge(p.dateOfBirth);
+        const status = p.status || 'active';
+        const contactInfo = [];
+        if (p.email) contactInfo.push(p.email);
+        if (p.phone) contactInfo.push(p.phone);
+        
+        return {
+          id: p.id,
+          type: "patient",
+          title: `${p.firstName} ${p.lastName}`.trim(),
+          subtitle: `${age} years old • ${status}${contactInfo.length > 0 ? ` • ${contactInfo.join(' | ')}` : ''}`,
+          href: `/patients/${p.id}`,
+        };
+      });
       console.log("Patient results:", patients.length);
 
       console.log("Searching appointments...");
@@ -1647,6 +1723,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Treatment record history endpoint
+  app.get("/api/records/:recordId/history", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const recordId = req.params.recordId;
+      const user = await storage.getUser(userId);
+
+      // Check if user has permission to view this record
+      const record = await storage.getTreatmentRecord(recordId);
+      if (!record) {
+        return res.status(404).json({ message: "Treatment record not found" });
+      }
+
+      // Only allow access if user is admin, the record's therapist, or the record's patient's assigned therapist
+      const canAccess = user?.role === "admin" || 
+                       record.therapist?.id === userId ||
+                       (record.patient && record.patient.assignedTherapistId?.toString() === userId);
+
+      if (!canAccess) {
+        return res.status(403).json({ message: "Access denied. You don't have permission to view this record's history." });
+      }
+
+      // Get audit logs for this specific treatment record
+      const filters = {
+        resourceType: "treatment_record",
+        resourceId: recordId,
+        limit: 50, // Limit to recent history
+        offset: 0,
+      };
+
+      const logs = await storage.getAuditLogs(filters);
+
+      // Enrich logs with user information
+      const enrichedLogs = await Promise.all(
+        logs.map(async (log: any) => {
+          try {
+            const logUser = await storage.getUser(log.userId);
+            return {
+              ...log,
+              user: logUser ? {
+                id: logUser.id,
+                firstName: logUser.firstName,
+                lastName: logUser.lastName,
+                email: logUser.email,
+                role: logUser.role,
+              } : null,
+              details: log.details ? JSON.parse(log.details) : null,
+            };
+          } catch (error) {
+            console.error("Error enriching log with user data:", error);
+            return {
+              ...log,
+              user: null,
+              details: log.details ? JSON.parse(log.details) : null,
+            };
+          }
+        })
+      );
+
+      res.json(enrichedLogs);
+    } catch (error) {
+      console.error("Error fetching treatment record history:", error);
+      res.status(500).json({ message: "Failed to fetch treatment record history" });
+    }
+  });
+
   // Treatment completion endpoints
   app.post("/api/patients/:id/check-discharge", isAuthenticated, async (req: any, res) => {
     try {
@@ -1759,6 +1901,201 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to update treatment goal" });
     }
   });
+
+  // Notification routes
+  app.get(
+    "/api/notifications",
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const userId = req.user.id;
+        const { unreadOnly, limit, offset, type } = req.query;
+
+        const notifications = await storage.getUserNotifications(userId, {
+          unreadOnly: unreadOnly === 'true',
+          limit: limit ? parseInt(limit) : undefined,
+          offset: offset ? parseInt(offset) : undefined,
+          type: type as any,
+        });
+
+        res.json(notifications);
+      } catch (error: any) {
+        console.error("Error fetching notifications:", error);
+        res.status(500).json({ message: "Failed to fetch notifications" });
+      }
+    },
+  );
+
+  app.get(
+    "/api/notifications/unread-count",
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const userId = req.user.id;
+        const count = await storage.getUnreadNotificationCount(userId);
+        res.json({ count });
+      } catch (error: any) {
+        console.error("Error fetching unread count:", error);
+        res.status(500).json({ message: "Failed to fetch unread count" });
+      }
+    },
+  );
+
+  app.put(
+    "/api/notifications/:id/read",
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const userId = req.user.id;
+        const { id } = req.params;
+
+        const success = await storage.markNotificationAsRead(id, userId);
+        
+        if (success) {
+          res.json({ message: "Notification marked as read" });
+        } else {
+          res.status(404).json({ message: "Notification not found" });
+        }
+      } catch (error: any) {
+        console.error("Error marking notification as read:", error);
+        res.status(500).json({ message: "Failed to mark notification as read" });
+      }
+    },
+  );
+
+  app.put(
+    "/api/notifications/mark-all-read",
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const userId = req.user.id;
+        const success = await storage.markAllNotificationsAsRead(userId);
+        
+        if (success) {
+          res.json({ message: "All notifications marked as read" });
+        } else {
+          res.status(404).json({ message: "No notifications found" });
+        }
+      } catch (error: any) {
+        console.error("Error marking all notifications as read:", error);
+        res.status(500).json({ message: "Failed to mark notifications as read" });
+      }
+    },
+  );
+
+  app.delete(
+    "/api/notifications/:id",
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const userId = req.user.id;
+        const { id } = req.params;
+
+        const success = await storage.deleteNotification(id, userId);
+        
+        if (success) {
+          res.json({ message: "Notification deleted" });
+        } else {
+          res.status(404).json({ message: "Notification not found" });
+        }
+      } catch (error: any) {
+        console.error("Error deleting notification:", error);
+        res.status(500).json({ message: "Failed to delete notification" });
+      }
+    },
+  );
+
+  app.get(
+    "/api/notifications/stats",
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const userId = req.user.id;
+        const stats = await notificationService.getNotificationStats(userId);
+        res.json(stats);
+      } catch (error: any) {
+        console.error("Error fetching notification stats:", error);
+        res.status(500).json({ message: "Failed to fetch notification stats" });
+      }
+    },
+  );
+
+  // Test notification endpoint
+  app.post(
+    "/api/notifications/test",
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const userId = req.user.id;
+        const { type, title, message, data } = req.body;
+
+        const notification = await notificationService.createNotification(
+          userId,
+          type || 'general',
+          title || 'Test Notification',
+          message || 'This is a test notification',
+          data
+        );
+
+        res.json({ 
+          message: "Test notification created", 
+          notification 
+        });
+      } catch (error: any) {
+        console.error("Error creating test notification:", error);
+        res.status(500).json({ message: "Failed to create test notification" });
+      }
+    },
+  );
+
+  // Email test endpoint
+  app.post(
+    "/api/email/test",
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const userId = req.user.id;
+        const user = await storage.getUser(userId);
+        
+        if (!user?.email) {
+          return res.status(400).json({ message: "User email not found" });
+        }
+
+        const { emailType, data } = req.body;
+        let success = false;
+
+        switch (emailType) {
+          case 'appointment_reminder':
+            success = await emailService.sendAppointmentReminder(user.email, data);
+            break;
+          case 'patient_update':
+            success = await emailService.sendPatientUpdate(user.email, data);
+            break;
+          case 'system_alert':
+            success = await emailService.sendSystemAlert(user.email, data);
+            break;
+          default:
+            success = await emailService.sendEmail({
+              to: user.email,
+              template: {
+                subject: 'Test Email',
+                html: '<h1>Test Email</h1><p>This is a test email from the Mental Health Tracker system.</p>',
+                text: 'Test Email\n\nThis is a test email from the Mental Health Tracker system.',
+              },
+            });
+        }
+
+        if (success) {
+          res.json({ message: "Test email sent successfully" });
+        } else {
+          res.status(500).json({ message: "Failed to send test email" });
+        }
+      } catch (error: any) {
+        console.error("Error sending test email:", error);
+        res.status(500).json({ message: "Failed to send test email" });
+      }
+    },
+  );
 
   const httpServer = createServer(app);
   return httpServer;

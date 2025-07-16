@@ -1,474 +1,389 @@
-import nodemailer from "nodemailer";
+import dotenv from "dotenv";
+dotenv.config();
+import nodemailer from 'nodemailer';
+import { storage } from './storage';
 
-interface EmailConfig {
-  host: string;
-  port: number;
-  secure: boolean;
-  auth: {
-    user: string;
-    pass: string;
-  };
+export interface EmailTemplate {
+  subject: string;
+  html: string;
+  text: string;
 }
 
-interface InvitationEmailData {
+export interface EmailData {
   to: string;
-  firstName: string;
-  lastName: string;
-  role: string;
-  message?: string;
-  inviteUrl: string;
+  template: EmailTemplate;
+  data?: Record<string, any>;
 }
 
-interface PasswordResetEmailData {
-  to: string;
-  firstName: string;
-  lastName: string;
-  resetUrl?: string;
-  defaultPassword?: string;
-}
+export class EmailService {
+  private static instance: EmailService;
+  private transporter: nodemailer.Transporter | null = null;
 
-class EmailService {
-  private transporter: nodemailer.Transporter;
-
-  constructor() {
-    this.transporter = this.createTransporter();
+  private constructor() {
+    this.initializeTransporter();
   }
 
-  private createTransporter(): nodemailer.Transporter {
-    const isDevelopment = process.env.NODE_ENV === "development";
-
-    if (isDevelopment) {
-      // Use Ethereal Email for development/testing
-      return nodemailer.createTransport({
-        host: "smtp.ethereal.email",
-        port: 587,
-        secure: false,
-        auth: {
-          user: process.env.ETHEREAL_USER || "test@ethereal.email",
-          pass: process.env.ETHEREAL_PASS || "test123",
-        },
-      });
-    } else {
-      // Production SMTP configuration
-      const config: EmailConfig = {
-        host: process.env.EMAIL_HOST || "smtp.gmail.com",
-        port: parseInt(process.env.EMAIL_PORT || "587"),
-        secure: false,
-        auth: {
-          user: process.env.EMAIL_USER || "",
-          pass: process.env.EMAIL_PASS || "",
-        },
-      };
-
-      return nodemailer.createTransport(config);
+  static getInstance(): EmailService {
+    if (!EmailService.instance) {
+      EmailService.instance = new EmailService();
     }
+    return EmailService.instance;
   }
 
-  async sendStaffInvitation(data: InvitationEmailData): Promise<boolean> {
+
+
+  private async initializeTransporter() {
+    console.log("SMTP config:", {
+      host: process.env.SMTP_HOST,
+      port: process.env.SMTP_PORT,
+      secure: process.env.SMTP_SECURE,
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS ? "***" : undefined,
+    });
+    // Always use SMTP config from environment variables
+    this.transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: parseInt(process.env.SMTP_PORT || '465'),
+      secure: process.env.SMTP_SECURE === 'true' || true,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+    });
+  }
+
+  async sendEmail(emailData: EmailData): Promise<boolean> {
     try {
-      const roleDisplayNames = {
-        admin: "Administrator",
-        therapist: "Therapist",
-        staff: "Staff Member",
-      };
+      if (!this.transporter) {
+        await this.initializeTransporter();
+      }
 
-      const roleDescription = {
-        admin:
-          "Full system access including user management, patient records, and administrative functions.",
-        therapist:
-          "Access to patient records, treatment plans, and appointment scheduling.",
-        staff:
-          "Basic access to patient information and appointment management.",
-      };
-
-      const htmlContent = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Welcome to NewLife Mental Health</title>
-          <style>
-            body {
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-              line-height: 1.6;
-              color: #333;
-              max-width: 600px;
-              margin: 0 auto;
-              padding: 20px;
-              background-color: #f8f9fa;
-            }
-            .container {
-              background-color: white;
-              border-radius: 8px;
-              padding: 40px;
-              box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            }
-            .header {
-              text-align: center;
-              margin-bottom: 30px;
-            }
-            .logo {
-              font-size: 28px;
-              font-weight: bold;
-              color: #2563eb;
-              margin-bottom: 10px;
-            }
-            .subtitle {
-              color: #6b7280;
-              font-size: 16px;
-            }
-            .content {
-              margin-bottom: 30px;
-            }
-            .welcome {
-              font-size: 20px;
-              font-weight: 600;
-              margin-bottom: 15px;
-              color: #1f2937;
-            }
-            .role-info {
-              background-color: #f3f4f6;
-              border-left: 4px solid #2563eb;
-              padding: 15px;
-              margin: 20px 0;
-              border-radius: 4px;
-            }
-            .role-title {
-              font-weight: 600;
-              color: #1f2937;
-              margin-bottom: 5px;
-            }
-            .role-description {
-              color: #6b7280;
-              font-size: 14px;
-            }
-            .message {
-              background-color: #fef3c7;
-              border: 1px solid #f59e0b;
-              border-radius: 6px;
-              padding: 15px;
-              margin: 20px 0;
-            }
-            .cta-button {
-              display: inline-block;
-              background-color: #2563eb;
-              color: white;
-              text-decoration: none;
-              padding: 12px 24px;
-              border-radius: 6px;
-              font-weight: 500;
-              margin: 20px 0;
-            }
-            .cta-button:hover {
-              background-color: #1d4ed8;
-            }
-            .footer {
-              text-align: center;
-              margin-top: 40px;
-              padding-top: 20px;
-              border-top: 1px solid #e5e7eb;
-              color: #6b7280;
-              font-size: 14px;
-            }
-            .security-note {
-              background-color: #fef2f2;
-              border: 1px solid #fecaca;
-              border-radius: 6px;
-              padding: 15px;
-              margin: 20px 0;
-              font-size: 14px;
-              color: #991b1b;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <div class="logo">NewLife Mental Health</div>
-              <div class="subtitle">Professional Mental Health Management System</div>
-            </div>
-            
-            <div class="content">
-              <div class="welcome">Welcome, ${data.firstName}!</div>
-              
-              <p>You have been invited to join the NewLife Mental Health team as a <strong>${roleDisplayNames[data.role as keyof typeof roleDisplayNames]}</strong>.</p>
-              
-              <div class="role-info">
-                <div class="role-title">Your Role: ${roleDisplayNames[data.role as keyof typeof roleDisplayNames]}</div>
-                <div class="role-description">${roleDescription[data.role as keyof typeof roleDescription]}</div>
-              </div>
-              
-              ${
-                data.message
-                  ? `
-                <div class="message">
-                  <strong>Personal Message:</strong><br>
-                  ${data.message}
-                </div>
-              `
-                  : ""
-              }
-              
-              <p>To get started, please click the button below to access your account:</p>
-              
-              <div style="text-align: center;">
-                <a href="${data.inviteUrl}" class="cta-button">Access Your Account</a>
-              </div>
-              
-              <div class="security-note">
-                <strong>Security Note:</strong> This invitation link is unique to you and should not be shared. 
-                If you did not expect this invitation, please contact your administrator immediately.
-              </div>
-            </div>
-            
-            <div class="footer">
-              <p>This is an automated message from NewLife Mental Health.</p>
-              <p>If you have any questions, please contact your system administrator.</p>
-            </div>
-          </div>
-        </body>
-        </html>
-      `;
-
-      const textContent = `
-Welcome to NewLife Mental Health!
-
-Hi ${data.firstName},
-
-You have been invited to join the NewLife Mental Health team as a ${roleDisplayNames[data.role as keyof typeof roleDisplayNames]}.
-
-Your Role: ${roleDisplayNames[data.role as keyof typeof roleDisplayNames]}
-${roleDescription[data.role as keyof typeof roleDescription]}
-
-${data.message ? `Personal Message: ${data.message}\n` : ""}
-To access your account, visit: ${data.inviteUrl}
-
-Security Note: This invitation is unique to you and should not be shared.
-
-Best regards,
-The NewLife Mental Health Team
-      `;
+      if (!this.transporter) {
+        console.error('Email transporter not initialized');
+        return false;
+      }
 
       const mailOptions = {
-        from:
-          process.env.FROM_EMAIL ||
-          '"NewLife Mental Health" <noreply@newlife.com>',
-        to: data.to,
-        subject: `Welcome to NewLife Mental Health - You're Invited!`,
-        text: textContent,
-        html: htmlContent,
+        from: process.env.SMTP_FROM || '"Mental Health Tracker" <noreply@mentalhealthtracker.com>',
+        to: emailData.to,
+        subject: emailData.template.subject,
+        html: emailData.template.html,
+        text: emailData.template.text,
       };
 
       const info = await this.transporter.sendMail(mailOptions);
-
-      if (process.env.NODE_ENV === "development") {
-        console.log("Development email sent to Ethereal:");
-        console.log("Preview URL:", nodemailer.getTestMessageUrl(info));
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log('📧 Email sent:', {
+          messageId: info.messageId,
+          previewURL: nodemailer.getTestMessageUrl(info),
+        });
       }
 
       return true;
     } catch (error) {
-      console.error("Error sending invitation email:", error);
+      console.error('Failed to send email:', error);
       return false;
     }
   }
 
-  async sendPasswordReset(data: PasswordResetEmailData): Promise<boolean> {
-    try {
-      const htmlContent = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Password Reset - NewLife Mental Health</title>
-          <style>
-            body {
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-              line-height: 1.6;
-              color: #333;
-              max-width: 600px;
-              margin: 0 auto;
-              padding: 20px;
-              background-color: #f8f9fa;
-            }
-            .container {
-              background-color: white;
-              border-radius: 8px;
-              padding: 40px;
-              box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            }
-            .header {
-              text-align: center;
-              margin-bottom: 30px;
-            }
-            .logo {
-              font-size: 28px;
-              font-weight: bold;
-              color: #2563eb;
-              margin-bottom: 10px;
-            }
-            .subtitle {
-              color: #6b7280;
-              font-size: 16px;
-            }
-            .content {
-              margin-bottom: 30px;
-            }
-            .title {
-              font-size: 20px;
-              font-weight: 600;
-              margin-bottom: 15px;
-              color: #1f2937;
-            }
-            .password-box {
-              background-color: #f3f4f6;
-              border: 2px solid #d1d5db;
-              border-radius: 6px;
-              padding: 20px;
-              margin: 20px 0;
-              text-align: center;
-              font-family: monospace;
-              font-size: 20px;
-              font-weight: bold;
-              color: #1f2937;
-              letter-spacing: 2px;
-            }
-            .footer {
-              text-align: center;
-              margin-top: 40px;
-              padding-top: 20px;
-              border-top: 1px solid #e5e7eb;
-              color: #6b7280;
-              font-size: 14px;
-            }
-            .warning {
-              background-color: #fef3c7;
-              border: 1px solid #f59e0b;
-              border-radius: 6px;
-              padding: 15px;
-              margin: 20px 0;
-              font-size: 14px;
-              color: #92400e;
-            }
-            .info {
-              background-color: #dbeafe;
-              border: 1px solid #3b82f6;
-              border-radius: 6px;
-              padding: 15px;
-              margin: 20px 0;
-              font-size: 14px;
-              color: #1e40af;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <div class="logo">NewLife Mental Health</div>
-              <div class="subtitle">Professional Mental Health Management System</div>
-            </div>
-            
-            <div class="content">
-              <div class="title">Password Reset</div>
-              
-              <p>Hello ${data.firstName} ${data.lastName},</p>
-              
-              <p>Your password has been reset by an administrator. Here is your new temporary password:</p>
-              
-              <div class="password-box">
-                ${data.defaultPassword}
-              </div>
-              
-              <div class="warning">
-                <strong>Important:</strong> 
-                <ul>
-                  <li>You will be required to change this password on your next login</li>
-                  <li>Please choose a strong password that you can remember</li>
-                  <li>Do not share this password with anyone</li>
-                </ul>
-              </div>
-              
-              <div class="info">
-                <strong>To log in:</strong>
-                <ol>
-                  <li>Go to the NewLife Mental Health portal</li>
-                  <li>Enter your email address and the temporary password above</li>
-                  <li>You will be prompted to change your password immediately</li>
-                </ol>
-              </div>
-              
-              <p>If you have any questions, please contact your system administrator.</p>
-            </div>
-            
-            <div class="footer">
-              <p>This is an automated message from NewLife Mental Health.</p>
-              <p>If you have any questions, please contact your system administrator.</p>
-            </div>
+  // Appointment reminder email
+  async sendAppointmentReminder(
+    userEmail: string,
+    appointmentData: {
+      patientName: string;
+      appointmentDate: Date;
+      appointmentTime: string;
+      location?: string;
+      notes?: string;
+    }
+  ): Promise<boolean> {
+    const template: EmailTemplate = {
+      subject: `Appointment Reminder - ${appointmentData.patientName}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #2563eb;">Appointment Reminder</h2>
+          <p>Hello,</p>
+          <p>This is a reminder for your upcoming appointment:</p>
+          
+          <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="margin-top: 0;">Appointment Details</h3>
+            <p><strong>Patient:</strong> ${appointmentData.patientName}</p>
+            <p><strong>Date:</strong> ${appointmentData.appointmentDate.toLocaleDateString()}</p>
+            <p><strong>Time:</strong> ${appointmentData.appointmentTime}</p>
+            ${appointmentData.location ? `<p><strong>Location:</strong> ${appointmentData.location}</p>` : ''}
+            ${appointmentData.notes ? `<p><strong>Notes:</strong> ${appointmentData.notes}</p>` : ''}
           </div>
-        </body>
-        </html>
-      `;
+          
+          <p>Please ensure you're prepared for this appointment.</p>
+          <p>Best regards,<br>Mental Health Tracker Team</p>
+        </div>
+      `,
+      text: `
+        Appointment Reminder - ${appointmentData.patientName}
+        
+        Hello,
+        
+        This is a reminder for your upcoming appointment:
+        
+        Patient: ${appointmentData.patientName}
+        Date: ${appointmentData.appointmentDate.toLocaleDateString()}
+        Time: ${appointmentData.appointmentTime}
+        ${appointmentData.location ? `Location: ${appointmentData.location}` : ''}
+        ${appointmentData.notes ? `Notes: ${appointmentData.notes}` : ''}
+        
+        Please ensure you're prepared for this appointment.
+        
+        Best regards,
+        Mental Health Tracker Team
+      `,
+    };
 
-      const textContent = `
-Password Reset - NewLife Mental Health
-
-Hello ${data.firstName} ${data.lastName},
-
-Your password has been reset by an administrator. Here is your new temporary password:
-
-${data.defaultPassword}
-
-IMPORTANT:
-- You will be required to change this password on your next login
-- Please choose a strong password that you can remember
-- Do not share this password with anyone
-
-To log in:
-1. Go to the NewLife Mental Health portal
-2. Enter your email address and the temporary password above
-3. You will be prompted to change your password immediately
-
-If you have any questions, please contact your system administrator.
-
-Best regards,
-The NewLife Mental Health Team
-      `;
-
-      const mailOptions = {
-        from:
-          process.env.FROM_EMAIL ||
-          '"NewLife Mental Health" <noreply@newlife.com>',
-        to: data.to,
-        subject: `Password Reset Request - NewLife Mental Health`,
-        text: textContent,
-        html: htmlContent,
-      };
-
-      const info = await this.transporter.sendMail(mailOptions);
-
-      if (process.env.NODE_ENV === "development") {
-        console.log("Development password reset email sent to Ethereal:");
-        console.log("Preview URL:", nodemailer.getTestMessageUrl(info));
-      }
-
-      return true;
-    } catch (error) {
-      console.error("Error sending password reset email:", error);
-      return false;
-    }
+    return this.sendEmail({ to: userEmail, template });
   }
 
-  async verifyConnection(): Promise<boolean> {
-    try {
-      await this.transporter.verify();
-      return true;
-    } catch (error) {
-      console.error("Email service connection failed:", error);
-      return false;
+  // Patient status update email
+  async sendPatientUpdate(
+    userEmail: string,
+    patientData: {
+      patientName: string;
+      status: string;
+      updateType: string;
+      details?: string;
     }
+  ): Promise<boolean> {
+    const template: EmailTemplate = {
+      subject: `Patient Update - ${patientData.patientName}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #2563eb;">Patient Update</h2>
+          <p>Hello,</p>
+          <p>There has been an update to a patient's information:</p>
+          
+          <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="margin-top: 0;">Update Details</h3>
+            <p><strong>Patient:</strong> ${patientData.patientName}</p>
+            <p><strong>Status:</strong> ${patientData.status}</p>
+            <p><strong>Update Type:</strong> ${patientData.updateType}</p>
+            ${patientData.details ? `<p><strong>Details:</strong> ${patientData.details}</p>` : ''}
+          </div>
+          
+          <p>Please review this information in the system.</p>
+          <p>Best regards,<br>Mental Health Tracker Team</p>
+        </div>
+      `,
+      text: `
+        Patient Update - ${patientData.patientName}
+        
+        Hello,
+        
+        There has been an update to a patient's information:
+        
+        Patient: ${patientData.patientName}
+        Status: ${patientData.status}
+        Update Type: ${patientData.updateType}
+        ${patientData.details ? `Details: ${patientData.details}` : ''}
+        
+        Please review this information in the system.
+        
+        Best regards,
+        Mental Health Tracker Team
+      `,
+    };
+
+    return this.sendEmail({ to: userEmail, template });
+  }
+
+  // System alert email
+  async sendSystemAlert(
+    userEmail: string,
+    alertData: {
+      title: string;
+      message: string;
+      severity: 'info' | 'warning' | 'error';
+      actionRequired?: boolean;
+    }
+  ): Promise<boolean> {
+    const severityColors = {
+      info: '#3b82f6',
+      warning: '#f59e0b',
+      error: '#ef4444',
+    };
+
+    const template: EmailTemplate = {
+      subject: `System Alert - ${alertData.title}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: ${severityColors[alertData.severity]};">System Alert</h2>
+          <p>Hello,</p>
+          <p>You have received a system alert:</p>
+          
+          <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid ${severityColors[alertData.severity]};">
+            <h3 style="margin-top: 0;">${alertData.title}</h3>
+            <p>${alertData.message}</p>
+            ${alertData.actionRequired ? '<p><strong>⚠️ Action Required</strong></p>' : ''}
+          </div>
+          
+          <p>Please log into the system to review this alert.</p>
+          <p>Best regards,<br>Mental Health Tracker Team</p>
+        </div>
+      `,
+      text: `
+        System Alert - ${alertData.title}
+        
+        Hello,
+        
+        You have received a system alert:
+        
+        ${alertData.title}
+        ${alertData.message}
+        ${alertData.actionRequired ? '⚠️ Action Required' : ''}
+        
+        Please log into the system to review this alert.
+        
+        Best regards,
+        Mental Health Tracker Team
+      `,
+    };
+
+    return this.sendEmail({ to: userEmail, template });
+  }
+
+  // Welcome email for new users
+  async sendWelcomeEmail(
+    userEmail: string,
+    userData: {
+      firstName: string;
+      lastName: string;
+      role: string;
+    }
+  ): Promise<boolean> {
+    const template: EmailTemplate = {
+      subject: 'Welcome to Mental Health Tracker',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #2563eb;">Welcome to Mental Health Tracker</h2>
+          <p>Hello ${userData.firstName},</p>
+          <p>Welcome to the Mental Health Tracker system! Your account has been successfully created.</p>
+          
+          <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="margin-top: 0;">Account Details</h3>
+            <p><strong>Name:</strong> ${userData.firstName} ${userData.lastName}</p>
+            <p><strong>Email:</strong> ${userEmail}</p>
+            <p><strong>Role:</strong> ${userData.role}</p>
+          </div>
+          
+          <p>You can now log into the system and start managing patient records and appointments.</p>
+          <p>If you have any questions, please contact your system administrator.</p>
+          <p>Best regards,<br>Mental Health Tracker Team</p>
+        </div>
+      `,
+      text: `
+        Welcome to Mental Health Tracker
+        
+        Hello ${userData.firstName},
+        
+        Welcome to the Mental Health Tracker system! Your account has been successfully created.
+        
+        Account Details:
+        Name: ${userData.firstName} ${userData.lastName}
+        Email: ${userEmail}
+        Role: ${userData.role}
+        
+        You can now log into the system and start managing patient records and appointments.
+        
+        If you have any questions, please contact your system administrator.
+        
+        Best regards,
+        Mental Health Tracker Team
+      `,
+    };
+
+    return this.sendEmail({ to: userEmail, template });
+  }
+
+  // Password reset email
+  async sendPasswordReset(
+    userEmail: string,
+    resetToken: string,
+    resetUrl: string
+  ): Promise<boolean> {
+    const template: EmailTemplate = {
+      subject: 'Password Reset Request',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #2563eb;">Password Reset Request</h2>
+          <p>Hello,</p>
+          <p>You have requested to reset your password for the Mental Health Tracker system.</p>
+          
+          <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <p>Click the button below to reset your password:</p>
+            <a href="${resetUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">Reset Password</a>
+            <p style="margin-top: 15px; font-size: 14px; color: #6b7280;">
+              If the button doesn't work, copy and paste this link into your browser:<br>
+              <a href="${resetUrl}">${resetUrl}</a>
+            </p>
+          </div>
+          
+          <p>This link will expire in 1 hour for security reasons.</p>
+          <p>If you didn't request this password reset, please ignore this email.</p>
+          <p>Best regards,<br>Mental Health Tracker Team</p>
+        </div>
+      `,
+      text: `
+        Password Reset Request
+        
+        Hello,
+        
+        You have requested to reset your password for the Mental Health Tracker system.
+        
+        Click the link below to reset your password:
+        ${resetUrl}
+        
+        This link will expire in 1 hour for security reasons.
+        
+        If you didn't request this password reset, please ignore this email.
+        
+        Best regards,
+        Mental Health Tracker Team
+      `,
+    };
+
+    return this.sendEmail({ to: userEmail, template });
+  }
+
+  // Staff invitation email
+  async sendStaffInvitation(
+    to: string,
+    firstName: string,
+    lastName: string,
+    role: string,
+    inviteUrl: string,
+    tempPassword: string,
+    message?: string
+  ): Promise<boolean> {
+    const template: EmailTemplate = {
+      subject: 'Staff Invitation - Mental Health Tracker',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #2563eb;">Staff Invitation</h2>
+          <p>Hello ${firstName} ${lastName},</p>
+          <p>You have been invited to join the Mental Health Tracker system as a <strong>${role}</strong>.</p>
+          ${message ? `<p><em>${message}</em></p>` : ''}
+          <p><strong>Temporary Password:</strong> <code>${tempPassword}</code></p>
+          <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="margin-top: 0;">Login Link</h3>
+            <p><a href="${inviteUrl}" style="color: #2563eb;">Click here to log in</a></p>
+            <p>Or visit: ${inviteUrl}</p>
+          </div>
+          <p>Best regards,<br>Mental Health Tracker Team</p>
+        </div>
+      `,
+      text: `
+        Staff Invitation - Mental Health Tracker\n\nHello ${firstName} ${lastName},\n\nYou have been invited to join the Mental Health Tracker system as a ${role}.\n${message ? `\n${message}\n` : ''}\nTemporary Password: ${tempPassword}\n\nLogin Link: ${inviteUrl}\n\nBest regards,\nMental Health Tracker Team\n      `,
+    };
+    return this.sendEmail({ to, template });
   }
 }
 
-export const emailService = new EmailService();
+export const emailService = EmailService.getInstance();
