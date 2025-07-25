@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useParams } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Header } from "@/components/layout/Header";
@@ -23,6 +24,9 @@ import {
   User,
   ArrowLeft,
   Trash2,
+  Pencil,
+  CheckCircle,
+  XCircle,
 } from "lucide-react";
 import { Link } from "wouter";
 import { isUnauthorizedError, canSeeCreatedBy } from "@/lib/authUtils";
@@ -32,6 +36,8 @@ import type {
   AppointmentWithDetails,
   TreatmentRecordWithDetails,
 } from "@shared/schema";
+import { format, parseISO, isValid } from "date-fns";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export default function PatientDetail() {
   const params = useParams();
@@ -55,6 +61,16 @@ export default function PatientDetail() {
     }
   }, [isAuthenticated, authLoading, toast]);
 
+  // Clear appointments cache when component mounts
+  useEffect(() => {
+    if (patientId) {
+      queryClient.removeQueries({
+        queryKey: ["/api/appointments"],
+        exact: false,
+      });
+    }
+  }, [patientId, queryClient]);
+
   const { data: patient, isLoading: patientLoading } = useQuery({
     queryKey: [`/api/patients/${patientId}`],
     retry: false,
@@ -65,6 +81,8 @@ export default function PatientDetail() {
     queryKey: ["/api/appointments", { patientId }],
     retry: false,
     enabled: !!patientId,
+    staleTime: 0, // Force fresh fetch
+    refetchOnMount: true,
   }) as { data: any[]; isLoading: boolean };
 
   const { data: records, isLoading: recordsLoading } = useQuery({
@@ -229,6 +247,8 @@ export default function PatientDetail() {
     return age;
   };
 
+  const isFrontDesk = user?.role === "frontdesk";
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
@@ -317,6 +337,7 @@ export default function PatientDetail() {
                 <TabsTrigger value="overview">Overview</TabsTrigger>
                 <TabsTrigger value="appointments">Appointments</TabsTrigger>
                 <TabsTrigger value="records">Treatment Records</TabsTrigger>
+                <TabsTrigger value="assessment">Assessment</TabsTrigger>
               </TabsList>
 
               <TabsContent value="overview" className="space-y-6">
@@ -374,6 +395,21 @@ export default function PatientDetail() {
                         </label>
                         <p className="text-sm text-gray-900">
                           {formatDate(patient.createdAt!)}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">
+                          Length of Stay (LOS)
+                        </label>
+                        <p className="text-sm text-gray-900">
+                          {(() => {
+                            const intake = patient.intakeDate ? new Date(patient.intakeDate) : (patient.createdAt ? new Date(patient.createdAt) : null);
+                            const discharge = patient.dischargeDate ? new Date(patient.dischargeDate) : (patient.status === 'discharged' ? new Date() : null);
+                            if (!intake) return 'N/A';
+                            const end = discharge || new Date();
+                            const diff = Math.max(0, Math.floor((end.getTime() - intake.getTime()) / (1000 * 60 * 60 * 24)));
+                            return `${diff} day${diff !== 1 ? 's' : ''}`;
+                          })()}
                         </p>
                       </div>
 
@@ -462,31 +498,47 @@ export default function PatientDetail() {
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <div>
-                        <label className="text-sm font-medium text-gray-500">
-                          Insurance Provider
-                        </label>
-                        <p className="text-sm text-gray-900">
-                          {patient.insurance || "Not provided"}
-                        </p>
-                      </div>
-
-                      <div>
-                        <label className="text-sm font-medium text-gray-500">
-                          Reason for Visit
-                        </label>
-                        <p className="text-sm text-gray-900">
-                          {patient.reasonForVisit || "Not provided"}
-                        </p>
-                      </div>
-
-                      <div>
-                        <label className="text-sm font-medium text-gray-500">
-                          HIPAA Consent
-                        </label>
-                        <p className="text-sm text-gray-900">
-                          {patient.hipaaConsent ? "Provided" : "Not provided"}
-                        </p>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-sm font-medium text-gray-500">
+                            Insurance Provider
+                          </label>
+                          <p className="text-sm text-gray-900">
+                            {patient.insurance || "-"}
+                          </p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-500">
+                            Authorization Number
+                          </label>
+                          <p className="text-sm text-gray-900">
+                            {patient.authNumber || "-"}
+                          </p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-500">
+                            Level of Care (LOC)
+                          </label>
+                          <p className="text-sm text-gray-900">
+                            {patient.loc || "-"}
+                          </p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-500">
+                            Reason for Visit
+                          </label>
+                          <p className="text-sm text-gray-900">
+                            {patient.reasonForVisit || "-"}
+                          </p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-500">
+                            HIPAA Consent
+                          </label>
+                          <p className="text-sm text-gray-900">
+                            {patient.hipaaConsent ? "Provided" : "Not Provided"}
+                          </p>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -708,10 +760,361 @@ export default function PatientDetail() {
                   </CardContent>
                 </Card>
               </TabsContent>
+
+              <TabsContent value="assessment">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Patient Assessment</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {/* List of previous assessments */}
+                    <AssessmentsSection patientId={patient.id} patient={patient} />
+                  </CardContent>
+                </Card>
+              </TabsContent>
             </Tabs>
           </div>
         </main>
       </div>
+    </div>
+  );
+}
+
+function AssessmentsSection({ patientId, patient }: { patientId: string, patient: any }) {
+  const { user } = useAuth();
+  const isFrontDesk = user?.role === "frontdesk";
+  const isAdmin = user?.role === "admin";
+  const [form, setForm] = useState({
+    presentingProblem: "",
+    medicalHistory: "",
+    psychiatricHistory: "",
+    familyHistory: "",
+    socialHistory: "",
+    mentalStatus: "",
+    riskAssessment: "",
+    diagnosis: "",
+    impressions: "",
+    followUpDate: "",
+    followUpNotes: "",
+  });
+  const [submitting, setSubmitting] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editForm, setEditForm] = useState({
+    presentingProblem: "",
+    medicalHistory: "",
+    psychiatricHistory: "",
+    familyHistory: "",
+    socialHistory: "",
+    mentalStatus: "",
+    riskAssessment: "",
+    diagnosis: "",
+    impressions: "",
+    followUpDate: "",
+    followUpNotes: "",
+    status: "in_progress",
+  });
+  const { data: assessments = [], refetch, isLoading } = useQuery({
+    queryKey: ["/api/patients", patientId, "assessments"],
+    queryFn: async () => {
+      const res = await fetch(`/api/patients/${patientId}/assessments`);
+      if (!res.ok) throw new Error("Failed to fetch assessments");
+      return res.json();
+    },
+    enabled: !!patientId,
+  });
+  const handleChange = (e: any) => {
+    setForm(f => ({ ...f, [e.target.name]: e.target.value }));
+  };
+  const handleSubmit = async (e: any) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      let res;
+      if (editingId) {
+        res = await fetch(`/api/assessments/${editingId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...form }),
+        });
+      } else {
+        res = await fetch(`/api/patients/${patientId}/assessments`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...form }),
+        });
+      }
+      if (!res.ok) throw new Error("Failed to save assessment");
+      setForm({
+        presentingProblem: "",
+        medicalHistory: "",
+        psychiatricHistory: "",
+        familyHistory: "",
+        socialHistory: "",
+        mentalStatus: "",
+        riskAssessment: "",
+        diagnosis: "",
+        impressions: "",
+        followUpDate: "",
+        followUpNotes: "",
+      });
+      setEditingId(null);
+      refetch();
+    } catch (err) {
+      alert("Failed to save assessment");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+  const handleEdit = (a: any) => {
+    setEditForm({
+      presentingProblem: a.presentingProblem || "",
+      medicalHistory: a.medicalHistory || "",
+      psychiatricHistory: a.psychiatricHistory || "",
+      familyHistory: a.familyHistory || "",
+      socialHistory: a.socialHistory || "",
+      mentalStatus: a.mentalStatus || "",
+      riskAssessment: a.riskAssessment || "",
+      diagnosis: a.diagnosis || "",
+      impressions: a.impressions || "",
+      followUpDate: a.followUpDate ? a.followUpDate.slice(0, 10) : "",
+      followUpNotes: a.followUpNotes || "",
+      status: a.status || "in_progress",
+    });
+    setEditingId(a.id);
+    setEditDialogOpen(true);
+  };
+  const handleEditChange = (e: any) => {
+    setEditForm(f => ({ ...f, [e.target.name]: e.target.value }));
+  };
+  const handleEditSubmit = async (e: any) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/assessments/${editingId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editForm),
+      });
+      if (!res.ok) throw new Error("Failed to update assessment");
+      setEditingId(null);
+      setEditDialogOpen(false);
+      refetch();
+    } catch (err) {
+      alert("Failed to update assessment");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+  const handleDelete = async (id: string) => {
+    if (!window.confirm("Are you sure you want to delete this assessment?")) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/assessments/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete assessment");
+      refetch();
+    } catch (err) {
+      alert("Failed to delete assessment");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const formatDisplayDate = (date: string) => {
+    if (!date) return "N/A";
+    return isValid(parseISO(date)) ? format(parseISO(date), "PPP") : format(new Date(date + 'T12:00:00'), "PPP");
+  };
+
+  return (
+    <div>
+      {/* New assessment form */}
+      {!isFrontDesk && (
+        <form className="space-y-4 mb-10 bg-white p-6 rounded-lg shadow border" onSubmit={handleSubmit}>
+          <h2 className="text-xl font-bold mb-2 text-gray-800">New Assessment</h2>
+          <div>
+            <strong>Patient:</strong> {patient.firstName} {patient.lastName}
+          </div>
+          <div>
+            <label className="block font-medium">Presenting Problem</label>
+            <textarea className="w-full border rounded p-2" name="presentingProblem" value={form.presentingProblem} onChange={handleChange} required />
+          </div>
+          <div>
+            <label className="block font-medium">Medical History</label>
+            <textarea className="w-full border rounded p-2" name="medicalHistory" value={form.medicalHistory} onChange={handleChange} />
+          </div>
+          <div>
+            <label className="block font-medium">Psychiatric History</label>
+            <textarea className="w-full border rounded p-2" name="psychiatricHistory" value={form.psychiatricHistory} onChange={handleChange} />
+          </div>
+          <div>
+            <label className="block font-medium">Family History</label>
+            <textarea className="w-full border rounded p-2" name="familyHistory" value={form.familyHistory} onChange={handleChange} />
+          </div>
+          <div>
+            <label className="block font-medium">Social History</label>
+            <textarea className="w-full border rounded p-2" name="socialHistory" value={form.socialHistory} onChange={handleChange} />
+          </div>
+          <div>
+            <label className="block font-medium">Mental Status Exam</label>
+            <textarea className="w-full border rounded p-2" name="mentalStatus" value={form.mentalStatus} onChange={handleChange} />
+          </div>
+          <div>
+            <label className="block font-medium">Risk Assessment</label>
+            <textarea className="w-full border rounded p-2" name="riskAssessment" value={form.riskAssessment} onChange={handleChange} />
+          </div>
+          <div>
+            <label className="block font-medium">Diagnosis</label>
+            <input className="w-full border rounded p-2" name="diagnosis" value={form.diagnosis} onChange={handleChange} />
+          </div>
+          <div>
+            <label className="block font-medium">Initial Impressions & Recommendations</label>
+            <textarea className="w-full border rounded p-2" name="impressions" value={form.impressions} onChange={handleChange} required />
+          </div>
+          <div>
+            <label className="block font-medium">Follow-Up Date</label>
+            <input type="date" className="w-full border rounded p-2" name="followUpDate" value={form.followUpDate} onChange={handleChange} />
+          </div>
+          <div>
+            <label className="block font-medium">Follow-Up Notes</label>
+            <textarea className="w-full border rounded p-2" name="followUpNotes" value={form.followUpNotes} onChange={handleChange} />
+          </div>
+          <div className="flex justify-end">
+            <Button type="submit" variant="default" disabled={submitting}>Save Assessment</Button>
+          </div>
+        </form>
+      )}
+      <hr className="my-8" />
+      <h3 className="font-semibold mb-4 text-lg text-gray-800 flex items-center gap-2"><span>Previous Assessments</span></h3>
+      {isLoading ? (
+        <div>Loading assessments...</div>
+      ) : assessments.length === 0 ? (
+        <div className="text-gray-500">No assessments found for this patient.</div>
+      ) : (
+        <div className="space-y-6">
+          {assessments.map((a: any, idx: number) => (
+            <div key={a.id} className="border rounded-lg p-5 bg-gray-50 shadow-sm flex flex-col gap-2">
+              <div className="flex justify-between items-center mb-1">
+                <div className="flex items-center gap-2">
+                  <div className="font-medium text-blue-900 text-base">Assessment #{assessments.length - idx}</div>
+                  <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${a.status === 'complete' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{a.status === 'complete' ? 'Complete' : 'In Progress'}</span>
+                </div>
+                {(!isFrontDesk && (a.status !== 'complete' || isAdmin)) && (
+                  <>
+                    {a.status !== 'complete' && (
+                      <button className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded bg-green-100 text-green-700 hover:bg-green-200 transition" onClick={async () => {
+                        await fetch(`/api/assessments/${a.id}`, {
+                          method: 'PATCH',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ status: 'complete' }),
+                        });
+                        refetch();
+                      }}>
+                        <CheckCircle className="w-4 h-4" /> Mark as Complete
+                      </button>
+                    )}
+                    <div className="space-x-2 flex">
+                      <button className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded bg-blue-100 text-blue-700 hover:bg-blue-200 transition" onClick={() => handleEdit(a)}>
+                        <Pencil className="w-4 h-4" /> Edit
+                      </button>
+                      <button className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded bg-red-100 text-red-700 hover:bg-red-200 transition" onClick={() => handleDelete(a.id)}>
+                        <Trash2 className="w-4 h-4" /> Delete
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+              <div className="text-xs text-gray-500 mb-2">
+                Created by: {a.createdBy?.name || 'Unknown'} ({a.createdBy?.role || 'N/A'})
+                {a.updatedBy && a.updatedBy.name && a.updatedBy.name !== a.createdBy?.name && (
+                  <> | Last updated by: {a.updatedBy.name} ({a.updatedBy.role || 'N/A'})</>
+                )}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div><span className="font-semibold text-gray-700">Presenting Problem:</span> {a.presentingProblem}</div>
+                <div><span className="font-semibold text-gray-700">Impressions:</span> {a.impressions}</div>
+                {a.diagnosis && <div><span className="font-semibold text-gray-700">Diagnosis:</span> {a.diagnosis}</div>}
+                {a.followUpDate && (
+                  <div>
+                    <span className="font-semibold text-gray-700">Follow-Up:</span> {
+                      typeof a.followUpDate === 'string'
+                        ? (isValid(parseISO(a.followUpDate)) ? format(parseISO(a.followUpDate), "PPP") : format(new Date(a.followUpDate + 'T12:00:00'), "PPP"))
+                        : format(new Date(a.followUpDate), "PPP")
+                    }
+                  </div>
+                )}
+                {a.followUpNotes && <div><span className="font-semibold text-gray-700">Follow-Up Notes:</span> {a.followUpNotes}</div>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {/* Edit Assessment Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={open => { setEditDialogOpen(open); if (!open) { setEditingId(null); } }}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto bg-white shadow-xl rounded-lg p-0">
+          <div className="sticky top-0 z-10 bg-white border-b px-6 pt-4 pb-2 rounded-t-lg shadow-sm">
+            <DialogHeader>
+              <DialogTitle className="text-lg font-bold">Edit Assessment</DialogTitle>
+            </DialogHeader>
+          </div>
+          <form id="edit-assessment-form" className="space-y-5 px-6 pt-2 pb-20" onSubmit={handleEditSubmit}>
+            <div className="mb-2">
+              <strong>Patient:</strong> {patient.firstName} {patient.lastName}
+            </div>
+            <div className="space-y-2">
+              <label className="block font-semibold">Presenting Problem</label>
+              <textarea className="w-full border rounded p-2" name="presentingProblem" value={editForm.presentingProblem} onChange={handleEditChange} disabled={isFrontDesk || (editForm.status === 'complete' && !isAdmin)} />
+            </div>
+            <div className="space-y-2">
+              <label className="block font-semibold">Medical History</label>
+              <textarea className="w-full border rounded p-2" name="medicalHistory" value={editForm.medicalHistory} onChange={handleEditChange} disabled={isFrontDesk || (editForm.status === 'complete' && !isAdmin)} />
+            </div>
+            <div className="space-y-2">
+              <label className="block font-semibold">Psychiatric History</label>
+              <textarea className="w-full border rounded p-2" name="psychiatricHistory" value={editForm.psychiatricHistory} onChange={handleEditChange} disabled={isFrontDesk || (editForm.status === 'complete' && !isAdmin)} />
+            </div>
+            <div className="space-y-2">
+              <label className="block font-semibold">Family History</label>
+              <textarea className="w-full border rounded p-2" name="familyHistory" value={editForm.familyHistory} onChange={handleEditChange} disabled={isFrontDesk || (editForm.status === 'complete' && !isAdmin)} />
+            </div>
+            <div className="space-y-2">
+              <label className="block font-semibold">Social History</label>
+              <textarea className="w-full border rounded p-2" name="socialHistory" value={editForm.socialHistory} onChange={handleEditChange} disabled={isFrontDesk || (editForm.status === 'complete' && !isAdmin)} />
+            </div>
+            <div className="space-y-2">
+              <label className="block font-semibold">Mental Status Exam</label>
+              <textarea className="w-full border rounded p-2" name="mentalStatus" value={editForm.mentalStatus} onChange={handleEditChange} disabled={isFrontDesk || (editForm.status === 'complete' && !isAdmin)} />
+            </div>
+            <div className="space-y-2">
+              <label className="block font-semibold">Risk Assessment</label>
+              <textarea className="w-full border rounded p-2" name="riskAssessment" value={editForm.riskAssessment} onChange={handleEditChange} disabled={isFrontDesk || (editForm.status === 'complete' && !isAdmin)} />
+            </div>
+            <div className="space-y-2">
+              <label className="block font-semibold">Diagnosis</label>
+              <input className="w-full border rounded p-2" name="diagnosis" value={editForm.diagnosis} onChange={handleEditChange} disabled={isFrontDesk || (editForm.status === 'complete' && !isAdmin)} />
+            </div>
+            <div className="space-y-2">
+              <label className="block font-semibold">Initial Impressions & Recommendations</label>
+              <textarea className="w-full border rounded p-2" name="impressions" value={editForm.impressions} onChange={handleEditChange} disabled={isFrontDesk || (editForm.status === 'complete' && !isAdmin)} />
+            </div>
+            <div className="space-y-2">
+              <label className="block font-semibold">Follow-Up Date</label>
+              <input type="date" className="w-full border rounded p-2" name="followUpDate" value={editForm.followUpDate} onChange={handleEditChange} disabled={isFrontDesk || (editForm.status === 'complete' && !isAdmin)} />
+            </div>
+            <div className="space-y-2">
+              <label className="block font-semibold">Follow-Up Notes</label>
+              <textarea className="w-full border rounded p-2" name="followUpNotes" value={editForm.followUpNotes} onChange={handleEditChange} disabled={isFrontDesk || (editForm.status === 'complete' && !isAdmin)} />
+            </div>
+          </form>
+          <div className="sticky bottom-0 z-10 bg-white border-t px-6 py-4 flex justify-end space-x-2 rounded-b-lg shadow-sm">
+            <button type="button" className="inline-flex items-center gap-2 px-4 py-2 rounded bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium transition" onClick={() => { setEditDialogOpen(false); setEditingId(null); }}>Close</button>
+            {(!isFrontDesk && (editForm.status !== 'complete' || isAdmin)) && (
+              <button type="submit" form="edit-assessment-form" className="inline-flex items-center gap-2 px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700 font-semibold shadow transition" disabled={submitting}>
+                <CheckCircle className="w-5 h-5" /> {submitting ? "Updating..." : "Update Assessment"}
+              </button>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

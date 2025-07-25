@@ -148,7 +148,7 @@ export function AppointmentForm({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {therapists.map((therapist) => (
+                        {Array.isArray(therapists) && therapists.map((therapist) => (
                           <SelectItem key={therapist.id} value={therapist.id}>
                             {therapist.firstName} {therapist.lastName}
                           </SelectItem>

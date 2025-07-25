@@ -9,7 +9,7 @@ import { RecentPatients } from "@/components/dashboard/RecentPatients";
 import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import { Button } from "@/components/ui/button";
-import { Download, Plus, UserCheck } from "lucide-react";
+import { Download, Plus, UserCheck, User } from "lucide-react";
 import { Link } from "wouter";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import type { DashboardStats } from "@/components/dashboard/StatsCards";
@@ -134,10 +134,9 @@ export default function Dashboard() {
               <StatsCards stats={statsData} isLoading={statsLoading} />
             </div>
 
-            {/* Main Content Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-              {/* Recent Patients */}
-              <div className="lg:col-span-2">
+            {/* Main Content Grid: Recent Patients and Today's Schedule side-by-side */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div>
                 <RecentPatients
                   patients={Array.isArray(recentPatients) ? recentPatients : []}
                   isLoading={patientsLoading}
@@ -147,21 +146,17 @@ export default function Dashboard() {
                   }}
                 />
               </div>
-
-              {/* Today's Schedule */}
               <div>
                 <TodaySchedule
-                  appointments={
-                    Array.isArray(todayAppointments) ? todayAppointments : []
-                  }
+                  appointments={Array.isArray(todayAppointments) ? todayAppointments : []}
                   isLoading={appointmentsLoading}
                 />
               </div>
             </div>
-
-            {/* Quick Actions */}
-            <QuickActions />
           </div>
+
+          {/* Quick Actions */}
+          <QuickActions />
         </main>
       </div>
     </div>

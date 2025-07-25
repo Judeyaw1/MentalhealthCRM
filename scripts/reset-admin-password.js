@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import mongoose from 'mongoose';
+import nodemailer from 'nodemailer';
 
 // Connect to MongoDB
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/mentalhealthcrm';
@@ -30,39 +31,49 @@ async function resetAdminPassword() {
     const hashedPassword = await bcrypt.hash(newPassword, 12);
     console.log('Password hashed successfully');
 
-    // Find and update the admin user
-    const result = await User.updateOne(
-      { role: 'admin' },
-      { 
-        password: hashedPassword,
-        updatedAt: new Date()
-      }
-    );
+    const emailToReset = process.argv[2];
+    if (!emailToReset) {
+      console.error("Please provide the user's email as an argument.\nUsage: node scripts/reset-admin-password.js user@example.com");
+      process.exit(1);
+    }
 
-    if (result.matchedCount === 0) {
-      console.log('No admin user found. Creating a new admin user...');
-      
-      // Create a new admin user
-      const newAdmin = new User({
-        email: 'admin@newlife.com',
-        firstName: 'Admin',
-        lastName: 'User',
-        role: 'admin',
-        password: hashedPassword,
-        forcePasswordChange: false,
-        createdAt: new Date(),
-        updatedAt: new Date()
+    // Find and update the user by email
+    const user = await User.findOne({ email: emailToReset });
+    if (!user) {
+      console.error("No user found with that email.");
+      process.exit(1);
+    }
+
+    user.password = hashedPassword;
+    user.updatedAt = new Date();
+    await user.save();
+    console.log(`Password updated for user: ${user.email}`);
+
+    // Send email notification
+    if (user.email) {
+      const transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST || 'smtp.gmail.com',
+        port: process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT) : 465,
+        secure: process.env.SMTP_SECURE === 'true' || true,
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS,
+        },
       });
-
-      await newAdmin.save();
-      console.log('New admin user created successfully');
-      console.log(`Email: admin@newlife.com`);
+      await transporter.sendMail({
+        from: process.env.SMTP_USER,
+        to: user.email,
+        subject: 'Your Password Has Been Reset',
+        text: `Hello ${user.firstName || ''} ${user.lastName || ''},\n\nYour password has been reset by an administrator.\n\nEmail: ${user.email}\nNew Password: ${newPassword}\n\nPlease log in and change your password as soon as possible.`,
+        html: `<p>Hello ${user.firstName || ''} ${user.lastName || ''},</p><p>Your password has been reset by an administrator.</p><p><b>Email:</b> ${user.email}<br/><b>New Password:</b> ${newPassword}</p><p>Please log in and change your password as soon as possible.</p>`,
+      });
+      console.log(`Password reset email sent to ${user.email}`);
     } else {
-      console.log('Admin user password updated successfully');
+      console.log('User has no email address set. Cannot send notification.');
     }
 
     console.log('\n=== LOGIN CREDENTIALS ===');
-    console.log(`Email: admin@newlife.com`);
+    console.log(`Email: ${emailToReset}`);
     console.log(`Password: ${newPassword}`);
     console.log('========================\n');
 

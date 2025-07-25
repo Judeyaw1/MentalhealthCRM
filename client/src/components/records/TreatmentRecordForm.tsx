@@ -408,7 +408,7 @@ export function TreatmentRecordForm({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {therapists.map((therapist) => (
+                        {Array.isArray(therapists) && therapists.map((therapist) => (
                           <SelectItem
                             key={therapist.id}
                             value={therapist.id.toString()}

@@ -19,6 +19,7 @@ const TreatmentRecordSchema = new mongoose.Schema(
     interventions: { type: String },
     progress: { type: String },
     planForNextSession: { type: String },
+    patientName: { type: String },
   },
   { timestamps: true },
 );

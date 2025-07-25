@@ -82,7 +82,19 @@ const patientSchema = new mongoose.Schema({
   insurance: {
     type: String,
   },
+  insuranceCardUrl: {
+    type: String,
+  },
+  photoUrl: {
+    type: String,
+  },
   reasonForVisit: {
+    type: String,
+  },
+  authNumber: {
+    type: String,
+  },
+  loc: {
     type: String,
   },
   status: {

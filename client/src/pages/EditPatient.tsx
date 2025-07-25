@@ -44,13 +44,23 @@ export default function EditPatient() {
   });
 
   const updatePatientMutation = useMutation({
-    mutationFn: async (patientData: Partial<InsertPatient>) => {
-      const response = await apiRequest(
-        "PATCH",
-        `/api/patients/${patientId}`,
-        patientData,
-      );
-      return response.json();
+    mutationFn: async (patientData: Partial<InsertPatient> | FormData) => {
+      if (typeof FormData !== 'undefined' && patientData instanceof FormData) {
+        // Send as multipart/form-data
+        const response = await fetch(`/api/patients/${patientId}`, {
+          method: "PATCH",
+          body: patientData,
+        });
+        return response.json();
+      } else {
+        // Send as JSON
+        const response = await apiRequest(
+          "PATCH",
+          `/api/patients/${patientId}`,
+          patientData,
+        );
+        return response.json();
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
@@ -158,21 +168,7 @@ export default function EditPatient() {
             {/* Patient Form */}
             <div className="max-w-4xl">
               <PatientForm
-                initialData={{
-                  firstName: patient.firstName,
-                  lastName: patient.lastName,
-                  dateOfBirth: patient.dateOfBirth,
-                  gender: patient.gender || "",
-                  email: patient.email || "",
-                  phone: patient.phone || "",
-                  emergencyContact: patient.emergencyContact || "",
-                  address: patient.address || "",
-                  insurance: patient.insurance || "",
-                  reasonForVisit: patient.reasonForVisit || "",
-                  status: patient.status,
-                  hipaaConsent: patient.hipaaConsent,
-                  assignedTherapistId: patient.assignedTherapistId || "",
-                }}
+                initialData={patient}
                 onSubmit={(data) => updatePatientMutation.mutate(data)}
                 isLoading={updatePatientMutation.isPending}
                 submitLabel="Update Patient Record"

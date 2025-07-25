@@ -4,6 +4,8 @@ import { User } from "./models/User";
 import mongoose from "mongoose";
 import { TreatmentRecord } from "./models/TreatmentRecord";
 import { TreatmentCompletionService } from "./treatmentCompletionService";
+import { Notification as NotificationModel } from "./models/Notification";
+import { Notification, NotificationType } from "./notificationService";
 
 // Simplified MongoDB-only storage for now
 export class DatabaseStorage {
@@ -14,7 +16,7 @@ export class DatabaseStorage {
   }
   
   // Patient operations
-  async getPatients(limit = 50, offset = 0, search?: string, status?: string, createdBy?: string) {
+  async getPatients(limit = 50, offset = 0, search?: string, status?: string, createdBy?: string, therapist?: string, loc?: string) {
     let query: any = {};
 
     if (search) {
@@ -32,6 +34,14 @@ export class DatabaseStorage {
 
     if (createdBy) {
       query.createdBy = createdBy;
+    }
+
+    if (therapist) {
+      query.assignedTherapistId = therapist;
+    }
+
+    if (loc) {
+      query.loc = loc;
     }
 
     const total = await PatientModel.countDocuments(query);
@@ -65,7 +75,7 @@ export class DatabaseStorage {
       const transformed = {
         ...rest,
         id: _id.toString(),
-        assignedTherapist: undefined,
+        assignedTherapist: rest.assignedTherapistId || undefined,
         createdBy: rest.createdBy
           ? {
               ...rest.createdBy,
@@ -178,6 +188,10 @@ export class DatabaseStorage {
   }
 
   async updatePatient(id: string, patient: any) {
+    // Get the current patient to check for assignment changes
+    const currentPatient = await PatientModel.findById(id).lean();
+    if (!currentPatient) return undefined;
+
     // Clean up ObjectId fields - convert empty strings to null
     const cleanedPatient = {
       ...patient,
@@ -187,10 +201,41 @@ export class DatabaseStorage {
           : patient.assignedTherapistId,
     };
 
+    // Check if therapist assignment changed
+    const prevTherapistId = currentPatient.assignedTherapistId?.toString();
+    const newTherapistId = cleanedPatient.assignedTherapistId?.toString();
+
     const updatedPatient = await PatientModel.findByIdAndUpdate(id, cleanedPatient, {
       new: true,
     }).lean();
     if (!updatedPatient) return undefined;
+
+    // Send notification if therapist assignment changed
+    if (newTherapistId && newTherapistId !== prevTherapistId) {
+      try {
+        const { notificationService } = require("./notificationService");
+        const patientName = `${updatedPatient.firstName} ${updatedPatient.lastName}`;
+        const notificationTitle = "New Patient Assigned";
+        const notificationMessage = `You have been assigned patient ${patientName}.`;
+        const notificationData = {
+          patientId: updatedPatient._id.toString(),
+          patientName,
+          reasonForVisit: updatedPatient.reasonForVisit,
+          status: updatedPatient.status,
+        };
+
+        await notificationService.createNotification(
+          newTherapistId,
+          "patient_assigned",
+          notificationTitle,
+          notificationMessage,
+          notificationData
+        );
+      } catch (error) {
+        console.error("Failed to send patient assignment notification:", error);
+      }
+    }
+
     const { _id, ...rest } = updatedPatient;
     return {
       ...rest,
@@ -407,6 +452,33 @@ export class DatabaseStorage {
       throw new Error("Failed to create appointment");
     }
 
+    // Send notification to the assigned therapist
+    try {
+      const { notificationService } = await import("./notificationService");
+      const patientName = `${populatedAppointment.patientId.firstName} ${populatedAppointment.patientId.lastName}`;
+      const appointmentDate = new Date(populatedAppointment.appointmentDate).toLocaleDateString();
+      const notificationTitle = "New Appointment Assigned";
+      const notificationMessage = `You have a new appointment with ${patientName} on ${appointmentDate}.`;
+      const notificationData = {
+        appointmentId: populatedAppointment._id.toString(),
+        patientId: populatedAppointment.patientId._id.toString(),
+        patientName,
+        appointmentDate: populatedAppointment.appointmentDate,
+        appointmentType: populatedAppointment.type,
+        duration: populatedAppointment.duration,
+      };
+
+      await notificationService.createNotification(
+        populatedAppointment.therapistId._id.toString(),
+        "general",
+        notificationTitle,
+        notificationMessage,
+        notificationData
+      );
+    } catch (error) {
+      console.error("Failed to send appointment assignment notification:", error);
+    }
+
     return {
       ...populatedAppointment,
       id: populatedAppointment._id.toString(),
@@ -422,6 +494,24 @@ export class DatabaseStorage {
   }
 
   async updateAppointment(id: string, updates: any) {
+    console.log("🔍 updateAppointment called with:", { id, updates });
+    
+    // Fetch the current appointment to check for therapist reassignment
+    const currentAppointment = await Appointment.findById(id).lean();
+    if (!currentAppointment) {
+      console.log("❌ Current appointment not found");
+      return null;
+    }
+
+    const prevTherapistId = currentAppointment.therapistId?.toString();
+    const newTherapistId = updates.therapistId?.toString();
+    
+    console.log("🔍 Therapist assignment check:", {
+      prevTherapistId,
+      newTherapistId,
+      hasChanged: newTherapistId && newTherapistId !== prevTherapistId
+    });
+
     const appointment = await Appointment.findByIdAndUpdate(id, updates, {
       new: true,
     })
@@ -431,16 +521,55 @@ export class DatabaseStorage {
 
     if (!appointment) return null;
 
+    // Send notification if therapist assignment changed
+    if (newTherapistId && newTherapistId !== prevTherapistId) {
+      console.log("🔔 Sending appointment reassignment notification to:", newTherapistId);
+      try {
+        const { notificationService } = await import("./notificationService");
+        // Defensive: patientId may be ObjectId or object
+        let patientName = "";
+        if (appointment.patientId && typeof appointment.patientId === "object" && 'firstName' in appointment.patientId && 'lastName' in appointment.patientId) {
+          patientName = `${appointment.patientId.firstName} ${appointment.patientId.lastName}`;
+        }
+        const appointmentDate = new Date(appointment.appointmentDate).toLocaleDateString();
+        const notificationTitle = "New Appointment Assigned";
+        const notificationMessage = `You have a new appointment with ${patientName} on ${appointmentDate}.`;
+        const notificationData = {
+          appointmentId: appointment._id.toString(),
+          patientId: appointment.patientId && appointment.patientId._id ? appointment.patientId._id.toString() : "",
+          patientName,
+          appointmentDate: appointment.appointmentDate,
+          appointmentType: appointment.type,
+          duration: appointment.duration,
+        };
+
+        console.log("🔔 Notification data:", notificationData);
+
+        await notificationService.createNotification(
+          newTherapistId,
+          "general",
+          notificationTitle,
+          notificationMessage,
+          notificationData
+        );
+        console.log("✅ Appointment reassignment notification sent successfully");
+      } catch (error) {
+        console.error("❌ Failed to send appointment reassignment notification:", error);
+      }
+    } else {
+      console.log("ℹ️ No therapist change detected, skipping notification");
+    }
+
     return {
       ...appointment,
       id: appointment._id.toString(),
       patient: {
         ...appointment.patientId,
-        id: appointment.patientId._id.toString(),
+        id: appointment.patientId && appointment.patientId._id ? appointment.patientId._id.toString() : appointment.patientId?.toString?.() || "",
       },
       therapist: {
         ...appointment.therapistId,
-        id: appointment.therapistId._id.toString(),
+        id: appointment.therapistId && appointment.therapistId._id ? appointment.therapistId._id.toString() : appointment.therapistId?.toString?.() || "",
       },
     };
   }
@@ -457,7 +586,7 @@ export class DatabaseStorage {
     }
   }
 
-  async getTodayAppointments() {
+  async getTodayAppointments(therapistId?: string) {
     const today = new Date();
     const startOfDay = new Date(
       today.getFullYear(),
@@ -470,37 +599,18 @@ export class DatabaseStorage {
       today.getDate() + 1,
     );
 
-    console.log("getTodayAppointments - Date range:", {
-      today: today.toISOString(),
-      startOfDay: startOfDay.toISOString(),
-      endOfDay: endOfDay.toISOString(),
-    });
-
-    const appointments = await Appointment.find({
+    const query: any = {
       appointmentDate: { $gte: startOfDay, $lt: endOfDay },
-    })
+    };
+    if (therapistId) {
+      query.therapistId = therapistId;
+    }
+
+    const appointments = await Appointment.find(query)
       .populate("patientId", "firstName lastName")
       .populate("therapistId", "firstName lastName")
       .sort({ createdAt: -1 })
       .lean();
-
-    console.log(
-      "getTodayAppointments - Found appointments:",
-      appointments.length,
-    );
-    if (appointments.length > 0) {
-      appointments.forEach((apt, index) => {
-        console.log(`Today's appointment ${index + 1}:`, {
-          id: apt._id,
-          patient:
-            apt.patientId && typeof apt.patientId === "object"
-              ? `${apt.patientId.firstName} ${apt.patientId.lastName}`
-              : "Unknown",
-          appointmentDate: apt.appointmentDate,
-          status: apt.status,
-        });
-      });
-    }
 
     return appointments.map((apt: any) => ({
       ...apt,
@@ -517,22 +627,91 @@ export class DatabaseStorage {
   }
 
   async getAllTreatmentRecords(query: any = {}) {
-    console.log("Fetching treatment records with query:", query);
-    const records = await TreatmentRecord.find(query)
-      .populate("patientId", "firstName lastName")
-      .populate("therapistId", "firstName lastName")
-      .lean();
-    const total = await TreatmentRecord.countDocuments(query);
-    console.log("Fetched records:", records.length, "Total:", total);
-
-    const transformedRecords = records.map((record: any) => ({
-      ...record,
-      id: record._id.toString(),
-      patient: record.patientId,
-      therapist: record.therapistId,
-    }));
-
-    return transformedRecords;
+    console.log("🔍 Storage - getAllTreatmentRecords called with query:", query);
+    // If searching by patientName, use aggregation
+    let useAggregation = false;
+    let searchRegex = null;
+    if (query.$or) {
+      for (const cond of query.$or) {
+        if (cond.patientName && cond.patientName.$regex) {
+          useAggregation = true;
+          searchRegex = cond.patientName.$regex;
+          break;
+        }
+      }
+    }
+    if (useAggregation && searchRegex) {
+      // Remove patientName from $or
+      const newOr = query.$or.filter((cond: any) => !cond.patientName);
+      // Build aggregation pipeline
+      const pipeline: any[] = [
+        { $lookup: {
+            from: "patients",
+            localField: "patientId",
+            foreignField: "_id",
+            as: "patientObj"
+        }},
+        { $unwind: "$patientObj" },
+        { $lookup: {
+            from: "users",
+            localField: "therapistId",
+            foreignField: "_id",
+            as: "therapistObj"
+        }},
+        { $unwind: { path: "$therapistObj", preserveNullAndEmptyArrays: true } },
+        { $match: {
+            $or: [
+              ...newOr,
+              { "patientObj.firstName": { $regex: searchRegex, $options: "i" } },
+              { "patientObj.lastName": { $regex: searchRegex, $options: "i" } }
+            ],
+            ...(query.patientId ? { patientId: query.patientId } : {}),
+            ...(query.therapistId ? { therapistId: query.therapistId } : {}),
+            ...(query.sessionType ? { sessionType: query.sessionType } : {}),
+            ...(query.sessionDate ? { sessionDate: query.sessionDate } : {}),
+          }
+        },
+        { $sort: { sessionDate: -1 } },
+      ];
+      const records = await TreatmentRecord.aggregate(pipeline);
+      // Transform for frontend
+      const transformedRecords = records.map((record: any) => ({
+        ...record,
+        id: record._id.toString(),
+        patient: {
+          _id: record.patientObj._id,
+          firstName: record.patientObj.firstName,
+          lastName: record.patientObj.lastName,
+        },
+        therapist: record.therapistObj
+          ? {
+              _id: record.therapistObj._id,
+              firstName: record.therapistObj.firstName,
+              lastName: record.therapistObj.lastName,
+            }
+          : undefined,
+      }));
+      return transformedRecords;
+    } else {
+      // Fallback to normal query
+      const records = await TreatmentRecord.find(query)
+        .populate("patientId", "firstName lastName")
+        .populate("therapistId", "firstName lastName")
+        .lean();
+      const transformedRecords = records.map((record: any) => ({
+        ...record,
+        id: record._id.toString(),
+        patient:
+          record.patientId && typeof record.patientId === 'object' && 'firstName' in record.patientId
+            ? record.patientId
+            : undefined,
+        therapist:
+          record.therapistId && typeof record.therapistId === 'object' && 'firstName' in record.therapistId
+            ? record.therapistId
+            : undefined,
+      }));
+      return transformedRecords;
+    }
   }
 
   async getTreatmentRecords(patientId: string) {
@@ -580,7 +759,10 @@ export class DatabaseStorage {
   }
 
   async createTreatmentRecord(record: any) {
-    const newRecord = new TreatmentRecord(record);
+    // Fetch patient to get name
+    const patient = await PatientModel.findById(record.patientId).lean();
+    const patientName = patient ? `${patient.firstName} ${patient.lastName}` : '';
+    const newRecord = new TreatmentRecord({ ...record, patientName });
     await newRecord.save();
 
     // Fetch the record with populated data
@@ -591,6 +773,32 @@ export class DatabaseStorage {
 
     if (!populatedRecord) {
       throw new Error("Failed to create treatment record");
+    }
+
+    // Send notification to the assigned therapist
+    try {
+      const { notificationService } = require("./notificationService");
+      const patientName = `${populatedRecord.patientId.firstName} ${populatedRecord.patientId.lastName}`;
+      const sessionDate = new Date(populatedRecord.sessionDate).toLocaleDateString();
+      const notificationTitle = "New Treatment Record Assigned";
+      const notificationMessage = `You have a new treatment record for ${patientName} from ${sessionDate}.`;
+      const notificationData = {
+        treatmentRecordId: populatedRecord._id.toString(),
+        patientId: populatedRecord.patientId._id.toString(),
+        patientName,
+        sessionDate: populatedRecord.sessionDate,
+        sessionType: populatedRecord.sessionType,
+      };
+
+      await notificationService.createNotification(
+        populatedRecord.therapistId._id.toString(),
+        "general",
+        notificationTitle,
+        notificationMessage,
+        notificationData
+      );
+    } catch (error) {
+      console.error("Failed to send treatment record assignment notification:", error);
     }
 
     const obj = {
@@ -604,7 +812,13 @@ export class DatabaseStorage {
   }
 
   async updateTreatmentRecord(id: string, record: any) {
-    const updated = await TreatmentRecord.findByIdAndUpdate(id, record, {
+    // Fetch patient to get name
+    let patientName = record.patientName;
+    if (!patientName && record.patientId) {
+      const patient = await PatientModel.findById(record.patientId).lean();
+      patientName = patient ? `${patient.firstName} ${patient.lastName}` : '';
+    }
+    const updated = await TreatmentRecord.findByIdAndUpdate(id, { ...record, patientName }, {
       new: true,
     })
       .populate("patientId", "firstName lastName")
@@ -939,8 +1153,40 @@ export class DatabaseStorage {
       throw new Error("Inquiry not found");
     }
 
+    // Detect assignment change
+    const prevAssignedTo = inquiry.assignedTo?.toString();
     Object.assign(inquiry, updateData, { updatedAt: new Date() });
     await patient.save();
+
+    // If assignedTo is set and changed, send notification
+    if (
+      updateData.assignedTo &&
+      updateData.assignedTo.toString() !== prevAssignedTo
+    ) {
+      // Fetch assigned user for name/email
+      const assignedUser = await User.findById(updateData.assignedTo).lean();
+      if (assignedUser) {
+        const patientName = `${patient.firstName} ${patient.lastName}`;
+        const notificationTitle = "New Inquiry Assigned";
+        const notificationMessage = `You have been assigned a new inquiry for patient ${patientName}.`;
+        const notificationData = {
+          inquiryId: inquiry._id.toString(),
+          patientId: patient._id.toString(),
+          patientName,
+          inquiryType: inquiry.inquiryType,
+          priority: inquiry.priority,
+        };
+        // In-app notification only
+        const { notificationService } = require("./notificationService");
+        await notificationService.createNotification(
+          assignedUser._id.toString(),
+          "inquiry_received",
+          notificationTitle,
+          notificationMessage,
+          notificationData
+        );
+      }
+    }
 
     const { _id, ...rest } = patient.toObject();
     return {
@@ -1040,32 +1286,96 @@ export class DatabaseStorage {
   }
 
   async updatePracticeSettings(settings: any, userId: string) {
+    // Implementation for updating practice settings
+    console.log("Updating practice settings:", settings);
+    return { success: true };
+  }
+
+  // Notification methods
+  async createNotification(notification: Notification): Promise<void> {
+    console.log("🔔 Creating notification:", {
+      id: notification.id,
+      userId: notification.userId,
+      type: notification.type,
+      title: notification.title,
+      message: notification.message
+    });
+    
     try {
-      const updateData = {
-        practiceName: settings.practiceName,
-        address: settings.address,
-        phone: settings.phone,
-        email: settings.email,
-        businessHours: settings.businessHours,
-        updatedAt: new Date(),
-        updatedBy: userId
-      };
-
-      // Use upsert to create if doesn't exist, update if it does
-      const result = await this.db.collection('practice_settings').updateOne(
-        {}, // empty filter to match any document
-        { $set: updateData },
-        { upsert: true }
-      );
-
-      return {
-        ...updateData,
-        _id: result.upsertedId || "existing"
-      };
+      await NotificationModel.create(notification);
+      console.log("✅ Notification created successfully");
     } catch (error) {
-      console.error("Error updating practice settings:", error);
+      console.error("❌ Failed to create notification:", error);
       throw error;
     }
+  }
+
+  async getUserNotifications(
+    userId: string,
+    options?: {
+      unreadOnly?: boolean;
+      limit?: number;
+      offset?: number;
+      type?: NotificationType;
+    }
+  ): Promise<Notification[]> {
+    let query: any = { userId };
+
+    if (options?.unreadOnly) {
+      query.read = false;
+    }
+
+    if (options?.type) {
+      query.type = options.type;
+    }
+
+    let queryBuilder = NotificationModel.find(query).sort({ createdAt: -1 });
+
+    if (options?.offset) {
+      queryBuilder = queryBuilder.skip(options.offset);
+    }
+
+    if (options?.limit) {
+      queryBuilder = queryBuilder.limit(options.limit);
+    }
+
+    const notifications = await queryBuilder.lean();
+    return notifications;
+  }
+
+  async markNotificationAsRead(notificationId: string, userId: string): Promise<boolean> {
+    const result = await NotificationModel.updateOne(
+      { id: notificationId, userId },
+      { read: true }
+    );
+
+    return result.modifiedCount > 0;
+  }
+
+  async markAllNotificationsAsRead(userId: string): Promise<boolean> {
+    const result = await NotificationModel.updateMany(
+      { userId, read: false },
+      { read: true }
+    );
+
+    return result.modifiedCount > 0;
+  }
+
+  async deleteNotification(notificationId: string, userId: string): Promise<boolean> {
+    const result = await NotificationModel.deleteOne({ id: notificationId, userId });
+    return result.deletedCount > 0;
+  }
+
+  async getUnreadNotificationCount(userId: string): Promise<number> {
+    return NotificationModel.countDocuments({ userId, read: false });
+  }
+
+  async cleanupExpiredNotifications(): Promise<number> {
+    const result = await NotificationModel.deleteMany({
+      expiresAt: { $lt: new Date() }
+    });
+
+    return result.deletedCount || 0;
   }
 }
 

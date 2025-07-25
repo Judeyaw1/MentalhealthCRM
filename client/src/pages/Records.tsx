@@ -4,6 +4,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { RecordHistoryDialog } from "@/components/records/RecordHistoryDialog";
+import { PatientDetailsDialog } from "@/components/patients/PatientDetailsDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +35,10 @@ import {
   Target,
   MessageSquare,
   ArrowLeft,
+  Printer,
+  Copy,
+  History,
+  AlertTriangle,
 } from "lucide-react";
 import { Link } from "wouter";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -51,6 +57,16 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function Records() {
   const { toast } = useToast();
@@ -63,6 +79,8 @@ export default function Records() {
   const [selectedSessionType, setSelectedSessionType] = useState("all");
   const [dateRange, setDateRange] = useState("all");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+  const [deleteRecordId, setDeleteRecordId] = useState<string | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const pageSize = 20;
 
   // Redirect to home if not authenticated
@@ -80,22 +98,43 @@ export default function Records() {
     }
   }, [isAuthenticated, authLoading, toast]);
 
+  // Get appointmentId from URL if present
+  const urlParams = new URLSearchParams(window.location.search);
+  const appointmentIdFromUrl = urlParams.get("appointmentId");
+
+  // Fetch appointment details if appointmentId is provided
+  const { data: appointmentDetails } = useQuery({
+    queryKey: ["/api/appointments", appointmentIdFromUrl],
+    queryFn: async () => {
+      if (!appointmentIdFromUrl) return null;
+      const response = await fetch(`/api/appointments/${appointmentIdFromUrl}`);
+      if (!response.ok) return null;
+      return response.json();
+    },
+    enabled: !!appointmentIdFromUrl,
+    retry: false,
+  });
+
   // Fetch records with filters
   const {
     data: recordsData,
     isLoading: recordsLoading,
     refetch,
-  } = useQuery<{ records: TreatmentRecordWithDetails[]; total: number }>({
+  } = useQuery<{ records: TreatmentRecordWithDetails[]; total: number } | { records: TreatmentRecordWithDetails[]; total?: number }>({
     queryKey: [
-      "/api/records",
+      appointmentIdFromUrl && appointmentDetails?.patient?.id
+        ? `/api/patients/${appointmentDetails.patient.id}/records`
+        : "/api/records",
       {
         limit: pageSize,
         offset: (currentPage - 1) * pageSize,
         search: searchQuery || undefined,
         patientId:
-          selectedPatient && selectedPatient !== "all"
-            ? selectedPatient
-            : undefined,
+          appointmentIdFromUrl && appointmentDetails?.patient?.id
+            ? undefined // handled by endpoint
+            : (selectedPatient && selectedPatient !== "all"
+                ? selectedPatient
+                : undefined),
         therapistId:
           selectedTherapist && selectedTherapist !== "all"
             ? selectedTherapist
@@ -105,16 +144,65 @@ export default function Records() {
             ? selectedSessionType
             : undefined,
         startDate:
-          dateRange === "week"
-            ? new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-            : dateRange === "month"
-              ? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-              : undefined,
+          appointmentDetails?.appointmentDate 
+            ? new Date(appointmentDetails.appointmentDate) // Use appointment date as start
+            : dateRange === "week"
+              ? new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+              : dateRange === "month"
+                ? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+                : undefined,
         endDate: undefined,
       },
     ],
+    queryFn: async (context) => {
+      const [endpoint, params] = context.queryKey as Readonly<[string, any]>;
+      let url = endpoint;
+      if (endpoint.startsWith("/api/records")) {
+        const searchParams = new URLSearchParams();
+        if (params.limit) searchParams.set("limit", params.limit);
+        if (params.offset) searchParams.set("offset", params.offset);
+        if (params.search) searchParams.set("search", params.search);
+        if (params.patientId) searchParams.set("patientId", params.patientId);
+        if (params.therapistId) searchParams.set("therapistId", params.therapistId);
+        if (params.sessionType) searchParams.set("sessionType", params.sessionType);
+        if (params.startDate) searchParams.set("startDate", new Date(params.startDate).toISOString());
+        if (params.endDate) searchParams.set("endDate", new Date(params.endDate).toISOString());
+        if (Array.from(searchParams).length > 0) url += `?${searchParams.toString()}`;
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("Failed to fetch records");
+        return response.json();
+      } else if (endpoint.startsWith("/api/patients/")) {
+        // Only fetch for the patient, ignore other filters
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("Failed to fetch patient records");
+        const records = await response.json();
+        return { records, total: records.length };
+      }
+      return { records: [], total: 0 };
+    },
     retry: false,
+    enabled: !appointmentIdFromUrl || !!appointmentDetails, // Wait for appointment details if appointmentId is provided
   });
+
+  // Debug logging
+  useEffect(() => {
+    if (recordsData) {
+      console.log('🔍 Records query result:', {
+        appointmentIdFromUrl,
+        appointmentDetails: appointmentDetails ? {
+          patientId: appointmentDetails.patient?.id,
+          patientName: `${appointmentDetails.patient?.firstName} ${appointmentDetails.patient?.lastName}`,
+          appointmentDate: appointmentDetails.appointmentDate
+        } : null,
+        recordsCount: recordsData?.records?.length || 0,
+        firstRecord: recordsData?.records?.[0] ? {
+          patientId: recordsData.records[0].patient?.id,
+          patientName: `${recordsData.records[0].patient?.firstName} ${recordsData.records[0].patient?.lastName}`,
+          sessionDate: recordsData.records[0].sessionDate
+        } : null
+      });
+    }
+  }, [recordsData, appointmentDetails, appointmentIdFromUrl]);
 
   // Fetch patients for filter
   const { data: patients } = useQuery<{
@@ -210,13 +298,170 @@ export default function Records() {
   };
 
   const handleDeleteRecord = (recordId: string) => {
-    if (
-      confirm(
-        "Are you sure you want to delete this treatment record? This action cannot be undone.",
-      )
-    ) {
-      deleteRecordMutation.mutate(recordId);
+    setDeleteRecordId(recordId);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteRecord = async () => {
+    if (!deleteRecordId) return;
+    
+    try {
+      await deleteRecordMutation.mutateAsync(deleteRecordId);
+      setIsDeleteDialogOpen(false);
+      setDeleteRecordId(null);
+    } catch (error) {
+      console.error("Error deleting record:", error);
     }
+  };
+
+  const handleDownloadRecord = async (record: TreatmentRecordWithDetails) => {
+    try {
+      const recordData = {
+        patient: `${record.patient.firstName} ${record.patient.lastName}`,
+        therapist: record.therapist ? `${record.therapist.firstName} ${record.therapist.lastName}` : "Unknown",
+        sessionDate: formatDateTime(record.sessionDate),
+        sessionType: record.sessionType,
+        goals: record.goals || "N/A",
+        notes: record.notes || "N/A",
+        progress: record.progress || "N/A",
+        planForNextSession: record.planForNextSession || "N/A",
+        interventions: record.interventions || "N/A",
+      };
+
+      const blob = new Blob([JSON.stringify(recordData, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `treatment-record-${record.patient.firstName}-${record.patient.lastName}-${formatDate(record.sessionDate)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      // Log the download action
+      await fetch(`/api/records/${record.id}`, { method: 'GET' }); // This will log the view action
+      
+      toast({
+        title: "Record Downloaded",
+        description: "Treatment record has been downloaded successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Download Failed",
+        description: "Failed to download the treatment record.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handlePrintRecord = async (record: TreatmentRecordWithDetails) => {
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      toast({
+        title: "Print Failed",
+        description: "Please allow pop-ups to print records.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Treatment Record - ${record.patient.firstName} ${record.patient.lastName}</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 10px; }
+            .section { margin-bottom: 20px; }
+            .section h3 { color: #333; border-bottom: 1px solid #ccc; padding-bottom: 5px; }
+            .label { font-weight: bold; color: #555; }
+            .value { margin-bottom: 10px; }
+            @media print { body { margin: 0; } }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>Treatment Record</h1>
+            <p>Generated on ${new Date().toLocaleDateString()}</p>
+          </div>
+          
+          <div class="section">
+            <h3>Patient Information</h3>
+            <div class="label">Patient Name:</div>
+            <div class="value">${record.patient.firstName} ${record.patient.lastName}</div>
+            
+            <div class="label">Therapist:</div>
+            <div class="value">${record.therapist ? `${record.therapist.firstName} ${record.therapist.lastName}` : "Unknown"}</div>
+            
+            <div class="label">Session Date:</div>
+            <div class="value">${formatDateTime(record.sessionDate)}</div>
+            
+            <div class="label">Session Type:</div>
+            <div class="value">${record.sessionType}</div>
+          </div>
+          
+          ${record.goals ? `
+          <div class="section">
+            <h3>Session Goals</h3>
+            <div class="value">${record.goals}</div>
+          </div>
+          ` : ''}
+          
+          ${record.notes ? `
+          <div class="section">
+            <h3>Session Notes</h3>
+            <div class="value">${record.notes}</div>
+          </div>
+          ` : ''}
+          
+          ${record.progress ? `
+          <div class="section">
+            <h3>Progress</h3>
+            <div class="value">${record.progress}</div>
+          </div>
+          ` : ''}
+          
+          ${record.interventions ? `
+          <div class="section">
+            <h3>Interventions</h3>
+            <div class="value">${record.interventions}</div>
+          </div>
+          ` : ''}
+          
+          ${record.planForNextSession ? `
+          <div class="section">
+            <h3>Plan for Next Session</h3>
+            <div class="value">${record.planForNextSession}</div>
+          </div>
+          ` : ''}
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+    printWindow.close();
+
+    // Log the print action
+    await fetch(`/api/records/${record.id}`, { method: 'GET' }); // This will log the view action
+
+    toast({
+      title: "Print Initiated",
+      description: "Print dialog has been opened for the treatment record.",
+    });
+  };
+
+  const handleCopyRecordId = (recordId: string) => {
+    navigator.clipboard.writeText(recordId);
+    toast({
+      title: "Record ID Copied",
+      description: "Record ID has been copied to clipboard.",
+    });
   };
 
   const handleRefresh = () => {
@@ -333,11 +578,16 @@ export default function Records() {
                   </Button>
                   <div>
                     <h1 className="text-2xl font-semibold text-gray-900">
-                      Treatment Records
+                      {appointmentDetails 
+                        ? `Treatment Records - ${appointmentDetails.patient?.firstName} ${appointmentDetails.patient?.lastName}`
+                        : "Treatment Records"
+                      }
                     </h1>
                     <p className="text-gray-600 mt-1">
-                      View and manage patient treatment documentation and
-                      progress tracking.
+                      {appointmentDetails 
+                        ? `Viewing treatment records for appointment on ${formatDate(appointmentDetails.appointmentDate)}`
+                        : "View and manage patient treatment documentation and progress tracking."
+                      }
                     </p>
                   </div>
                 </div>
@@ -581,9 +831,9 @@ export default function Records() {
                     </CardContent>
                   </Card>
                 ))
-              ) : recordsData?.records && recordsData.records.length > 0 ? (
+              ) : (recordsData?.records?.length ?? 0) > 0 ? (
                 <>
-                  {recordsData.records.map(
+                  {(recordsData?.records ?? []).map(
                     (record: TreatmentRecordWithDetails) => (
                       <Card
                         key={record.id}
@@ -623,16 +873,28 @@ export default function Records() {
                                       : "Unknown Therapist"}
                                   </Badge>
 
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                      <Button variant="ghost" size="icon">
-                                        <MoreHorizontal className="h-4 w-4" />
-                                      </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                      <DropdownMenuItem asChild>
+                                                                    <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <DropdownMenu>
+                                          <DropdownMenuTrigger asChild>
+                                            <Button 
+                                              variant="ghost" 
+                                              size="icon"
+                                              aria-label="More options"
+                                              className="h-8 w-8"
+                                            >
+                                              <MoreHorizontal className="h-4 w-4" />
+                                            </Button>
+                                          </DropdownMenuTrigger>
+                                          <DropdownMenuContent align="end" className="w-56">
+                                      {/* Primary Actions */}
+                                      <DropdownMenuItem
+                                        asChild
+                                      >
                                         <Link
-                                          href={`/patients/${record.patient.id}`}
+                                          href={`/patients/${typeof record.patient === 'object' ? (record.patient.id || record.patient._id) : record.patient}`}
+                                          className="flex items-center"
                                         >
                                           <Eye className="h-4 w-4 mr-2" />
                                           View Patient
@@ -641,22 +903,60 @@ export default function Records() {
                                       <DropdownMenuItem asChild>
                                         <Link
                                           href={`/records/${record.id}/edit`}
+                                          className="flex items-center"
                                         >
                                           <Edit className="h-4 w-4 mr-2" />
                                           Edit Record
                                         </Link>
                                       </DropdownMenuItem>
+                                      
                                       <DropdownMenuSeparator />
+                                      
+                                      {/* Export Actions */}
                                       <DropdownMenuItem
-                                        onClick={() =>
-                                          handleDeleteRecord(record.id)
-                                        }
-                                        className="text-red-600"
+                                        onClick={() => handleDownloadRecord(record)}
+                                        className="flex items-center"
                                       >
+                                        <Download className="h-4 w-4 mr-2" />
+                                        Download Record
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem
+                                        onClick={() => handlePrintRecord(record)}
+                                        className="flex items-center"
+                                      >
+                                        <Printer className="h-4 w-4 mr-2" />
+                                        Print Record
+                                      </DropdownMenuItem>
+                                      
+                                      <DropdownMenuSeparator />
+                                      
+                                      {/* Utility Actions */}
+                                      <DropdownMenuItem
+                                        onClick={() => handleCopyRecordId(record.id)}
+                                        className="flex items-center"
+                                      >
+                                        <Copy className="h-4 w-4 mr-2" />
+                                        Copy Record ID
+                                      </DropdownMenuItem>
+                                      
+                                      <DropdownMenuSeparator />
+                                      
+                                      {/* Destructive Actions */}
+                                      <DropdownMenuItem
+                                        onClick={() => handleDeleteRecord(record.id)}
+                                        className="flex items-center text-red-600 focus:text-red-600 focus:bg-red-50"
+                                      >
+                                        <AlertTriangle className="h-4 w-4 mr-2" />
                                         Delete Record
                                       </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
+                                                                            </DropdownMenuContent>
+                                      </DropdownMenu>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>More options</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
                                 </div>
                               </div>
 
@@ -724,8 +1024,8 @@ export default function Records() {
                     <div className="flex items-center justify-between mt-6">
                       <div className="text-sm text-gray-600">
                         Showing {(currentPage - 1) * pageSize + 1} to{" "}
-                        {Math.min(currentPage * pageSize, recordsData.total)} of{" "}
-                        {recordsData.total} records
+                        {Math.min(currentPage * pageSize, recordsData?.total ?? 0)} of{" "}
+                        {recordsData?.total ?? 0} records
                       </div>
                       <div className="flex items-center space-x-2">
                         <Button
@@ -779,6 +1079,26 @@ export default function Records() {
           </div>
         </main>
       </div>
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete your
+              treatment record.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setIsDeleteDialogOpen(false)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteRecord}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

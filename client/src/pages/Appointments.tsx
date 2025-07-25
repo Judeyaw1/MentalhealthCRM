@@ -49,6 +49,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { PatientDetailsDialog } from "@/components/patients/PatientDetailsDialog";
 
 export default function Appointments() {
   const { toast } = useToast();
@@ -61,6 +62,8 @@ export default function Appointments() {
   const [dateFilter, setDateFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+  const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
+  const [showPatientDialog, setShowPatientDialog] = useState(false);
 
   // Redirect to home if not authenticated
   useEffect(() => {
@@ -321,7 +324,10 @@ export default function Appointments() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem onClick={() => setLocation(`/appointments/${row.id}`)}>
+            <DropdownMenuItem onClick={() => {
+              setSelectedPatientId(row.patient?.id);
+              setShowPatientDialog(true);
+            }}>
               <Eye className="h-4 w-4 mr-2" />
               View Details
             </DropdownMenuItem>
@@ -605,10 +611,58 @@ export default function Appointments() {
   };
 
   const handleExport = () => {
-    // TODO: Implement export functionality
+    if (!appointments || appointments.length === 0) {
+      toast({
+        title: "No Data",
+        description: "No appointments to export",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Prepare data for export
+    const exportData = appointments.map((apt: any) => ({
+      "Appointment ID": apt.id,
+      "Patient Name": `${apt.patient?.firstName || ""} ${apt.patient?.lastName || ""}`.trim(),
+      "Patient Email": apt.patient?.email || "",
+      "Patient Phone": apt.patient?.phone || "",
+      "Therapist": `${apt.therapist?.firstName || ""} ${apt.therapist?.lastName || ""}`.trim(),
+      "Type": apt.type,
+      "Status": apt.status,
+      "Date": new Date(apt.appointmentDate).toLocaleDateString(),
+      "Time": new Date(apt.appointmentDate).toLocaleTimeString(),
+      "Duration": `${apt.duration} minutes`,
+      "Notes": apt.notes || "",
+      "Created": new Date(apt.createdAt).toLocaleDateString(),
+    }));
+
+    // Create CSV content
+    const headers = Object.keys(exportData[0]);
+    const csvContent = [
+      headers.join(","),
+      ...exportData.map(row => 
+        headers.map(header => {
+          const value = row[header] || "";
+          // Escape commas and quotes in CSV
+          return `"${value.toString().replace(/"/g, '""')}"`;
+        }).join(",")
+      )
+    ].join("\n");
+
+    // Create and download file
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `appointments_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
     toast({
-      title: "Export",
-      description: "Export functionality coming soon!",
+      title: "Export Successful",
+      description: `Exported ${appointments.length} appointments to CSV`,
     });
   };
 
@@ -744,6 +798,11 @@ export default function Appointments() {
           </div>
         </main>
       </div>
+      <PatientDetailsDialog
+        patientId={selectedPatientId}
+        isOpen={showPatientDialog}
+        onClose={() => setShowPatientDialog(false)}
+      />
     </div>
   );
 }

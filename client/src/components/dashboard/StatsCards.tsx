@@ -51,6 +51,10 @@ export function StatsCards({ stats, isLoading }: StatsCardsProps) {
     );
   }
 
+  const dischargedCount = stats.treatmentCompletionBreakdown
+    ? (stats.treatmentCompletionBreakdown.manuallyDischarged || 0) + (stats.treatmentCompletionBreakdown.autoDischarged || 0)
+    : 0;
+
   const statCards = [
     {
       title: "Total Patients",
@@ -80,6 +84,15 @@ export function StatsCards({ stats, isLoading }: StatsCardsProps) {
       iconColor: "text-warning-500",
     },
     {
+      title: "Discharged Patients",
+      value: dischargedCount,
+      change: "Total discharged",
+      changeType: "neutral" as const,
+      icon: Users,
+      iconBg: "bg-red-100",
+      iconColor: "text-red-600",
+    },
+    {
       title: "Treatment Completion Rate",
       value: `${stats.treatmentCompletionRate}%`,
       change: stats.treatmentCompletionBreakdown 
@@ -93,10 +106,9 @@ export function StatsCards({ stats, isLoading }: StatsCardsProps) {
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 w-full">
       {statCards.map((stat, index) => {
         const Icon = stat.icon;
-
         return (
           <Card key={index} className="hover:shadow-md transition-shadow">
             <CardContent className="p-6">

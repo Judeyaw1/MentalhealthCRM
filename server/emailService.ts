@@ -384,6 +384,35 @@ export class EmailService {
     };
     return this.sendEmail({ to, template });
   }
+
+  // Admin-initiated password reset email
+  async sendAdminPasswordReset(
+    to: string,
+    firstName: string,
+    lastName: string,
+    tempPassword: string
+  ): Promise<boolean> {
+    const template: EmailTemplate = {
+      subject: 'Your Password Has Been Reset',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #2563eb;">Password Reset by Administrator</h2>
+          <p>Hello ${firstName} ${lastName},</p>
+          <p>Your account password has been reset by an administrator.</p>
+          <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="margin-top: 0;">Temporary Password</h3>
+            <p><strong>Temporary Password:</strong> <code>${tempPassword}</code></p>
+            <p>For security, you will be required to change your password after logging in.</p>
+          </div>
+          <p>If you did not request this change, please contact your system administrator immediately.</p>
+          <p>Best regards,<br>Mental Health Tracker Team</p>
+        </div>
+      `,
+      text: `
+        Your account password has been reset by an administrator.\n\nTemporary Password: ${tempPassword}\n\nYou will be required to change your password after logging in.\nIf you did not request this change, please contact your system administrator immediately.\n\nBest regards,\nMental Health Tracker Team\n      `,
+    };
+    return this.sendEmail({ to, template });
+  }
 }
 
 export const emailService = EmailService.getInstance();

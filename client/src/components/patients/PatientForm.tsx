@@ -22,6 +22,8 @@ import {
 } from "@/components/ui/form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { z } from "zod";
+import { useQuery } from "@tanstack/react-query";
+import { useRef, useState } from "react";
 
 interface PatientFormProps {
   initialData?: Partial<InsertPatient>;
@@ -53,6 +55,8 @@ type PatientFormValues = {
   status?: string;
   hipaaConsent?: boolean;
   assignedTherapistId?: string;
+  loc?: string;
+  authNumber?: string;
 };
 
 export function PatientForm({
@@ -61,6 +65,43 @@ export function PatientForm({
   isLoading = false,
   submitLabel = "Create Patient Record",
 }: PatientFormProps) {
+  // Fetch therapists for dropdown
+  const { data: therapists = [] } = useQuery<{ id: string; firstName: string; lastName: string }[]>({
+    queryKey: ["/api/therapists"],
+    retry: false,
+  });
+
+  const [insuranceCardFile, setInsuranceCardFile] = useState<File | null>(null);
+  const [insuranceCardPreview, setInsuranceCardPreview] = useState<string | null>(null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+
+  // Handle insurance card upload
+  const handleInsuranceCardChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    setInsuranceCardFile(file);
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (ev) => setInsuranceCardPreview(ev.target?.result as string);
+      reader.readAsDataURL(file);
+    } else {
+      setInsuranceCardPreview(null);
+    }
+  };
+
+  // Handle photo upload
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    setPhotoFile(file);
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (ev) => setPhotoPreview(ev.target?.result as string);
+      reader.readAsDataURL(file);
+    } else {
+      setPhotoPreview(null);
+    }
+  };
+
   const form = useForm<PatientFormValues>({
     resolver: zodResolver(patientFormSchema),
     defaultValues: {
@@ -79,15 +120,31 @@ export function PatientForm({
       status: initialData?.status || "active",
       hipaaConsent: initialData?.hipaaConsent || false,
       assignedTherapistId: initialData?.assignedTherapistId || "",
+      loc: initialData?.loc || "",
+      authNumber: initialData?.authNumber || "",
     },
   });
 
-  const handleSubmit = (data: PatientFormValues) => {
-    // Convert dateOfBirth string to Date object
+  const handleSubmit = async (data: PatientFormValues) => {
+    // Convert dateOfBirth string to Date object and handle unassigned therapist
     const processedData: InsertPatient = {
       ...data,
       dateOfBirth: new Date(data.dateOfBirth),
     };
+    // Handle file uploads (to be implemented in backend)
+    if (insuranceCardFile || photoFile) {
+      const formData = new FormData();
+      Object.entries(processedData).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          formData.append(key, value as any);
+        }
+      });
+      if (insuranceCardFile) formData.append("insuranceCard", insuranceCardFile);
+      if (photoFile) formData.append("photo", photoFile);
+      // Call onSubmit with FormData (backend must handle multipart/form-data)
+      onSubmit(formData as any);
+      return;
+    }
     onSubmit(processedData);
   };
 
@@ -291,7 +348,53 @@ export function PatientForm({
                 </FormItem>
               )}
             />
-
+            <FormField
+              control={form.control}
+              name="authNumber"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Authorization Number</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      placeholder="Enter authorization number"
+                      value={field.value ?? ""}
+                      onChange={field.onChange}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="loc"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Level of Care (LOC)</FormLabel>
+                  <Select
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select LOC" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="2.1">2.1</SelectItem>
+                      <SelectItem value="3.3">3.3</SelectItem>
+                      <SelectItem value="3.1">3.1</SelectItem>
+                      <SelectItem value="0.0">0.0</SelectItem>
+                      <SelectItem value="0.0-2">0.0</SelectItem>
+                      <SelectItem value="0.0-3">0.0</SelectItem>
+                      <SelectItem value="0.0-4">0.0</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <FormField
               control={form.control}
               name="reasonForVisit"
@@ -339,6 +442,71 @@ export function PatientForm({
           </CardContent>
         </Card>
 
+        <Card>
+          <CardHeader>
+            <CardTitle>Assign Therapist</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <FormField
+              control={form.control}
+              name="assignedTherapistId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Assigned Therapist</FormLabel>
+                  <Select
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select therapist" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="unassigned">Unassigned</SelectItem>
+                      {Array.isArray(therapists) && therapists.map((t) => (
+                        <SelectItem key={t.id} value={t.id}>
+                          {t.firstName} {t.lastName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </CardContent>
+        </Card>
+
+        {/* Uploads Card: move this above Consent & Privacy */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Uploads</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <FormLabel>Insurance/Medicare Card</FormLabel>
+                <Input type="file" accept="image/*,application/pdf" onChange={handleInsuranceCardChange} />
+                {insuranceCardPreview && (
+                  <div className="mt-2">
+                    <img src={insuranceCardPreview} alt="Insurance Card Preview" className="max-h-32 rounded border" />
+                  </div>
+                )}
+              </div>
+              <div>
+                <FormLabel>Patient Photo</FormLabel>
+                <Input type="file" accept="image/*" onChange={handlePhotoChange} />
+                {photoPreview && (
+                  <div className="mt-2">
+                    <img src={photoPreview} alt="Patient Photo Preview" className="max-h-32 rounded-full border" />
+                  </div>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        {/* Consent & Privacy Card: now below Uploads */}
         <Card>
           <CardHeader>
             <CardTitle>Consent & Privacy</CardTitle>

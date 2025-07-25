@@ -12,6 +12,10 @@ import { createObjectCsvWriter } from 'csv-writer';
 import { TreatmentCompletionService } from "./treatmentCompletionService";
 import { notificationService } from "./notificationService";
 import mongoose from "mongoose";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+import { PatientAssessment } from "./models/PatientAssessment";
 
 // Custom schema for MongoDB treatment records
 const insertTreatmentRecordSchema = z.object({
@@ -40,6 +44,21 @@ const insertAppointmentSchema = z.object({
   status: z.string().default("scheduled"),
   notes: z.string().optional(),
 });
+
+// Set up multer storage for uploads
+const uploadDir = path.join(path.dirname(new URL(import.meta.url).pathname), "../uploads");
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
+const storageEngine = multer.diskStorage({
+  destination: (req: any, file: Express.Multer.File, cb: (error: Error | null, destination: string) => void) => {
+    cb(null, uploadDir);
+  },
+  filename: (req: any, file: Express.Multer.File, cb: (error: Error | null, filename: string) => void) => {
+    const ext = path.extname(file.originalname);
+    const base = path.basename(file.originalname, ext);
+    cb(null, `${base}-${Date.now()}${ext}`);
+  },
+});
+const upload = multer({ storage: storageEngine });
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
@@ -170,9 +189,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const userId = req.user.id;
         const user = await storage.getUser(userId);
-        const therapistId = user?.role === "therapist" ? userId : undefined;
+        let therapistId: string | undefined = undefined;
+        let allowAll = false;
+        if (user?.role === "therapist") {
+          therapistId = userId;
+        } else if (user?.role === "admin") {
+          allowAll = true;
+        } else if (user?.role === "staff" || user?.role === "frontdesk") {
+          // Staff and front desk cannot see any appointments
+          return res.json([]);
+        }
 
-        const appointments = await storage.getTodayAppointments();
+        const appointments = await storage.getTodayAppointments(allowAll ? undefined : therapistId);
         res.json(appointments);
       } catch (error) {
         console.error("Error fetching today's appointments:", error);
@@ -187,14 +215,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/patients", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const { limit = 50, offset = 0, search, status, createdBy } = req.query;
+      const { limit = 50, offset = 0, search, status, createdBy, therapist, loc } = req.query;
+
+      const query: any = {};
+      if (search) {
+        query.$or = [
+          { firstName: { $regex: search, $options: "i" } },
+          { lastName: { $regex: search, $options: "i" } },
+          { email: { $regex: search, $options: "i" } },
+          { phone: { $regex: search, $options: "i" } },
+        ];
+      }
+      if (status) {
+        query.status = status;
+      }
+      if (createdBy) {
+        query.createdBy = createdBy;
+      }
+      if (therapist) {
+        query.assignedTherapistId = therapist;
+      }
+      if (loc) {
+        query.loc = loc;
+      }
 
       const result = await storage.getPatients(
         parseInt(limit as string),
         parseInt(offset as string),
         search as string,
         status as string,
-        createdBy as string
+        createdBy as string,
+        therapist as string,
+        loc as string
       );
 
       await logActivity(userId, "view", "patients", "list");
@@ -223,32 +275,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/patients", isAuthenticated, async (req: any, res) => {
+  app.post("/api/patients", isAuthenticated, upload.fields([
+    { name: "insuranceCard", maxCount: 1 },
+    { name: "photo", maxCount: 1 },
+  ]), async (req: any, res) => {
     try {
       const userId = req.user.id;
-      console.log(
-        "Creating patient with data:",
-        JSON.stringify(req.body, null, 2),
-      );
-
-      const patientData = insertPatientSchema.parse(req.body);
-      console.log("Parsed patient data:", JSON.stringify(patientData, null, 2));
-
+      let patientData;
+      if (req.is("multipart/form-data")) {
+        // Parse FormData
+        patientData = { ...req.body };
+        if (req.files && req.files.insuranceCard) {
+          patientData.insuranceCardUrl = `/uploads/${req.files.insuranceCard[0].filename}`;
+        }
+        if (req.files && req.files.photo) {
+          patientData.photoUrl = `/uploads/${req.files.photo[0].filename}`;
+        }
+      } else {
+        patientData = req.body;
+      }
+      // Parse/validate
+      const parsed = insertPatientSchema.parse(patientData);
       // Add the current user as the creator
       const patientWithCreator = {
-        ...patientData,
+        ...parsed,
         createdBy: userId,
       };
-
       const patient = await storage.createPatient(patientWithCreator);
       await logActivity(
         userId,
         "create",
         "patient",
         patient.id.toString(),
-        patientData,
+        parsed,
       );
-
       res.status(201).json(patient);
     } catch (error) {
       console.error("Error creating patient:", error);
@@ -261,12 +321,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/patients/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/patients/:id", upload.fields([
+    { name: "insuranceCard", maxCount: 1 },
+    { name: "photo", maxCount: 1 },
+  ]), isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
       const patientId = req.params.id;
-      const updates = insertPatientSchema.partial().parse(req.body);
-
+      let updates;
+      if (req.is("multipart/form-data")) {
+        updates = { ...req.body };
+        if (req.files && req.files.insuranceCard) {
+          updates.insuranceCardUrl = `/uploads/${req.files.insuranceCard[0].filename}`;
+        }
+        if (req.files && req.files.photo) {
+          updates.photoUrl = `/uploads/${req.files.photo[0].filename}`;
+        }
+      } else {
+        updates = insertPatientSchema.partial().parse(req.body);
+      }
       // Clean up ObjectId fields - convert empty strings to null
       const cleanedUpdates = {
         ...updates,
@@ -275,7 +348,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ? null
             : updates.assignedTherapistId,
       };
-
       const patient = await storage.updatePatient(patientId, cleanedUpdates);
       await logActivity(
         userId,
@@ -284,7 +356,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         patientId.toString(),
         cleanedUpdates,
       );
-
       res.json(patient);
     } catch (error) {
       console.error("Error updating patient:", error);
@@ -480,7 +551,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Build query object
       const query: any = {};
-      if (search) query.$text = { $search: search };
+      if (typeof search === "string" && search.trim() !== "") {
+        query.$or = [
+          { notes: { $regex: search, $options: "i" } },
+          { goals: { $regex: search, $options: "i" } },
+          { progress: { $regex: search, $options: "i" } },
+          { sessionType: { $regex: search, $options: "i" } },
+          { patientName: { $regex: search, $options: "i" } },
+        ];
+      }
       if (patientId) {
         const patientIdStr = String(Array.isArray(patientId) ? patientId[0] : patientId);
         query.patientId = patientIdStr;
@@ -666,11 +745,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUser(userId);
       const { patientId, startDate, endDate, status, search } = req.query;
 
-      const therapistId = user?.role === "therapist" ? userId : undefined;
+      let therapistId: string | undefined = undefined;
+      let allowAll = false;
+      if (user?.role === "therapist") {
+        therapistId = userId;
+      } else if (user?.role === "admin") {
+        allowAll = true;
+      } else if (user?.role === "staff") {
+        // Staff cannot see any appointments
+        return res.json([]);
+      }
 
       let appointments = await storage.getAppointments(
-        therapistId,
-        patientId ? patientId.toString() : undefined,
+        allowAll ? undefined : therapistId,
+        patientId ? String(patientId) : undefined,
         startDate ? new Date(startDate as string) : undefined,
         endDate ? new Date(endDate as string) : undefined,
         search as string,
@@ -1089,12 +1177,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         // Send password reset email
-        const emailSent = await emailService.sendPasswordReset({
-          to: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          defaultPassword,
-        });
+        const emailSent = await emailService.sendAdminPasswordReset(
+          user.email,
+          user.firstName,
+          user.lastName,
+          defaultPassword
+        );
 
         await logActivity(adminId, "reset_password", "user", userId, {
           targetEmail: user.email,
@@ -1440,81 +1528,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     },
   );
-
-  // Sample data creation endpoint
-  app.post("/api/sample-data", isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.id;
-      const user = await storage.getUser(userId);
-
-      // Only admins can create sample data
-      if (user?.role !== "admin") {
-        return res.status(403).json({ message: "Access denied" });
-      }
-
-      // Create sample patients
-      const patient1 = await storage.createPatient({
-        firstName: "John",
-        lastName: "Doe",
-        dateOfBirth: new Date("1990-01-15"),
-        gender: "male",
-        email: "john.doe@example.com",
-        phone: "555-0101",
-        status: "active",
-      });
-
-      const patient2 = await storage.createPatient({
-        firstName: "Jane",
-        lastName: "Smith",
-        dateOfBirth: new Date("1985-03-22"),
-        gender: "female",
-        email: "jane.smith@example.com",
-        phone: "555-0102",
-        status: "active",
-      });
-
-      // Create sample therapist
-      const therapist = await storage.createUser({
-        email: "dr.therapist@example.com",
-        firstName: "Dr. Sarah",
-        lastName: "Johnson",
-        role: "therapist",
-        password: "password123",
-      });
-
-      // Create sample appointments
-      const appointment1 = await storage.createAppointment({
-        patientId: patient1.id,
-        therapistId: therapist.id,
-        appointmentDate: new Date(),
-        duration: 60,
-        type: "therapy-session",
-        status: "scheduled",
-      });
-
-      const appointment2 = await storage.createAppointment({
-        patientId: patient2.id,
-        therapistId: therapist.id,
-        appointmentDate: new Date(Date.now() + 24 * 60 * 60 * 1000), // Tomorrow
-        duration: 45,
-        type: "consultation",
-        status: "scheduled",
-      });
-
-      await logActivity(userId, "create", "sample_data", "all");
-      res.json({
-        message: "Sample data created successfully",
-        created: {
-          patients: 2,
-          therapist: 1,
-          appointments: 2,
-        },
-      });
-    } catch (error) {
-      console.error("Error creating sample data:", error);
-      res.status(500).json({ message: "Failed to create sample data" });
-    }
-  });
 
   // --- SEARCH ENDPOINT ---
   app.get("/api/search", isAuthenticated, async (req: any, res) => {
@@ -2096,6 +2109,139 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     },
   );
+
+  // Patient Assessment API
+  app.get("/api/patients/:id/assessments", isAuthenticated, async (req, res) => {
+    const assessments = await PatientAssessment.find({ patientId: req.params.id }).sort({ date: -1 }).lean();
+    res.json(assessments.map(a => ({ ...a, id: a._id.toString() })));
+  });
+  app.post("/api/patients/:id/assessments", isAuthenticated, async (req, res) => {
+    try {
+      let user = req.user;
+      if (!user.firstName || !user.lastName || !user.role) {
+        const dbUser = await storage.getUser(user.id);
+        console.log('Fetched dbUser:', dbUser);
+        if (dbUser) {
+          user = { ...user, ...dbUser };
+        }
+      }
+      // Use 'name' if firstName/lastName missing
+      let name = user.firstName && user.lastName ? `${user.firstName} ${user.lastName}`.trim() : (user.name || '').trim();
+      console.log('User for createdBy:', user, 'Resolved name:', name);
+      const createdBy = {
+        id: user.id,
+        name: name || 'Unknown',
+        role: user.role || 'N/A'
+      };
+      const assessment = new PatientAssessment({
+        ...req.body,
+        patientId: req.params.id,
+        createdBy,
+        updatedBy: createdBy
+      });
+      await assessment.save();
+      // Schedule follow-up notification if followUpDate is set
+      if (assessment.followUpDate) {
+        // Find patient and assigned therapist
+        const patient = await Patient.findById(req.params.id).lean();
+        let userId = req.user.id;
+        if (patient && patient.assignedTherapistId) {
+          userId = patient.assignedTherapistId.toString();
+        }
+        const title = "Assessment Follow-Up Reminder";
+        const message = `Follow-up for patient ${patient?.firstName || ""} ${patient?.lastName || ""} is due on ${assessment.followUpDate.toLocaleDateString()}.`;
+        await notificationService.createNotification(
+          userId,
+          "assessment_followup",
+          title,
+          message,
+          { patientId: req.params.id, assessmentId: assessment._id.toString(), followUpDate: assessment.followUpDate },
+          assessment.followUpDate
+        );
+      }
+      res.status(201).json({ ...assessment.toObject(), id: assessment._id.toString() });
+    } catch (error) {
+      res.status(400).json({ message: "Failed to create assessment", error });
+    }
+  });
+  app.get("/api/assessments/:assessmentId", isAuthenticated, async (req, res) => {
+    const assessment = await PatientAssessment.findById(req.params.assessmentId).lean();
+    if (!assessment) return res.status(404).json({ message: "Not found" });
+    res.json({ ...assessment, id: assessment._id.toString() });
+  });
+  app.patch("/api/assessments/:assessmentId", isAuthenticated, async (req, res) => {
+    let user = req.user;
+    if (!user.firstName || !user.lastName || !user.role) {
+      const dbUser = await storage.getUser(user.id);
+      console.log('Fetched dbUser:', dbUser);
+      if (dbUser) {
+        user = { ...user, ...dbUser };
+      }
+    }
+    let name = user.firstName && user.lastName ? `${user.firstName} ${user.lastName}`.trim() : (user.name || '').trim();
+    console.log('User for updatedBy:', user, 'Resolved name:', name);
+    const updatedBy = {
+      id: user.id,
+      name: name || 'Unknown',
+      role: user.role || 'N/A'
+    };
+    const allowedFields = [
+      'presentingProblem', 'medicalHistory', 'psychiatricHistory', 'familyHistory',
+      'socialHistory', 'mentalStatus', 'riskAssessment', 'diagnosis', 'impressions',
+      'followUpDate', 'followUpNotes', 'status'
+    ];
+    const updates = {};
+    for (const key of allowedFields) {
+      if (req.body[key] !== undefined) updates[key] = req.body[key];
+    }
+    updates.updatedBy = updatedBy;
+    const oldAssessment = await PatientAssessment.findById(req.params.assessmentId).lean();
+    const updated = await PatientAssessment.findByIdAndUpdate(req.params.assessmentId, updates, { new: true }).lean();
+    if (!updated) return res.status(404).json({ message: "Not found" });
+    // If followUpDate changed, remove previous notification
+    if (updated.followUpDate && oldAssessment && String(updated.followUpDate) !== String(oldAssessment.followUpDate)) {
+      const patient = await Patient.findById(updated.patientId).lean();
+      let userId = req.user.id;
+      if (patient && patient.assignedTherapistId) {
+        userId = patient.assignedTherapistId.toString();
+      }
+      // Delete previous follow-up notification for this assessment
+      await storage.deleteAssessmentFollowupNotification(userId, updated._id.toString());
+      // Create new notification for the new date
+      const title = "Assessment Follow-Up Reminder";
+      const message = `Follow-up for patient ${patient?.firstName || ""} ${patient?.lastName || ""} is due on ${new Date(updated.followUpDate).toLocaleDateString()}.`;
+      await notificationService.createNotification(
+        userId,
+        "assessment_followup",
+        title,
+        message,
+        { patientId: updated.patientId.toString(), assessmentId: updated._id.toString(), followUpDate: updated.followUpDate },
+        updated.followUpDate
+      );
+    } else if (updated.followUpDate) {
+      // If not changed, just ensure notification exists (legacy support)
+      const patient = await Patient.findById(updated.patientId).lean();
+      let userId = req.user.id;
+      if (patient && patient.assignedTherapistId) {
+        userId = patient.assignedTherapistId.toString();
+      }
+      const title = "Assessment Follow-Up Reminder";
+      const message = `Follow-up for patient ${patient?.firstName || ""} ${patient?.lastName || ""} is due on ${new Date(updated.followUpDate).toLocaleDateString()}.`;
+      await notificationService.createNotification(
+        userId,
+        "assessment_followup",
+        title,
+        message,
+        { patientId: updated.patientId.toString(), assessmentId: updated._id.toString(), followUpDate: updated.followUpDate },
+        updated.followUpDate
+      );
+    }
+    res.json({ ...updated, id: updated._id.toString() });
+  });
+  app.delete("/api/assessments/:assessmentId", isAuthenticated, async (req, res) => {
+    await PatientAssessment.findByIdAndDelete(req.params.assessmentId);
+    res.status(204).end();
+  });
 
   const httpServer = createServer(app);
   return httpServer;

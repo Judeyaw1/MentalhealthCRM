@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Header } from "@/components/layout/Header";
@@ -31,6 +31,7 @@ export default function AppointmentDetail() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [, setLocation] = useLocation();
   const [appointmentId, setAppointmentId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   // Extract appointment ID from URL
   useEffect(() => {
@@ -72,6 +73,72 @@ export default function AppointmentDetail() {
     },
     enabled: !!appointmentId,
     retry: false,
+  });
+
+  // Update appointment status mutation
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ appointmentId, newStatus }: { appointmentId: string; newStatus: string }) => {
+      const response = await fetch(`/api/appointments/${appointmentId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (!response.ok) {
+        throw new Error("Failed to update appointment status");
+      }
+      return response.json();
+    },
+    onSuccess: (_, { newStatus }) => {
+      toast({
+        title: "Success",
+        description: `Appointment marked as ${newStatus} successfully`,
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/appointments"],
+        exact: false,
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/dashboard/today-appointments"],
+        exact: false,
+      });
+    },
+    onError: (error) => {
+      console.error("Error updating appointment status:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update appointment status",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Send reminder mutation
+  const sendReminderMutation = useMutation({
+    mutationFn: async (appointmentId: string) => {
+      const response = await fetch(`/api/appointments/${appointmentId}/reminder`, {
+        method: "POST",
+      });
+      if (!response.ok) {
+        throw new Error("Failed to send reminder");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Reminder sent successfully",
+      });
+    },
+    onError: (error) => {
+      console.error("Error sending reminder:", error);
+      toast({
+        title: "Error",
+        description: "Failed to send reminder",
+        variant: "destructive",
+      });
+    },
   });
 
   const getStatusBadge = (status: string) => {
@@ -421,30 +488,40 @@ export default function AppointmentDetail() {
                           variant="outline"
                           className="w-full justify-start"
                           onClick={() => {
-                            // Handle complete appointment
-                            toast({
-                              title: "Feature Coming Soon",
-                              description:
-                                "Complete appointment functionality will be added soon.",
-                            });
+                            if (window.confirm("Are you sure you want to mark this appointment as completed?")) {
+                              updateStatusMutation.mutate({ 
+                                appointmentId: appointment.id, 
+                                newStatus: "completed" 
+                              });
+                            }
                           }}
+                          disabled={updateStatusMutation.isPending}
                         >
-                          <CheckCircle className="h-4 w-4 mr-2" />
+                          {updateStatusMutation.isPending ? (
+                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent mr-2" />
+                          ) : (
+                            <CheckCircle className="h-4 w-4 mr-2" />
+                          )}
                           Mark as Completed
                         </Button>
                         <Button
                           variant="outline"
                           className="w-full justify-start text-red-600 hover:text-red-700"
                           onClick={() => {
-                            // Handle cancel appointment
-                            toast({
-                              title: "Feature Coming Soon",
-                              description:
-                                "Cancel appointment functionality will be added soon.",
-                            });
+                            if (window.confirm("Are you sure you want to cancel this appointment?")) {
+                              updateStatusMutation.mutate({ 
+                                appointmentId: appointment.id, 
+                                newStatus: "cancelled" 
+                              });
+                            }
                           }}
+                          disabled={updateStatusMutation.isPending}
                         >
-                          <XCircle className="h-4 w-4 mr-2" />
+                          {updateStatusMutation.isPending ? (
+                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent mr-2" />
+                          ) : (
+                            <XCircle className="h-4 w-4 mr-2" />
+                          )}
                           Cancel Appointment
                         </Button>
                       </>
@@ -453,12 +530,7 @@ export default function AppointmentDetail() {
                       variant="outline"
                       className="w-full justify-start"
                       onClick={() => {
-                        // Handle reschedule
-                        toast({
-                          title: "Feature Coming Soon",
-                          description:
-                            "Reschedule functionality will be added soon.",
-                        });
+                        setLocation(`/appointments/${appointment.id}/edit?reschedule=true`);
                       }}
                     >
                       <Clock className="h-4 w-4 mr-2" />
@@ -468,17 +540,39 @@ export default function AppointmentDetail() {
                       variant="outline"
                       className="w-full justify-start"
                       onClick={() => {
-                        // Handle send reminder
-                        toast({
-                          title: "Feature Coming Soon",
-                          description:
-                            "Send reminder functionality will be added soon.",
-                        });
+                        sendReminderMutation.mutate(appointment.id);
                       }}
+                      disabled={sendReminderMutation.isPending}
                     >
-                      <Mail className="h-4 w-4 mr-2" />
+                      {sendReminderMutation.isPending ? (
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent mr-2" />
+                      ) : (
+                        <Mail className="h-4 w-4 mr-2" />
+                      )}
                       Send Reminder
                     </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start"
+                      onClick={() => {
+                        setLocation(`/records?patientId=${appointment.patient?.id}`);
+                      }}
+                    >
+                      <FileText className="h-4 w-4 mr-2" />
+                      View Patient Records
+                    </Button>
+                    {appointment.status === "completed" && (
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start"
+                        onClick={() => {
+                          setLocation(`/records?appointmentId=${appointment.id}`);
+                        }}
+                      >
+                        <FileText className="h-4 w-4 mr-2" />
+                        View Treatment Record
+                      </Button>
+                    )}
                   </CardContent>
                 </Card>
               </div>

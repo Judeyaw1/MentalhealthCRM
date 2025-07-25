@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -19,10 +19,24 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { isUnauthorizedError } from "@/lib/authUtils";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Link } from "wouter";
 
 export default function Reports() {
   const { toast } = useToast();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const [selectedLevel, setSelectedLevel] = useState<string | null>(null);
+  const [patients, setPatients] = useState<any[]>([]);
+  const [loadingPatients, setLoadingPatients] = useState(false);
+  const [levelCounts, setLevelCounts] = useState<{ [key: string]: number }>({});
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [allPatients, setAllPatients] = useState<any[]>([]);
+  const [selectedPatientId, setSelectedPatientId] = useState("");
+  const [searchAdd, setSearchAdd] = useState("");
+  const [selectedPatientIds, setSelectedPatientIds] = useState<string[]>([]);
 
   // Redirect to home if not authenticated
   useEffect(() => {
@@ -43,6 +57,125 @@ export default function Reports() {
     queryKey: ["/api/dashboard/stats"],
     retry: false,
   });
+
+  const levelsOfCare = [
+    {
+      label: "Level 2.1 - Intensive Outpatient/Partial Hospitalization",
+      value: "2.1",
+    },
+    {
+      label: "Level 3.1 - Residential/Inpatient (Low Intensity)",
+      value: "3.1",
+    },
+    {
+      label: "Level 3.3 - Residential/Inpatient (Medium Intensity)",
+      value: "3.3",
+    },
+  ];
+
+  // Fetch counts for each level on mount
+  useEffect(() => {
+    (async () => {
+      const counts: { [key: string]: number } = {};
+      for (const level of levelsOfCare) {
+        try {
+          const res = await fetch(`/api/patients?loc=${level.value}`);
+          const data = await res.json();
+          counts[level.value] = data.patients?.length || 0;
+        } catch {
+          counts[level.value] = 0;
+        }
+      }
+      setLevelCounts(counts);
+    })();
+  }, []);
+
+  // Fetch all patients (for add dialog)
+  useEffect(() => {
+    if (showAddDialog) {
+      (async () => {
+        const res = await fetch(`/api/patients?limit=1000`);
+        const data = await res.json();
+        setAllPatients(data.patients || []);
+      })();
+    }
+  }, [showAddDialog]);
+
+  const handleLevelClick = async (level: string) => {
+    if (selectedLevel === level) {
+      setSelectedLevel(null);
+      setPatients([]);
+      return;
+    }
+    setSelectedLevel(level);
+    setLoadingPatients(true);
+    try {
+      const res = await fetch(`/api/patients?loc=${level}`);
+      const data = await res.json();
+      setPatients((data.patients || []).filter((p: any) => p.loc === level));
+    } catch (err) {
+      setPatients([]);
+    } finally {
+      setLoadingPatients(false);
+    }
+  };
+
+  const handleExport = () => {
+    if (!patients.length) return;
+    const csvRows = [
+      ["Name", "Therapist", "Status"],
+      ...patients.map((p) => [
+        `${p.firstName} ${p.lastName}`,
+        p.assignedTherapist ? `${p.assignedTherapist.firstName} ${p.assignedTherapist.lastName}` : "-",
+        p.status
+      ])
+    ];
+    const csvContent = csvRows.map(row => row.map(field => `"${field}"`).join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `patients-level-${selectedLevel}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleAddPatient = async (e: any) => {
+    e.preventDefault();
+    if (!selectedPatientId || !selectedLevel) return;
+    await fetch(`/api/patients/${selectedPatientId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ loc: selectedLevel }),
+    });
+    setShowAddDialog(false);
+    setSelectedPatientId("");
+    handleLevelClick(selectedLevel); // refresh list
+  };
+
+  const filteredAddPatients = allPatients.filter(
+    (p) => p.status === "active" && p.loc !== selectedLevel &&
+      (`${p.firstName} ${p.lastName}`.toLowerCase().includes(searchAdd.toLowerCase()) ||
+       p.email?.toLowerCase().includes(searchAdd.toLowerCase()) ||
+       p.phone?.toLowerCase().includes(searchAdd.toLowerCase()))
+  );
+  const handleBulkAdd = async (e: any) => {
+    e.preventDefault();
+    if (!selectedPatientIds.length || !selectedLevel) return;
+    await Promise.all(selectedPatientIds.map(id =>
+      fetch(`/api/patients/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ loc: selectedLevel }),
+      })
+    ));
+    setShowAddDialog(false);
+    setSelectedPatientIds([]);
+    setSearchAdd("");
+    handleLevelClick(selectedLevel); // refresh list
+  };
 
   if (authLoading) {
     return (
@@ -207,6 +340,73 @@ export default function Reports() {
               </Card>
             </div>
 
+            {/* Levels of Care Section */}
+            <div className="mb-10">
+              <h2 className="text-xl font-bold mb-4 text-gray-800">Levels of Care</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                {levelsOfCare.map((level) => (
+                  <Card
+                    key={level.value}
+                    className={`cursor-pointer hover:shadow-lg transition-shadow border-2 ${selectedLevel === level.value ? "border-blue-600" : "border-transparent"}`}
+                    onClick={() => handleLevelClick(level.value)}
+                  >
+                    <CardContent className="p-6 flex flex-col items-center">
+                      <div className="text-lg font-semibold text-gray-900 mb-2 text-center">{level.label}</div>
+                      <div className="mb-2 text-sm text-gray-600">{levelCounts[level.value] ?? "..."} patients</div>
+                      <Button variant="outline" size="sm">View Patients</Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+              {selectedLevel && (
+                <div className="bg-white rounded-lg shadow p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-bold text-gray-800">Patients in {levelsOfCare.find(l => l.value === selectedLevel)?.label}</h3>
+                    <div className="flex gap-2">
+                      {patients.length > 0 && (
+                        <Button variant="outline" size="sm" onClick={handleExport} className="flex items-center gap-2">
+                          <Download className="h-4 w-4" /> Export CSV
+                        </Button>
+                      )}
+                      <Button variant="default" size="sm" onClick={() => setShowAddDialog(true)} className="flex items-center gap-2">
+                        + Add Patient to Program
+                      </Button>
+                    </div>
+                  </div>
+                  {loadingPatients ? (
+                    <div>Loading patients...</div>
+                  ) : patients.length === 0 ? (
+                    <div className="text-gray-500">No patients found in this level.</div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full text-sm">
+                        <thead>
+                          <tr className="bg-gray-100">
+                            <th className="px-4 py-2 text-left">Name</th>
+                            <th className="px-4 py-2 text-left">Therapist</th>
+                            <th className="px-4 py-2 text-left">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {patients.map((p) => (
+                            <tr key={p.id} className="border-b">
+                              <td className="px-4 py-2">
+                                <Link href={`/patients/${p.id}`} className="text-blue-600 hover:underline">
+                                  {p.firstName} {p.lastName}
+                                </Link>
+                              </td>
+                              <td className="px-4 py-2">{p.assignedTherapist ? `${p.assignedTherapist.firstName} ${p.assignedTherapist.lastName}` : "-"}</td>
+                              <td className="px-4 py-2 capitalize">{p.status}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* Report Categories */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {reportCards.map((report, index) => {
@@ -306,6 +506,42 @@ export default function Reports() {
           </div>
         </main>
       </div>
+      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Add Patients to {levelsOfCare.find(l => l.value === selectedLevel)?.label}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleBulkAdd} className="space-y-4">
+            <Input
+              placeholder="Search patients by name, email, or phone..."
+              value={searchAdd}
+              onChange={e => setSearchAdd(e.target.value)}
+            />
+            <div className="max-h-64 overflow-y-auto border rounded p-2 bg-gray-50">
+              {filteredAddPatients.length === 0 ? (
+                <div className="text-gray-500 text-sm">No patients available to add.</div>
+              ) : (
+                filteredAddPatients.map((p) => (
+                  <label key={p.id} className="flex items-center gap-2 py-1 cursor-pointer">
+                    <Checkbox
+                      checked={selectedPatientIds.includes(p.id)}
+                      onCheckedChange={checked => {
+                        setSelectedPatientIds(ids =>
+                          checked ? [...ids, p.id] : ids.filter(id => id !== p.id)
+                        );
+                      }}
+                    />
+                    <span>{p.firstName} {p.lastName} ({p.status})</span>
+                  </label>
+                ))
+              )}
+            </div>
+            <div className="flex justify-end">
+              <Button type="submit" disabled={!selectedPatientIds.length}>Add Selected Patients</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -44,12 +44,15 @@ export const patients = sqliteTable("patients", {
   emergencyContact: text("emergency_contact"),
   address: text("address"),
   insurance: text("insurance"),
+  insuranceCardUrl: text("insurance_card_url"),
+  photoUrl: text("photo_url"),
   reasonForVisit: text("reason_for_visit"),
   status: text("status").notNull().default("active"), // active, inactive, discharged
   hipaaConsent: integer("hipaa_consent", { mode: "boolean" })
     .notNull()
     .default(false),
   assignedTherapistId: text("assigned_therapist_id"),
+  loc: text("loc"),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 });
@@ -177,10 +180,30 @@ export const insertPatientSchema = z.object({
   emergencyContact: z.string().optional(),
   address: z.string().optional(),
   insurance: z.string().optional(),
+  insuranceCardUrl: z.string().optional(),
+  photoUrl: z.string().optional(),
   reasonForVisit: z.string().optional(),
   status: z.string().optional(),
   hipaaConsent: z.boolean().optional(),
   assignedTherapistId: z.string().optional(),
+  loc: z.string().optional(),
+  // New fields from Excel
+  participants: z.string().optional(),
+  location: z.string().optional(),
+  intakeDate: z.union([z.date(), z.number(), z.string()]).optional().transform((val) => {
+    if (val === undefined) return undefined;
+    if (typeof val === "string") return new Date(val);
+    if (typeof val === "number") return new Date(val);
+    return val;
+  }),
+  maNumber: z.string().optional(),
+  authNumber: z.string().optional(),
+  dischargeDate: z.union([z.date(), z.number(), z.string()]).optional().transform((val) => {
+    if (val === undefined) return undefined;
+    if (typeof val === "string") return new Date(val);
+    if (typeof val === "number") return new Date(val);
+    return val;
+  }),
   // New treatment completion fields (optional for backward compatibility)
   treatmentGoals: z.array(z.object({
     goal: z.string(),

@@ -12,6 +12,8 @@ import {
   UserCog,
   Settings,
   AlertCircle,
+  Bell,
+  ClipboardList,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -72,16 +74,10 @@ export function Sidebar({
         ...(!isFrontDesk
           ? [
               {
-                name: "Medical Records",
+                name: "Treatment Records",
                 href: "/records",
                 icon: FileText,
                 current: location.startsWith("/records"),
-              },
-              {
-                name: "Billing & Insurance",
-                href: "/billing",
-                icon: DollarSign,
-                current: location.startsWith("/billing"),
               },
             ]
           : []),

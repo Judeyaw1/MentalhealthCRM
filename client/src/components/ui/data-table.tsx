@@ -156,13 +156,13 @@ export function DataTable<T>({
       const firstRow = data[0] as any;
       
       // Patient-related suggestions
-      if (firstRow.patient?.firstName && query.includes("name")) {
+      if (firstRow.firstName && query.includes("name")) {
         suggestions.push("Search by patient name");
       }
-      if (firstRow.patient?.email && query.includes("email")) {
+      if (firstRow.email && query.includes("email")) {
         suggestions.push("Search by patient email");
       }
-      if (firstRow.patient?.phone && query.includes("phone")) {
+      if (firstRow.phone && query.includes("phone")) {
         suggestions.push("Search by patient phone");
       }
       

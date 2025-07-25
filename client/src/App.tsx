@@ -25,6 +25,7 @@ import Staff from "@/pages/Staff";
 import Reports from "@/pages/Reports";
 import AuditLogs from "@/pages/AuditLogs";
 import Settings from "@/pages/Settings";
+import Notifications from "@/pages/Notifications";
 
 function RouterComponent() {
   const { logout, isAuthenticated, user, forcePasswordChange } = useAuth();
@@ -70,6 +71,7 @@ function RouterComponent() {
             <Route path="/reports" component={Reports} />
             <Route path="/audit" component={AuditLogs} />
             <Route path="/settings" component={Settings} />
+            <Route path="/notifications" component={Notifications} />
             <Route path="*" component={NotFound} />
           </>
         ) : (

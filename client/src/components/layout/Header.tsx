@@ -42,6 +42,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import { NotificationBell } from "@/components/ui/notification-bell";
 
 interface HeaderProps {
   onSearch?: (query: string) => void;
@@ -243,24 +244,42 @@ export function Header({ onSearch }: HeaderProps) {
     const trimmedQuery = searchQuery.trim();
     const shouldSearch = trimmedQuery.length > 2;
 
+    console.log("🔍 Search effect triggered:", {
+      searchQuery,
+      trimmedQuery,
+      shouldSearch,
+      length: trimmedQuery.length
+    });
+
     // Always clear results if input is cleared or too short
     if (!shouldSearch) {
+      console.log("🔍 Query too short, clearing results");
       setApiResults([]);
       setApiLoading(false);
       return;
     }
 
+    console.log("🔍 Starting API search for:", trimmedQuery);
     setApiLoading(true);
     const timeoutId = setTimeout(() => {
-      fetch(`/api/search?q=${encodeURIComponent(trimmedQuery)}`)
-        .then((res) => (res.ok ? res.json() : []))
+      const searchUrl = `/api/search?q=${encodeURIComponent(trimmedQuery)}`;
+      console.log("🔍 Making API request to:", searchUrl);
+      
+      fetch(searchUrl)
+        .then((res) => {
+          console.log("🔍 Search API response status:", res.status);
+          return res.ok ? res.json() : [];
+        })
         .then((data) => {
+          console.log("🔍 Search API response data:", data);
           if (!ignore) setApiResults(Array.isArray(data) ? data : []);
         })
-        .catch(() => {
+        .catch((error) => {
+          console.error("🔍 Search API error:", error);
           if (!ignore) setApiResults([]);
         })
         .finally(() => {
+          console.log("🔍 Search API request completed");
           if (!ignore) setApiLoading(false);
         });
     }, 300);
@@ -284,6 +303,19 @@ export function Header({ onSearch }: HeaderProps) {
     prevIsSearchOpen.current = isSearchOpen;
   }, [isSearchOpen]);
 
+  // Add keyboard shortcut for search
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
+        event.preventDefault();
+        setIsSearchOpen(true);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const navResults =
     searchQuery.length > 0
       ? portalLocations.filter(
@@ -304,6 +336,8 @@ export function Header({ onSearch }: HeaderProps) {
   console.log("Search query:", searchQuery);
   console.log("Location results:", navResults);
   console.log("Help results:", helpResults);
+  console.log("API Results:", apiResults);
+  console.log("API Loading:", apiLoading);
 
   return (
     <>
@@ -340,11 +374,7 @@ export function Header({ onSearch }: HeaderProps) {
                       onClick={() => setIsSearchOpen(true)}
                     >
                       <Search className="mr-2 h-4 w-4" />
-                      <span>Search patients, appointments...</span>
-                      <div className="absolute right-2 flex items-center space-x-1">
-                        <Command className="h-3 w-3" />
-                        <span className="text-xs">K</span>
-                      </div>
+                      <span>Search patients, appointments, records...</span>
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
@@ -353,12 +383,7 @@ export function Header({ onSearch }: HeaderProps) {
                 </Tooltip>
               </TooltipProvider>
 
-              <Button variant="ghost" size="icon" className="relative">
-                <Bell className="h-5 w-5" />
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
-                  3
-                </span>
-              </Button>
+              <NotificationBell />
 
               <div className="flex items-center space-x-3 pl-4 border-l border-gray-200">
                 <DropdownMenu>
@@ -420,13 +445,19 @@ export function Header({ onSearch }: HeaderProps) {
       </header>
 
       <CommandDialog open={isSearchOpen} onOpenChange={setIsSearchOpen}>
-        <CommandInput
-          ref={searchInputRef}
-          placeholder="Search patients, appointments, records..."
-          value={searchQuery}
-          onValueChange={setSearchQuery}
-        />
-        <CommandList>
+        <div className="p-4 border-b">
+          <Input
+            ref={searchInputRef}
+            placeholder="Search patients, appointments, records..."
+            value={searchQuery}
+            onChange={(e) => {
+              const value = e.target.value;
+              setSearchQuery(value);
+            }}
+            className="w-full"
+          />
+        </div>
+        <CommandList className="max-h-[70vh] overflow-y-auto">
           <CommandGroup heading="Navigate to">
             {navResults.map((loc) => (
               <CommandItem
@@ -452,6 +483,126 @@ export function Header({ onSearch }: HeaderProps) {
             )}
           </CommandGroup>
 
+          {/* Grouped Search Results */}
+          {(() => {
+            const patientResults = apiResults.filter(r => r.type === 'patient');
+            const appointmentResults = apiResults.filter(r => r.type === 'appointment');
+            const recordResults = apiResults.filter(r => r.type === 'record');
+            
+            return <>
+              {apiLoading && (
+                <CommandGroup heading="Searching...">
+                  <div className="flex items-center justify-center py-6 text-gray-400">
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    <span>Searching...</span>
+                  </div>
+                </CommandGroup>
+              )}
+              
+              <CommandGroup heading="Patients">
+                {patientResults.length > 0 ? patientResults.map((result, idx) => (
+                  <CommandItem
+                    key={result.id || idx}
+                    onSelect={() => {
+                      setIsSearchOpen(false);
+                      if (result.href) navigate(result.href);
+                    }}
+                    className="cursor-pointer hover:bg-gray-50"
+                  >
+                    <div className="flex items-center space-x-2 mr-2">
+                      {getSearchIcon(result.type)}
+                      {getTypeBadge(result.type)}
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-medium">
+                        {result.title || result.name}
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        {result.subtitle || result.type || ""}
+                      </div>
+                    </div>
+                  </CommandItem>
+                )) : (
+                  <div className="text-gray-400 px-4 py-2 text-sm">
+                    {apiLoading ? "Searching..." : "No patient matches"}
+                  </div>
+                )}
+              </CommandGroup>
+              <CommandGroup heading="Appointments">
+                {appointmentResults.length > 0 ? appointmentResults.map((result, idx) => (
+                  <CommandItem
+                    key={result.id || idx}
+                    onSelect={() => {
+                      setIsSearchOpen(false);
+                      if (result.href) navigate(result.href);
+                    }}
+                    className="cursor-pointer hover:bg-gray-50"
+                  >
+                    <div className="flex items-center space-x-2 mr-2">
+                      {getSearchIcon(result.type)}
+                      {getTypeBadge(result.type)}
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-medium">
+                        {result.title || result.name}
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        {result.subtitle || result.type || ""}
+                      </div>
+                    </div>
+                  </CommandItem>
+                )) : (
+                  <div className="text-gray-400 px-4 py-2 text-sm">
+                    {apiLoading ? "Searching..." : "No appointment matches"}
+                  </div>
+                )}
+              </CommandGroup>
+              <CommandGroup heading="Records">
+                {recordResults.length > 0 ? recordResults.map((result, idx) => (
+                  <CommandItem
+                    key={result.id || idx}
+                    onSelect={() => {
+                      setIsSearchOpen(false);
+                      if (result.href) navigate(result.href);
+                    }}
+                    className="cursor-pointer hover:bg-gray-50"
+                  >
+                    <div className="flex items-center space-x-2 mr-2">
+                      {getSearchIcon(result.type)}
+                      {getTypeBadge(result.type)}
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-medium">
+                        {result.title || result.name}
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        {result.subtitle || result.type || ""}
+                      </div>
+                    </div>
+                  </CommandItem>
+                )) : (
+                  <div className="text-gray-400 px-4 py-2 text-sm">
+                    {apiLoading ? "Searching..." : "No record matches"}
+                  </div>
+                )}
+              </CommandGroup>
+              
+              {!apiLoading && apiResults.length === 0 && searchQuery.length > 2 && (
+                <CommandGroup heading="No Results">
+                  <div className="text-center py-6 text-gray-400">
+                    <Search className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+                    <p className="text-sm">
+                      No results found for "{searchQuery}"
+                    </p>
+                    <p className="text-xs text-gray-300 mt-1">
+                      Try searching by name, email, or phone number
+                    </p>
+                  </div>
+                </CommandGroup>
+              )}
+            </>;
+          })()}
+
           <CommandGroup heading="Help & FAQ">
             {helpResults.map((topic) => (
               <CommandItem key={topic.id}>
@@ -466,47 +617,6 @@ export function Header({ onSearch }: HeaderProps) {
                 No help matches
               </div>
             )}
-          </CommandGroup>
-
-          <CommandGroup heading="Search Results">
-            {apiLoading && (
-              <div className="flex items-center justify-center py-6 text-gray-400">
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                <span>Searching...</span>
-              </div>
-            )}
-            {apiResults.map((result, idx) => (
-              <CommandItem
-                key={result.id || idx}
-                onSelect={() => {
-                  setIsSearchOpen(false);
-                  if (result.href) navigate(result.href);
-                }}
-              >
-                <div className="flex items-center space-x-2 mr-2">
-                  {getSearchIcon(result.type)}
-                  {getTypeBadge(result.type)}
-                </div>
-                <div className="flex-1">
-                  <div className="font-medium">
-                    {result.title || result.name}
-                  </div>
-                  <div className="text-sm text-gray-500">
-                    {result.subtitle || result.type || ""}
-                  </div>
-                </div>
-              </CommandItem>
-            ))}
-            {!apiLoading &&
-              apiResults.length === 0 &&
-              searchQuery.length > 2 && (
-                <div className="text-center py-6 text-gray-400">
-                  <Search className="h-8 w-8 mx-auto text-gray-400 mb-2" />
-                  <p className="text-sm">
-                    No results found for "{searchQuery}"
-                  </p>
-                </div>
-              )}
           </CommandGroup>
         </CommandList>
       </CommandDialog>

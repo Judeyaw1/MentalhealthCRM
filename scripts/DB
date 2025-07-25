@@ -1,0 +1,53 @@
+import mongoose from 'mongoose';
+
+// Connect to MongoDB
+mongoose.connect('mongodb://localhost:27017/mental-health-tracker', {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+});
+
+// Define User schema
+const userSchema = new mongoose.Schema({
+  email: { type: String, required: true, unique: true },
+  firstName: { type: String, required: true },
+  lastName: { type: String, required: true },
+  role: { type: String, required: true },
+  password: { type: String },
+  forcePasswordChange: { type: Boolean, default: false },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+});
+
+const User = mongoose.model('User', userSchema);
+
+async function createAdminUser() {
+  try {
+    // Check if admin already exists
+    const existingAdmin = await User.findOne({ email: 'admin@example.com' });
+    if (existingAdmin) {
+      console.log('Admin user already exists');
+      return;
+    }
+
+    // Create admin user
+    const adminUser = new User({
+      email: 'admin@example.com',
+      firstName: 'Admin',
+      lastName: 'User',
+      role: 'admin',
+      password: 'password',
+      forcePasswordChange: false,
+    });
+
+    await adminUser.save();
+    console.log('Admin user created successfully');
+    console.log('Email: admin@example.com');
+    console.log('Password: password');
+  } catch (error) {
+    console.error('Error creating admin user:', error);
+  } finally {
+    mongoose.connection.close();
+  }
+}
+
+createAdminUser(); 

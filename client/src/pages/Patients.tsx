@@ -58,6 +58,9 @@ import type { PatientWithTherapist } from "@shared/schema";
 import { RecentPatients } from "@/components/dashboard/RecentPatients";
 import { Input } from "@/components/ui/input";
 import { useDebounce } from "@/hooks/use-mobile";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { format } from "date-fns";
 
 export default function Patients() {
   const { toast } = useToast();
@@ -75,6 +78,8 @@ export default function Patients() {
   const [showFilters, setShowFilters] = useState(false);
   const [exportLoading, setExportLoading] = useState(false);
   const [showRecentPatients, setShowRecentPatients] = useState(false);
+  const [showAssessment, setShowAssessment] = useState(false);
+  const [assessmentPatient, setAssessmentPatient] = useState<any>(null);
   const pageSize = 20;
   const debouncedSearch = useDebounce(searchQuery, 300);
 
@@ -577,6 +582,13 @@ export default function Patients() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => { setAssessmentPatient(row); setShowAssessment(true); }}
+          >
+            Assess
+          </Button>
         </div>
       ),
     },
@@ -854,11 +866,18 @@ export default function Patients() {
                       onViewModeChange={setViewMode}
                       showQuickActions={true}
                       onSearch={handleSearch}
-                      searchPlaceholder="Search patients by name, surname, email, or phone..."
+                      searchPlaceholder="Search patients by name, email, or phone..."
                     />
                     {!isLoading && patientsData?.patients?.length === 0 && (
-                      <div className="text-center text-gray-500 py-8 text-lg">
-                        No patients found.
+                      <div className="text-center text-gray-500 py-8">
+                        <div className="text-lg mb-2">
+                          {searchQuery ? `No patients found matching "${searchQuery}"` : "No patients found."}
+                        </div>
+                        {searchQuery && (
+                          <div className="text-sm text-gray-400">
+                            Try searching by name, email, or phone. You can also try partial matches.
+                          </div>
+                        )}
                       </div>
                     )}
                   </>
@@ -946,6 +965,67 @@ export default function Patients() {
           </div>
         </main>
       </div>
+      <Dialog open={showAssessment} onOpenChange={setShowAssessment}>
+        <DialogContent className="max-w-2xl overflow-y-auto max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle>New Patient Assessment</DialogTitle>
+          </DialogHeader>
+          {assessmentPatient && (
+            <form className="space-y-4">
+              <div>
+                <strong>Patient:</strong> {assessmentPatient.firstName} {assessmentPatient.lastName}
+              </div>
+              <div>
+                <label className="block font-medium">Presenting Problem</label>
+                <Textarea required />
+              </div>
+              <div>
+                <label className="block font-medium">Medical History</label>
+                <Textarea />
+              </div>
+              <div>
+                <label className="block font-medium">Psychiatric History</label>
+                <Textarea />
+              </div>
+              <div>
+                <label className="block font-medium">Family History</label>
+                <Textarea />
+              </div>
+              <div>
+                <label className="block font-medium">Social History</label>
+                <Textarea />
+              </div>
+              <div>
+                <label className="block font-medium">Mental Status Exam</label>
+                <Textarea />
+              </div>
+              <div>
+                <label className="block font-medium">Risk Assessment</label>
+                <Textarea />
+              </div>
+              <div>
+                <label className="block font-medium">Diagnosis</label>
+                <Input />
+              </div>
+              <div>
+                <label className="block font-medium">Initial Impressions & Recommendations</label>
+                <Textarea required />
+              </div>
+              <div>
+                <label className="block font-medium">Follow-Up Date</label>
+                <Input type="date" />
+              </div>
+              <div>
+                <label className="block font-medium">Follow-Up Notes</label>
+                <Textarea />
+              </div>
+              <div className="flex justify-end">
+                <Button type="submit">Save Assessment</Button>
+              </div>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
