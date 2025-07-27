@@ -50,6 +50,7 @@ import {
   ArrowLeft,
   CheckCircle,
   XCircle,
+  Star,
 } from "lucide-react";
 import { Link } from "wouter";
 import { isUnauthorizedError, canSeeCreatedBy } from "@/lib/authUtils";
@@ -61,6 +62,7 @@ import { useDebounce } from "@/hooks/use-mobile";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { format } from "date-fns";
+import * as XLSX from "xlsx";
 
 export default function Patients() {
   const { toast } = useToast();
@@ -80,8 +82,19 @@ export default function Patients() {
   const [showRecentPatients, setShowRecentPatients] = useState(false);
   const [showAssessment, setShowAssessment] = useState(false);
   const [assessmentPatient, setAssessmentPatient] = useState<any>(null);
-  const pageSize = 20;
+  const [showAssignTherapistDialog, setShowAssignTherapistDialog] = useState(false);
+  const [showFollowupDialog, setShowFollowupDialog] = useState(false);
+  const [assigning, setAssigning] = useState(false);
+  const [scheduling, setScheduling] = useState(false);
+  const [selectedTherapistId, setSelectedTherapistId] = useState<string>("");
+  const [followupDate, setFollowupDate] = useState<string>("");
+  const pageSize = 10;
   const debouncedSearch = useDebounce(searchQuery, 300);
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importData, setImportData] = useState<any[]>([]);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importResult, setImportResult] = useState<any>(null);
 
   // Redirect to home if not authenticated
   useEffect(() => {
@@ -276,10 +289,13 @@ export default function Patients() {
         handleExport("pdf", selectedPatients);
         break;
       case "assign":
-        toast({
-          title: "Assign Therapist",
-          description: `Assigning therapist to ${selectedPatients.length} patients...`,
-        });
+        setShowAssignTherapistDialog(true);
+        break;
+      case "important":
+        handleMarkImportant();
+        break;
+      case "followup":
+        setShowFollowupDialog(true);
         break;
       case "status":
         toast({
@@ -287,6 +303,114 @@ export default function Patients() {
           description: `Updating status for ${selectedPatients.length} patients...`,
         });
         break;
+      case "delete":
+        handleDeletePatients();
+        break;
+    }
+  };
+
+  const handleMarkImportant = async () => {
+    try {
+      const response = await fetch("/api/patients/bulk-update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ patientIds: selectedPatients, updates: { important: true } }),
+      });
+      if (!response.ok) throw new Error("Failed to mark as important");
+      toast({ title: "Marked as Important", description: `Marked ${selectedPatients.length} patient(s) as important.` });
+      refetch();
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to mark as important.", variant: "destructive" });
+    }
+  };
+
+  const handleAssignTherapist = async () => {
+    setAssigning(true);
+    try {
+      const response = await fetch("/api/patients/bulk-update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ patientIds: selectedPatients, updates: { assignedTherapistId: selectedTherapistId } }),
+      });
+      if (!response.ok) throw new Error("Failed to assign therapist");
+      toast({ title: "Therapist Assigned", description: `Assigned therapist to ${selectedPatients.length} patient(s).` });
+      setShowAssignTherapistDialog(false);
+      setSelectedTherapistId("");
+      refetch();
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to assign therapist.", variant: "destructive" });
+    } finally {
+      setAssigning(false);
+    }
+  };
+
+  const handleScheduleFollowup = async () => {
+    setScheduling(true);
+    try {
+      for (const patientId of selectedPatients) {
+        await fetch("/api/appointments", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ patientId, appointmentDate: followupDate, type: "Follow-up", status: "scheduled" }),
+        });
+      }
+      toast({ title: "Follow-up Scheduled", description: `Scheduled follow-up for ${selectedPatients.length} patient(s).` });
+      setShowFollowupDialog(false);
+      setFollowupDate("");
+      refetch();
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to schedule follow-up.", variant: "destructive" });
+    } finally {
+      setScheduling(false);
+    }
+  };
+
+  const handleDeletePatients = async () => {
+    if (
+      !confirm(
+        `Are you sure you want to delete ${selectedPatients.length} patient${selectedPatients.length !== 1 ? "s" : ""}? This action cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const patientIdsToDelete = selectedPatients;
+      const response = await fetch(`/api/patients/bulk-delete`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({ patientIds: patientIdsToDelete }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to delete patients");
+      }
+
+      toast({
+        title: "Success",
+        description: `Successfully deleted ${patientIdsToDelete.length} patient${patientIdsToDelete.length !== 1 ? "s" : ""}.`,
+      });
+
+      // Refresh the patients list
+      refetch();
+      setSelectedPatients([]); // Clear selection after successful deletion
+    } catch (error) {
+      console.error("Error deleting patients:", error);
+      toast({
+        title: "Error",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to delete patients. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -361,6 +485,68 @@ export default function Patients() {
             : "Failed to delete patient. Please try again.",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImportFile(file);
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const data = evt.target?.result;
+      let rows: any[] = [];
+      if (file.name.endsWith(".csv")) {
+        // Parse CSV
+        const text = data as string;
+        const lines = text.split(/\r?\n/).filter(Boolean);
+        const headers = lines[0].split(",");
+        rows = lines.slice(1).map(line => {
+          const values = line.split(",");
+          const obj: any = {};
+          headers.forEach((h, i) => { obj[h.trim()] = values[i]?.trim() || ""; });
+          return obj;
+        });
+      } else {
+        // Parse Excel
+        const workbook = XLSX.read(data, { type: "binary" });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        rows = XLSX.utils.sheet_to_json(sheet);
+      }
+      setImportData(rows);
+    };
+    if (file.name.endsWith(".csv")) {
+      reader.readAsText(file);
+    } else {
+      reader.readAsBinaryString(file);
+    }
+  };
+
+  const handleConfirmImport = async () => {
+    setImportLoading(true);
+    setImportResult(null);
+    try {
+      const response = await fetch("/api/patients/bulk-import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ patients: importData }),
+      });
+      const result = await response.json();
+      setImportResult(result);
+      if (response.ok) {
+        toast({ title: "Import Successful", description: `${result.successCount || 0} patients imported.` });
+        setShowImportDialog(false);
+        setImportFile(null);
+        setImportData([]);
+        refetch();
+      } else {
+        toast({ title: "Import Error", description: result.message || "Some patients could not be imported.", variant: "destructive" });
+      }
+    } catch (error) {
+      toast({ title: "Import Error", description: "Failed to import patients.", variant: "destructive" });
+    } finally {
+      setImportLoading(false);
     }
   };
 
@@ -532,56 +718,6 @@ export default function Patients() {
             </Tooltip>
           </TooltipProvider>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>More actions</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                onClick={() => handleExport("csv", [row.id as any])}
-              >
-                <FileText className="h-4 w-4 mr-2" />
-                Export as CSV
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => handleExport("excel", [row.id as any])}
-              >
-                <FileSpreadsheet className="h-4 w-4 mr-2" />
-                Export as Excel
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => handleExport("pdf", [row.id as any])}
-              >
-                <FileDown className="h-4 w-4 mr-2" />
-                Export as PDF
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem>
-                <Mail className="h-4 w-4 mr-2" />
-                Send Email
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <User className="h-4 w-4 mr-2" />
-                Assign Therapist
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-red-600">
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete Patient
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
           <Button
             variant="outline"
             size="sm"
@@ -738,29 +874,24 @@ export default function Patients() {
           <div className="p-6">
             {/* Page Header */}
             <div className="mb-8 flex items-center justify-between">
-              <div className="flex items-center gap-2 mb-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => (window.location.href = "/dashboard")}
-                  className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                </Button>
-                <div>
-                  <h1 className="text-2xl font-semibold text-gray-900">
-                    Patients
-                  </h1>
-                  <p className="text-gray-600 mt-1">
-                    Manage patient profiles and medical information.
-                  </p>
-                </div>
+              <div>
+                <h1 className="text-2xl font-semibold text-gray-900">
+                  Patients
+                </h1>
+                <p className="text-gray-600 mt-1">
+                  Manage patient profiles and medical information.
+                </p>
               </div>
-              <Link href="/patients/new">
-                <Button className="ml-auto" variant="default">
-                  <Plus className="h-4 w-4 mr-2" /> New Patient
+              <div className="flex items-center gap-2 ml-auto">
+                <Link href="/patients/new">
+                  <Button variant="default">
+                    <Plus className="h-4 w-4 mr-2" /> New Patient
+                  </Button>
+                </Link>
+                <Button variant="outline" onClick={() => setShowImportDialog(true)}>
+                  <Download className="h-4 w-4 mr-2" /> Import
                 </Button>
-              </Link>
+              </div>
             </div>
 
             {/* Content */}
@@ -819,6 +950,15 @@ export default function Patients() {
                       <Button
                         variant="outline"
                         size="sm"
+                        onClick={() => handleBulkAction("delete")}
+                        className="flex items-center space-x-2 text-red-600 border-red-200 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        <span>Delete Selected</span>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={() => handleBulkAction("assign")}
                         className="flex items-center space-x-2"
                       >
@@ -828,11 +968,20 @@ export default function Patients() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleBulkAction("status")}
+                        onClick={() => handleBulkAction("important")}
                         className="flex items-center space-x-2"
                       >
-                        <AlertCircle className="h-4 w-4" />
-                        <span>Update Status</span>
+                        <Star className="h-4 w-4 text-yellow-500" />
+                        <span>Mark as Important</span>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleBulkAction("followup")}
+                        className="flex items-center space-x-2"
+                      >
+                        <Calendar className="h-4 w-4 text-blue-500" />
+                        <span>Schedule Follow-up</span>
                       </Button>
                     </div>
                   </div>
@@ -1024,6 +1173,129 @@ export default function Patients() {
               </div>
             </form>
           )}
+        </DialogContent>
+      </Dialog>
+      <Dialog open={showAssignTherapistDialog} onOpenChange={setShowAssignTherapistDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Assign Therapist to Selected Patients</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="block font-medium">Select Therapist</label>
+              <select
+                className="w-full p-2 border border-gray-300 rounded-md"
+                value={selectedTherapistId}
+                onChange={(e) => setSelectedTherapistId(e.target.value)}
+              >
+                <option value="">Select a therapist</option>
+                {therapists?.map((therapist) => (
+                  <option key={therapist.id} value={therapist.id}>
+                    {therapist.firstName} {therapist.lastName}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button variant="outline" onClick={() => setShowAssignTherapistDialog(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleAssignTherapist}
+                disabled={!selectedTherapistId || assigning}
+              >
+                {assigning ? "Assigning..." : "Assign Therapist"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={showFollowupDialog} onOpenChange={setShowFollowupDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Schedule Follow-up for Selected Patients</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="block font-medium">Follow-up Date</label>
+              <input
+                type="date"
+                className="w-full p-2 border border-gray-300 rounded-md"
+                value={followupDate}
+                onChange={(e) => setFollowupDate(e.target.value)}
+              />
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button variant="outline" onClick={() => setShowFollowupDialog(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleScheduleFollowup}
+                disabled={!followupDate || scheduling}
+              >
+                {scheduling ? "Scheduling..." : "Schedule Follow-up"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Import Patients (CSV or Excel)</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <input
+              type="file"
+              accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
+              onChange={handleImportFile}
+              disabled={importLoading}
+            />
+            {importData.length > 0 && (
+              <div className="max-h-64 overflow-auto border rounded p-2 bg-gray-50">
+                <div className="mb-2 font-semibold">Preview ({importData.length} rows):</div>
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr>
+                      {Object.keys(importData[0]).map((h) => (
+                        <th key={h} className="border-b px-2 py-1 text-left">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {importData.slice(0, 10).map((row, i) => (
+                      <tr key={i}>
+                        {Object.values(row).map((v, j) => (
+                          <td key={j} className="border-b px-2 py-1">{v as string}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {importData.length > 10 && <div className="text-gray-400 mt-1">...and {importData.length - 10} more rows</div>}
+              </div>
+            )}
+            <div className="flex justify-end space-x-2">
+              <Button variant="outline" onClick={() => setShowImportDialog(false)} disabled={importLoading}>Cancel</Button>
+              <Button onClick={handleConfirmImport} disabled={importLoading || !importData.length}>
+                {importLoading ? "Importing..." : "Import Patients"}
+              </Button>
+            </div>
+            {importResult && (
+              <div className="mt-2 text-sm">
+                <div className={importResult.successCount ? "text-green-700" : "text-red-700"}>
+                  {importResult.message}
+                </div>
+                {importResult.errors && importResult.errors.length > 0 && (
+                  <ul className="mt-1 text-red-600 list-disc list-inside">
+                    {importResult.errors.map((err: any, i: number) => (
+                      <li key={i}>{err}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>

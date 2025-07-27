@@ -301,7 +301,7 @@ export class DatabaseStorage {
   }
 
   async getUserByEmail(email: string) {
-    const user = await User.findOne({ email }).lean();
+    const user = await User.findOne({ email: { $regex: new RegExp(`^${email}$`, 'i') } }).lean();
     if (!user) return undefined;
     const { _id, ...rest } = user;
     return {
@@ -311,7 +311,7 @@ export class DatabaseStorage {
   }
 
   async createUser(userData: any) {
-    const user = new User(userData);
+    const user = new User({ ...userData, email: userData.email.toLowerCase() });
     await user.save();
     const userObj = user.toObject();
     const { _id, ...rest } = userObj;

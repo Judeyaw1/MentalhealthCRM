@@ -15,7 +15,7 @@ import mongoose from "mongoose";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { PatientAssessment } from "./models/PatientAssessment";
+import { PatientNote } from "./models/PatientNote";
 
 // Custom schema for MongoDB treatment records
 const insertTreatmentRecordSchema = z.object({
@@ -391,6 +391,118 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: error.message });
       }
       res.status(500).json({ message: "Failed to delete patient" });
+    }
+  });
+
+  // Bulk delete patients endpoint
+  app.post("/api/patients/bulk-delete", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const { patientIds } = req.body;
+      if (!Array.isArray(patientIds) || patientIds.length === 0) {
+        return res.status(400).json({ message: "No patient IDs provided" });
+      }
+      const results = [];
+      for (const id of patientIds) {
+        try {
+          await storage.deletePatient(id);
+          await logActivity(userId, "delete", "patient", id.toString());
+          results.push({ id, success: true });
+        } catch (error) {
+          let message = "Failed to delete patient";
+          if (error instanceof Error) {
+            message = error.message;
+          }
+          results.push({ id, success: false, message });
+        }
+      }
+      const failed = results.filter(r => !r.success);
+      if (failed.length > 0) {
+        return res.status(207).json({
+          message: `Some patients could not be deleted`,
+          results,
+        });
+      }
+      res.json({ message: "All selected patients deleted successfully", results });
+    } catch (error) {
+      console.error("Bulk delete error:", error);
+      res.status(500).json({ message: "Failed to delete patients" });
+    }
+  });
+
+  // Bulk update patients endpoint
+  app.post("/api/patients/bulk-update", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const { patientIds, updates } = req.body;
+      if (!Array.isArray(patientIds) || patientIds.length === 0) {
+        return res.status(400).json({ message: "No patient IDs provided" });
+      }
+      if (!updates || typeof updates !== "object") {
+        return res.status(400).json({ message: "No updates provided" });
+      }
+      const results = [];
+      for (const id of patientIds) {
+        try {
+          const updated = await Patient.findByIdAndUpdate(id, updates, { new: true });
+          await logActivity(userId, "update", "patient", id.toString(), updates);
+          results.push({ id, success: true, updated });
+        } catch (error) {
+          let message = "Failed to update patient";
+          if (error instanceof Error) {
+            message = error.message;
+          }
+          results.push({ id, success: false, message });
+        }
+      }
+      const failed = results.filter(r => !r.success);
+      if (failed.length > 0) {
+        return res.status(207).json({
+          message: `Some patients could not be updated`,
+          results,
+        });
+      }
+      res.json({ message: "All selected patients updated successfully", results });
+    } catch (error) {
+      console.error("Bulk update error:", error);
+      res.status(500).json({ message: "Failed to update patients" });
+    }
+  });
+
+  // Bulk import patients endpoint
+  app.post("/api/patients/bulk-import", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const { patients } = req.body;
+      if (!Array.isArray(patients) || patients.length === 0) {
+        return res.status(400).json({ message: "No patients provided" });
+      }
+      let successCount = 0;
+      const errors: string[] = [];
+      for (const [i, data] of patients.entries()) {
+        try {
+          // Basic validation: require firstName, lastName, dateOfBirth, email
+          if (!data.firstName || !data.lastName || !data.dateOfBirth || !data.email) {
+            errors.push(`Row ${i + 1}: Missing required fields.`);
+            continue;
+          }
+          // Parse dateOfBirth if needed
+          if (typeof data.dateOfBirth === "string") {
+            data.dateOfBirth = new Date(data.dateOfBirth);
+          }
+          // Create patient
+          const patient = new Patient({ ...data });
+          await patient.save();
+          await logActivity(userId, "create", "patient", patient._id.toString(), data);
+          successCount++;
+        } catch (err: any) {
+          errors.push(`Row ${i + 1}: ${err.message || "Unknown error"}`);
+        }
+      }
+      res.json({ successCount, errors, message: `${successCount} patients imported. ${errors.length ? errors.length + ' errors.' : ''}` });
+    } catch (error) {
+      console.error("Bulk import error:", error);
+      res.status(500).json({ message: "Failed to import patients" });
     }
   });
 
@@ -2110,137 +2222,525 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
-  // Patient Assessment API
-  app.get("/api/patients/:id/assessments", isAuthenticated, async (req, res) => {
-    const assessments = await PatientAssessment.find({ patientId: req.params.id }).sort({ date: -1 }).lean();
-    res.json(assessments.map(a => ({ ...a, id: a._id.toString() })));
-  });
-  app.post("/api/patients/:id/assessments", isAuthenticated, async (req, res) => {
+  // Reset (delete all) audit logs endpoint (admin only)
+  app.post("/api/audit-logs/reset", isAuthenticated, async (req: any, res) => {
     try {
-      let user = req.user;
-      if (!user.firstName || !user.lastName || !user.role) {
-        const dbUser = await storage.getUser(user.id);
-        console.log('Fetched dbUser:', dbUser);
-        if (dbUser) {
-          user = { ...user, ...dbUser };
-        }
+      const user = await storage.getUser(req.user.id);
+      if (user?.role !== "admin") {
+        return res.status(403).json({ message: "Access denied. Admin only." });
       }
-      // Use 'name' if firstName/lastName missing
-      let name = user.firstName && user.lastName ? `${user.firstName} ${user.lastName}`.trim() : (user.name || '').trim();
-      console.log('User for createdBy:', user, 'Resolved name:', name);
-      const createdBy = {
-        id: user.id,
-        name: name || 'Unknown',
-        role: user.role || 'N/A'
-      };
-      const assessment = new PatientAssessment({
-        ...req.body,
-        patientId: req.params.id,
-        createdBy,
-        updatedBy: createdBy
-      });
-      await assessment.save();
-      // Schedule follow-up notification if followUpDate is set
-      if (assessment.followUpDate) {
-        // Find patient and assigned therapist
-        const patient = await Patient.findById(req.params.id).lean();
-        let userId = req.user.id;
-        if (patient && patient.assignedTherapistId) {
-          userId = patient.assignedTherapistId.toString();
-        }
-        const title = "Assessment Follow-Up Reminder";
-        const message = `Follow-up for patient ${patient?.firstName || ""} ${patient?.lastName || ""} is due on ${assessment.followUpDate.toLocaleDateString()}.`;
-        await notificationService.createNotification(
-          userId,
-          "assessment_followup",
-          title,
-          message,
-          { patientId: req.params.id, assessmentId: assessment._id.toString(), followUpDate: assessment.followUpDate },
-          assessment.followUpDate
-        );
-      }
-      res.status(201).json({ ...assessment.toObject(), id: assessment._id.toString() });
+      const db = Patient.db;
+      const result = await db.collection("auditLogs").deleteMany({});
+      res.json({ message: `All audit logs deleted (${result.deletedCount} logs).` });
     } catch (error) {
-      res.status(400).json({ message: "Failed to create assessment", error });
+      console.error("Error resetting audit logs:", error);
+      res.status(500).json({ message: "Failed to reset audit logs" });
     }
   });
-  app.get("/api/assessments/:assessmentId", isAuthenticated, async (req, res) => {
-    const assessment = await PatientAssessment.findById(req.params.assessmentId).lean();
-    if (!assessment) return res.status(404).json({ message: "Not found" });
-    res.json({ ...assessment, id: assessment._id.toString() });
+
+  // Patient Notes API endpoints
+  app.get("/api/patients/:id/notes", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const user = await storage.getUser(req.user.id);
+      if (!user) { return res.status(404).json({ message: "User not found" }); }
+
+      // Get all notes for this patient
+      const allNotes = await PatientNote.find({ patientId: id })
+        .sort({ createdAt: 1 })
+        .lean();
+
+      // Filter notes based on user permissions
+      const filteredNotes = allNotes.filter((note) => {
+        // General notes: visible to everyone
+        if (!note.directedTo) return true;
+        
+        // Directed notes: only visible to recipient, author, or admin
+        if (user.role === "admin") return true;
+        if (note.authorId.toString() === user.id) return true;
+        if (note.directedTo.toString() === user.id) return true;
+        
+        return false;
+      });
+
+      // Group notes by threads (same directedTo or general notes)
+      const groupedNotes = filteredNotes.reduce((acc: any, note) => {
+        const threadKey = note.directedTo ? `directed_${note.directedTo}` : 'general';
+        
+        if (!acc[threadKey]) {
+          acc[threadKey] = {
+            threadId: threadKey,
+            directedTo: note.directedTo,
+            directedToName: note.directedToName,
+            isGeneral: !note.directedTo,
+            notes: []
+          };
+        }
+        
+        acc[threadKey].notes.push(note);
+        return acc;
+      }, {});
+
+      // Convert to array and sort threads by most recent activity
+      const threads = Object.values(groupedNotes).map((thread: any) => {
+        // Sort notes within each thread by creation time
+        thread.notes.sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+        return thread;
+      });
+
+      // Sort threads by most recent activity
+      threads.sort((a: any, b: any) => {
+        const aLatest = Math.max(...a.notes.map((n: any) => new Date(n.createdAt).getTime()));
+        const bLatest = Math.max(...b.notes.map((n: any) => new Date(n.createdAt).getTime()));
+        return bLatest - aLatest;
+      });
+
+      res.json(threads);
+    } catch (error) {
+      console.error("Error fetching notes:", error);
+      res.status(500).json({ message: "Failed to fetch notes" });
+    }
   });
-  app.patch("/api/assessments/:assessmentId", isAuthenticated, async (req, res) => {
-    let user = req.user;
-    if (!user.firstName || !user.lastName || !user.role) {
-      const dbUser = await storage.getUser(user.id);
-      console.log('Fetched dbUser:', dbUser);
-      if (dbUser) {
-        user = { ...user, ...dbUser };
+
+  app.post("/api/patients/:id/notes", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { content, isPrivate = false, directedTo = null, directedToName = null, parentNoteId = null } = req.body;
+      const user = await storage.getUser(req.user.id);
+      if (!user) { return res.status(404).json({ message: "User not found" }); }
+      if (user.role === "frontdesk") { return res.status(403).json({ message: "Front desk cannot add notes" }); }
+      if (!content || content.trim().length === 0) { return res.status(400).json({ message: "Note content is required" }); }
+
+      let finalDirectedTo = directedTo;
+      let finalDirectedToName = directedToName;
+
+      // If this is a reply, verify the parent note exists and inherit its directedTo
+      if (parentNoteId) {
+        const parentNote = await PatientNote.findOne({ 
+          _id: parentNoteId, 
+          patientId: id 
+        });
+        if (!parentNote) {
+          return res.status(400).json({ message: "Parent note not found" });
+        }
+        // Inherit the directedTo from the parent note for replies
+        finalDirectedTo = parentNote.directedTo;
+        finalDirectedToName = parentNote.directedToName;
+        
+        console.log(`🔍 Reply inheritance debug:`, {
+          parentNoteId: parentNoteId,
+          parentDirectedTo: parentNote.directedTo,
+          parentDirectedToName: parentNote.directedToName,
+          finalDirectedTo: finalDirectedTo,
+          finalDirectedToName: finalDirectedToName,
+          currentUserId: user.id
+        });
       }
-    }
-    let name = user.firstName && user.lastName ? `${user.firstName} ${user.lastName}`.trim() : (user.name || '').trim();
-    console.log('User for updatedBy:', user, 'Resolved name:', name);
-    const updatedBy = {
-      id: user.id,
-      name: name || 'Unknown',
-      role: user.role || 'N/A'
-    };
-    const allowedFields = [
-      'presentingProblem', 'medicalHistory', 'psychiatricHistory', 'familyHistory',
-      'socialHistory', 'mentalStatus', 'riskAssessment', 'diagnosis', 'impressions',
-      'followUpDate', 'followUpNotes', 'status'
-    ];
-    const updates = {};
-    for (const key of allowedFields) {
-      if (req.body[key] !== undefined) updates[key] = req.body[key];
-    }
-    updates.updatedBy = updatedBy;
-    const oldAssessment = await PatientAssessment.findById(req.params.assessmentId).lean();
-    const updated = await PatientAssessment.findByIdAndUpdate(req.params.assessmentId, updates, { new: true }).lean();
-    if (!updated) return res.status(404).json({ message: "Not found" });
-    // If followUpDate changed, remove previous notification
-    if (updated.followUpDate && oldAssessment && String(updated.followUpDate) !== String(oldAssessment.followUpDate)) {
-      const patient = await Patient.findById(updated.patientId).lean();
-      let userId = req.user.id;
-      if (patient && patient.assignedTherapistId) {
-        userId = patient.assignedTherapistId.toString();
+
+      // Validate that the directedTo user exists (if specified)
+      if (finalDirectedTo) {
+        const targetUser = await storage.getUser(finalDirectedTo);
+        if (!targetUser) {
+          console.log(`⚠️ Warning: directedTo user ${finalDirectedTo} not found in database`);
+          // Reset to null if user doesn't exist
+          finalDirectedTo = null;
+          finalDirectedToName = null;
+        }
       }
-      // Delete previous follow-up notification for this assessment
-      await storage.deleteAssessmentFollowupNotification(userId, updated._id.toString());
-      // Create new notification for the new date
-      const title = "Assessment Follow-Up Reminder";
-      const message = `Follow-up for patient ${patient?.firstName || ""} ${patient?.lastName || ""} is due on ${new Date(updated.followUpDate).toLocaleDateString()}.`;
-      await notificationService.createNotification(
-        userId,
-        "assessment_followup",
-        title,
-        message,
-        { patientId: updated.patientId.toString(), assessmentId: updated._id.toString(), followUpDate: updated.followUpDate },
-        updated.followUpDate
-      );
-    } else if (updated.followUpDate) {
-      // If not changed, just ensure notification exists (legacy support)
-      const patient = await Patient.findById(updated.patientId).lean();
-      let userId = req.user.id;
-      if (patient && patient.assignedTherapistId) {
-        userId = patient.assignedTherapistId.toString();
+
+      const note = new PatientNote({ 
+        patientId: id, 
+        authorId: user.id, 
+        authorName: `${user.firstName} ${user.lastName}`, 
+        content: content.trim(), 
+        isPrivate, 
+        directedTo: finalDirectedTo, 
+        directedToName: finalDirectedToName,
+        parentNoteId,
+      });
+      await note.save();
+
+      // Create notification if note is directed to someone specific
+      if (finalDirectedTo && finalDirectedTo !== user.id) {
+        try {
+          console.log(`🔔 Creating notification for reply:`, {
+            recipientId: finalDirectedTo,
+            authorId: user.id,
+            authorName: `${user.firstName} ${user.lastName}`,
+            isReply: !!parentNoteId,
+            parentNoteId: parentNoteId
+          });
+          
+          await notificationService.createNotification(
+            finalDirectedTo,
+            "directed_note",
+            `New Note from ${user.firstName} ${user.lastName}`,
+            `You have a new directed note for patient ${id}`,
+            {
+              patientId: id,
+              noteId: note._id.toString(),
+              authorName: `${user.firstName} ${user.lastName}`,
+            },
+            new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
+          );
+        } catch (notificationError) {
+          console.error("Failed to create notification for directed note:", notificationError);
+          // Don't fail the note creation if notification fails
+        }
       }
-      const title = "Assessment Follow-Up Reminder";
-      const message = `Follow-up for patient ${patient?.firstName || ""} ${patient?.lastName || ""} is due on ${new Date(updated.followUpDate).toLocaleDateString()}.`;
-      await notificationService.createNotification(
-        userId,
-        "assessment_followup",
-        title,
-        message,
-        { patientId: updated.patientId.toString(), assessmentId: updated._id.toString(), followUpDate: updated.followUpDate },
-        updated.followUpDate
-      );
+
+      await logActivity(user.id, "create_note", "note", note._id.toString(), { content: content.trim(), isPrivate, directedTo: finalDirectedTo, directedToName: finalDirectedToName, parentNoteId });
+      res.status(201).json(note);
+    } catch (error) {
+      console.error("Error creating note:", error);
+      res.status(500).json({ message: "Failed to create note" });
     }
-    res.json({ ...updated, id: updated._id.toString() });
   });
-  app.delete("/api/assessments/:assessmentId", isAuthenticated, async (req, res) => {
-    await PatientAssessment.findByIdAndDelete(req.params.assessmentId);
-    res.status(204).end();
+
+  app.put("/api/notes/:noteId", isAuthenticated, async (req: any, res) => {
+    try {
+      const { noteId } = req.params;
+      const { content } = req.body;
+      const user = await storage.getUser(req.user.id);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const note = await PatientNote.findById(noteId);
+      if (!note) {
+        return res.status(404).json({ message: "Note not found" });
+      }
+
+      // Only author or admin can edit
+      if (note.authorId.toString() !== user.id && user.role !== "admin") {
+        return res.status(403).json({ message: "Not authorized to edit this note" });
+      }
+
+      if (!content || content.trim().length === 0) {
+        return res.status(400).json({ message: "Note content is required" });
+      }
+
+      note.content = content.trim();
+      await note.save();
+
+      // Log activity
+      await logActivity(user.id, "update_note", "note", note._id.toString(), {
+        content: content.trim(),
+      });
+
+      res.json(note);
+    } catch (error) {
+      console.error("Error updating patient note:", error);
+      res.status(500).json({ message: "Failed to update note" });
+    }
+  });
+
+  app.delete("/api/notes/:noteId", isAuthenticated, async (req: any, res) => {
+    try {
+      const { noteId } = req.params;
+      const user = await storage.getUser(req.user.id);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const note = await PatientNote.findById(noteId);
+      if (!note) {
+        return res.status(404).json({ message: "Note not found" });
+      }
+
+      // Only author or admin can delete
+      if (note.authorId.toString() !== user.id && user.role !== "admin") {
+        return res.status(403).json({ message: "Not authorized to delete this note" });
+      }
+
+      await PatientNote.findByIdAndDelete(noteId);
+
+      // Log activity
+      await logActivity(user.id, "delete_note", "note", note._id.toString());
+
+      res.json({ message: "Note deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting patient note:", error);
+      res.status(500).json({ message: "Failed to delete note" });
+    }
+  });
+
+  // Staff list endpoint for directed notes (accessible by admins and therapists)
+  app.get("/api/staff/list", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+
+      // Only admins and therapists can view staff list
+      if (user?.role !== "admin" && user?.role !== "therapist") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const staff = await storage.getStaff();
+      
+      // Return only basic info needed for directed notes
+      const staffList = staff.map((member: any) => ({
+        id: member.id,
+        firstName: member.firstName,
+        lastName: member.lastName,
+        role: member.role,
+      }));
+
+      console.log(`📋 Staff list for directed notes:`, staffList);
+
+      // Validate that all staff members have valid IDs
+      for (const member of staffList) {
+        const user = await storage.getUser(member.id);
+        if (!user) {
+          console.log(`⚠️ Warning: Staff member ${member.firstName} ${member.lastName} has invalid ID: ${member.id}`);
+        }
+      }
+
+      res.json(staffList);
+    } catch (error) {
+      console.error("Error fetching staff list:", error);
+      res.status(500).json({ message: "Failed to fetch staff list" });
+    }
+  });
+
+  // Get total note count for patient (admin only)
+  app.get("/api/patients/:id/notes/count", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const user = await storage.getUser(req.user.id);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Only admins can see total count
+      if (user.role !== "admin") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const totalCount = await PatientNote.countDocuments({ patientId: id });
+      res.json({ total: totalCount });
+    } catch (error) {
+      console.error("Error fetching note count:", error);
+      res.status(500).json({ message: "Failed to fetch note count" });
+    }
+  });
+
+  // Auto-cleanup old notes (older than 24 hours)
+  app.post("/api/notes/cleanup", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.id);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Only admins can trigger cleanup
+      if (user.role !== "admin") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000); // 24 hours ago
+      
+      const result = await PatientNote.deleteMany({
+        createdAt: { $lt: oneDayAgo }
+      });
+
+      console.log(`🧹 Cleaned up ${result.deletedCount} old notes (older than 24 hours)`);
+
+      // Log activity
+      await logActivity(user.id, "cleanup_notes", "system", "notes_cleanup", {
+        deletedCount: result.deletedCount,
+        cutoffDate: oneDayAgo
+      });
+
+      res.json({ 
+        message: `Cleaned up ${result.deletedCount} old notes`,
+        deletedCount: result.deletedCount,
+        cutoffDate: oneDayAgo
+      });
+    } catch (error) {
+      console.error("Error cleaning up old notes:", error);
+      res.status(500).json({ message: "Failed to cleanup old notes" });
+    }
+  });
+
+  // Get cleanup statistics (admin only)
+  app.get("/api/notes/cleanup-stats", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.id);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Only admins can see cleanup stats
+      if (user.role !== "admin") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const oldNotesCount = await PatientNote.countDocuments({
+        createdAt: { $lt: oneDayAgo }
+      });
+
+      const totalNotesCount = await PatientNote.countDocuments({});
+
+      res.json({
+        oldNotesCount,
+        totalNotesCount,
+        cutoffDate: oneDayAgo,
+        willBeCleaned: oldNotesCount
+      });
+    } catch (error) {
+      console.error("Error fetching cleanup stats:", error);
+      res.status(500).json({ message: "Failed to fetch cleanup stats" });
+    }
+  });
+
+  // Get patient changes summary for front desk
+  app.get("/api/patient-changes", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.id);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Only front desk staff can access this (temporarily allow all for testing)
+      // if (user.role !== "frontdesk") {
+      //   return res.status(403).json({ message: "Access denied" });
+      // }
+
+      const { since } = req.query;
+      let startDate: Date;
+
+      if (since === "last-login") {
+        // Get user's last login from audit logs
+        const lastLogin = await storage.db.collection("auditlogs").findOne(
+          { 
+            userId: user.id, 
+            action: "login" 
+          },
+          { 
+            sort: { createdAt: -1 },
+            limit: 2 // Get second to last login (current login is the latest)
+          }
+        );
+        
+        if (lastLogin) {
+          startDate = new Date(lastLogin.createdAt);
+          console.log(`🔍 Patient changes debug - Last login found: ${startDate}`);
+        } else {
+          // If no previous login found, default to 7 days ago to show more recent changes
+          startDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+          console.log(`🔍 Patient changes debug - No last login, using 7 days ago: ${startDate}`);
+        }
+      } else {
+        // Use provided date or default to 7 days ago
+        startDate = since ? new Date(since) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        console.log(`🔍 Patient changes debug - Using provided date: ${startDate}`);
+      }
+
+      const endDate = new Date();
+
+      // Get new patients created
+      const newPatients = await Patient.find({
+        createdAt: { $gte: startDate, $lte: endDate }
+      }).populate("createdBy", "firstName lastName");
+
+      console.log(`🔍 Patient changes debug - New patients found: ${newPatients.length}`);
+
+      // Get patients with status changes
+      const statusChanges = await Patient.find({
+        updatedAt: { $gte: startDate, $lte: endDate },
+        $or: [
+          { status: { $exists: true } },
+          { assignedTherapistId: { $exists: true } },
+          { important: { $exists: true } }
+        ]
+      }).populate("createdBy", "firstName lastName")
+        .populate("assignedTherapistId", "firstName lastName");
+
+      console.log(`🔍 Patient changes debug - Status changes found: ${statusChanges.length}`);
+      statusChanges.forEach(patient => {
+        console.log(`🔍 Patient changes debug - Patient: ${patient.firstName} ${patient.lastName}, Updated: ${patient.updatedAt}, Assigned: ${patient.assignedTherapistId ? 'Yes' : 'No'}`);
+      });
+
+      // Get audit logs for patient-related actions
+      const patientActions = await storage.db.collection("auditlogs").find({
+        createdAt: { $gte: startDate, $lte: endDate },
+        resourceType: "patient",
+        $or: [
+          { action: "create_patient" },
+          { action: "update_patient" },
+          { action: "assign_therapist" },
+          { action: "mark_important" }
+        ]
+      }).toArray();
+
+      // Process and categorize changes
+      const changes = {
+        newPatients: newPatients.map(patient => ({
+          id: patient._id,
+          name: `${patient.firstName} ${patient.lastName}`,
+          createdBy: patient.createdBy ? `${patient.createdBy.firstName} ${patient.createdBy.lastName}` : "Unknown",
+          createdAt: patient.createdAt,
+          status: patient.status,
+          assignedTherapist: patient.assignedTherapistId ? `${(patient.assignedTherapistId as any).firstName} ${(patient.assignedTherapistId as any).lastName}` : null
+        })),
+        statusChanges: statusChanges.filter(patient => {
+          // Only include if there were actual changes (not just new patients)
+          const isOldPatient = patient.createdAt < startDate;
+          console.log(`🔍 Patient changes debug - ${patient.firstName} ${patient.lastName}: createdAt=${patient.createdAt}, startDate=${startDate}, isOldPatient=${isOldPatient}`);
+          return isOldPatient;
+        }).map(patient => ({
+          id: patient._id,
+          name: `${patient.firstName} ${patient.lastName}`,
+          status: patient.status,
+          assignedTherapist: patient.assignedTherapistId ? `${(patient.assignedTherapistId as any).firstName} ${(patient.assignedTherapistId as any).lastName}` : null,
+          important: patient.important,
+          updatedAt: patient.updatedAt
+        })),
+         therapistAssignments: statusChanges.filter(patient => {
+           const hasTherapist = !!patient.assignedTherapistId;
+           console.log(`🔍 Therapist assignment debug - ${patient.firstName} ${patient.lastName}: hasTherapist=${hasTherapist}, assignedTherapistId=${patient.assignedTherapistId}`);
+           return hasTherapist;
+         }).map(patient => ({
+           id: patient._id,
+           name: `${patient.firstName} ${patient.lastName}`,
+           therapist: patient.assignedTherapistId ? `${(patient.assignedTherapistId as any).firstName} ${(patient.assignedTherapistId as any).lastName}` : null,
+           updatedAt: patient.updatedAt
+         })),
+        importantUpdates: statusChanges.filter(patient => 
+          patient.important && patient.createdAt < startDate
+        ).map(patient => ({
+          id: patient._id,
+          name: `${patient.firstName} ${patient.lastName}`,
+          updatedAt: patient.updatedAt
+        }))
+      };
+
+      res.json({
+        changes,
+        summary: {
+          newPatientsCount: changes.newPatients.length,
+          statusChangesCount: changes.statusChanges.length,
+          therapistAssignmentsCount: changes.therapistAssignments.length,
+          importantUpdatesCount: changes.importantUpdates.length,
+          totalChanges: changes.newPatients.length + changes.statusChanges.length + changes.therapistAssignments.length + changes.importantUpdates.length
+        },
+        dateRange: {
+          start: startDate,
+          end: endDate
+        }
+      });
+    } catch (error) {
+      console.error("Error fetching patient changes:", error);
+      res.status(500).json({ message: "Failed to fetch patient changes" });
+    }
   });
 
   const httpServer = createServer(app);

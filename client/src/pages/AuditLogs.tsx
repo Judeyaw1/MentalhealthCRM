@@ -29,6 +29,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import {
   Activity,
@@ -88,6 +89,8 @@ export default function AuditLogs() {
     search: "",
   });
   const [uniqueLoginCount, setUniqueLoginCount] = useState<number | null>(null);
+  const [showResetDialog, setShowResetDialog] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
 
   // Redirect to home if not authenticated
   useEffect(() => {
@@ -282,6 +285,25 @@ export default function AuditLogs() {
     });
   };
 
+  const handleResetLogs = async () => {
+    setResetLoading(true);
+    try {
+      const response = await fetch("/api/audit-logs/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Failed to reset logs");
+      toast({ title: "Logs Reset", description: "All audit logs have been deleted." });
+      setShowResetDialog(false);
+      window.location.reload();
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to reset logs.", variant: "destructive" });
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
   if (authLoading || logsLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -348,51 +370,42 @@ export default function AuditLogs() {
               </div>
             )}
             {/* Page Header */}
-            <div className="mb-8">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 mb-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => (window.location.href = "/dashboard")}
-                    className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
-                  >
-                    <ArrowLeft className="h-4 w-4" />
+            <div className="mb-8 flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl font-semibold text-gray-900 flex items-center gap-2">
+                  <Activity className="h-6 w-6 text-blue-600" /> Audit Logs
+                </h1>
+                <p className="text-gray-600 mt-1">Track all system activity and changes.</p>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => refetch()}
+                  className="flex items-center gap-2"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Refresh
+                </Button>
+                <Button
+                  onClick={handleExport}
+                  className="flex items-center gap-2"
+                >
+                  <Download className="h-4 w-4" />
+                  Export
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleReset}
+                  className="flex items-center gap-2"
+                >
+                  <Filter className="h-4 w-4" />
+                  Reset Filters
+                </Button>
+                {user?.role === "admin" && (
+                  <Button variant="destructive" onClick={() => setShowResetDialog(true)}>
+                    <Trash className="h-4 w-4 mr-2" /> Reset Logs
                   </Button>
-                  <div>
-                    <h1 className="text-2xl font-semibold text-gray-900">
-                      Audit Logs
-                    </h1>
-                    <p className="text-gray-600 mt-1">
-                      Monitor system activity and track user actions for compliance and security.
-                    </p>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => refetch()}
-                    className="flex items-center gap-2"
-                  >
-                    <RefreshCw className="h-4 w-4" />
-                    Refresh
-                  </Button>
-                  <Button
-                    onClick={handleExport}
-                    className="flex items-center gap-2"
-                  >
-                    <Download className="h-4 w-4" />
-                    Export
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={handleReset}
-                    className="flex items-center gap-2"
-                  >
-                    <Filter className="h-4 w-4" />
-                    Reset Filters
-                  </Button>
-                </div>
+                )}
               </div>
             </div>
 
@@ -696,6 +709,24 @@ export default function AuditLogs() {
               )}
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showResetDialog} onOpenChange={setShowResetDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reset Audit Logs</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-red-700 font-semibold mb-2">Are you sure you want to delete all audit logs?</p>
+            <p className="text-gray-600">This action cannot be undone. All system activity history will be permanently removed.</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowResetDialog(false)} disabled={resetLoading}>Cancel</Button>
+            <Button variant="destructive" onClick={handleResetLogs} disabled={resetLoading}>
+              {resetLoading ? "Resetting..." : "Reset Logs"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

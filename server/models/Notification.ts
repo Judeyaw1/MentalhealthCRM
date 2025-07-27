@@ -15,6 +15,7 @@ const NotificationSchema = new mongoose.Schema({
       'inquiry_received',
       'staff_invitation',
       'password_reset',
+      'directed_note',
       'general',
       'assessment_followup'
     ]

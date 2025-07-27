@@ -415,19 +415,11 @@ export function Header({ onSearch }: HeaderProps) {
                     </div>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem
-                      onClick={() => {
-                        /* TODO: Navigate to profile */
-                      }}
-                    >
-                      Profile
+                    <DropdownMenuItem asChild>
+                      <Link href="/settings#account-info">Profile</Link>
                     </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => {
-                        /* TODO: Navigate to settings */
-                      }}
-                    >
-                      Settings
+                    <DropdownMenuItem asChild>
+                      <Link href="/settings">Settings</Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem

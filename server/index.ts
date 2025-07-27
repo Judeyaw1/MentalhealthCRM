@@ -11,6 +11,7 @@ import { setupVite, serveStatic, log } from "./vite";
 import { connectToMongo } from "./mongo";
 import mongoose from "mongoose";
 import { storage } from "./storage";
+import { PatientNote } from "./models/PatientNote";
 
 const app = express();
 app.use(express.json());
@@ -70,6 +71,29 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
+  // Auto-cleanup function for old notes
+  const cleanupOldNotes = async () => {
+    try {
+      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000); // 24 hours ago
+      
+      const result = await PatientNote.deleteMany({
+        createdAt: { $lt: oneDayAgo }
+      });
+
+      if (result.deletedCount > 0) {
+        log(`🧹 Auto-cleanup: Removed ${result.deletedCount} old notes (older than 24 hours)`);
+      }
+    } catch (error) {
+      log(`❌ Auto-cleanup error: ${error}`);
+    }
+  };
+
+  // Run cleanup every 6 hours
+  setInterval(cleanupOldNotes, 6 * 60 * 60 * 1000);
+  
+  // Run initial cleanup after 1 minute
+  setTimeout(cleanupOldNotes, 60 * 1000);
+
   // Serve the app on port 3000 for local development
   const port = process.env.PORT || 3000;
   server.listen(
@@ -79,6 +103,7 @@ app.use((req, res, next) => {
     },
     () => {
       log(`serving on port ${port}`);
+      log(`🧹 Auto-cleanup scheduled: every 6 hours, removes notes older than 24 hours`);
     },
   );
 })();

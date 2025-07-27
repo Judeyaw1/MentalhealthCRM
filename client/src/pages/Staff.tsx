@@ -339,15 +339,11 @@ export default function Staff() {
 
                           <div className="mt-4 pt-4 border-t border-gray-200">
                             <div className="flex flex-col space-y-2">
-                              <div className="flex space-x-2" onClick={e => e.stopPropagation()}>
+                              <div className="flex flex-wrap gap-2" onClick={e => e.stopPropagation()}>
                                 <EditStaffForm staffMember={member} />
                                 <ResetPasswordForm staffMember={member} />
+                                {member.role !== "admin" && <RemoveStaffForm staffMember={member} />}
                               </div>
-                              {member.role !== "admin" && (
-                                <div onClick={e => e.stopPropagation()}>
-                                  <RemoveStaffForm staffMember={member} />
-                                </div>
-                              )}
                             </div>
                           </div>
                         </CardContent>

@@ -23,6 +23,7 @@ export type NotificationType =
   | 'inquiry_received'
   | 'staff_invitation'
   | 'password_reset'
+  | 'directed_note'
   | 'general';
 
 export interface NotificationPreferences {
@@ -401,6 +402,7 @@ export class NotificationService {
       inquiry_received: 0,
       staff_invitation: 0,
       password_reset: 0,
+      directed_note: 0,
       general: 0,
     };
     

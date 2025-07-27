@@ -106,6 +106,10 @@ const patientSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  important: {
+    type: Boolean,
+    default: false,
+  },
   assignedTherapistId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",

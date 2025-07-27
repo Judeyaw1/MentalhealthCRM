@@ -8,12 +8,15 @@ import { StatsCards } from "@/components/dashboard/StatsCards";
 import { RecentPatients } from "@/components/dashboard/RecentPatients";
 import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
 import { QuickActions } from "@/components/dashboard/QuickActions";
+import PatientChangesSummary from "@/components/dashboard/PatientChangesSummary";
 import { Button } from "@/components/ui/button";
 import { Download, Plus, UserCheck, User } from "lucide-react";
 import { Link } from "wouter";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import type { DashboardStats } from "@/components/dashboard/StatsCards";
 import { Card } from "@/components/ui/card";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import * as XLSX from "xlsx";
 
 export default function Dashboard() {
   const { toast } = useToast();
@@ -76,6 +79,81 @@ export default function Dashboard() {
     refetchInterval: 10000,
   });
 
+  const handleExportReport = async (format: string) => {
+    // Gather data
+    const statsSection = [
+      ["Metric", "Value"],
+      ["Total Patients", statsData.totalPatients],
+      ["Today's Appointments", statsData.todayAppointments],
+      ["Active Treatments", statsData.activeTreatments],
+      ["Treatment Completion Rate", statsData.treatmentCompletionRate],
+      ["Monthly Appointments", statsData.monthlyAppointments],
+      ["Completed Appointments", statsData.completedAppointments],
+      ["Upcoming Appointments", statsData.upcomingAppointments],
+      ["Appointments Needing Review", statsData.appointmentsNeedingReview],
+    ];
+    const patientsSection = [
+      ["ID", "Name", "Email", "Status", "Joined"],
+      ...(Array.isArray(recentPatients)
+        ? recentPatients.map((p: any) => [
+            p.id,
+            `${p.firstName} ${p.lastName}`,
+            p.email,
+            p.status,
+            p.createdAt ? new Date(p.createdAt).toLocaleDateString() : ""
+          ])
+        : []),
+    ];
+    const appointmentsSection = [
+      ["ID", "Patient", "Therapist", "Date", "Type", "Status"],
+      ...(Array.isArray(todayAppointments)
+        ? todayAppointments.map((a: any) => [
+            a.id,
+            a.patientName || "",
+            a.therapistName || "",
+            a.appointmentDate ? new Date(a.appointmentDate).toLocaleString() : "",
+            a.type,
+            a.status
+          ])
+        : []),
+    ];
+
+    if (format === "csv") {
+      // CSV: concatenate all sections with headers
+      const csv = [
+        "Dashboard Stats",
+        statsSection.map(row => row.join(",")).join("\n"),
+        "",
+        "Recent Patients",
+        patientsSection.map(row => row.join(",")).join("\n"),
+        "",
+        "Today's Appointments",
+        appointmentsSection.map(row => row.join(",")).join("\n"),
+      ].join("\n");
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `dashboard-report-${new Date().toISOString().split("T")[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast({ title: "Export Successful", description: "Dashboard report exported as CSV." });
+    } else if (format === "excel") {
+      // Excel: each section as a sheet
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(statsSection), "Stats");
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(patientsSection), "Recent Patients");
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(appointmentsSection), "Today's Appointments");
+      XLSX.writeFile(wb, `dashboard-report-${new Date().toISOString().split("T")[0]}.xlsx`);
+      toast({ title: "Export Successful", description: "Dashboard report exported as Excel." });
+    } else if (format === "pdf") {
+      // Placeholder: PDF export can be implemented with jsPDF or similar
+      toast({ title: "PDF Export Not Implemented", description: "PDF export will be available soon." });
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -112,13 +190,19 @@ export default function Dashboard() {
                   </p>
                 </div>
                 <div className="flex space-x-3">
-                  <Button
-                    variant="outline"
-                    className="flex items-center space-x-2"
-                  >
-                    <Download className="h-4 w-4" />
-                    <span>Export Report</span>
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" className="flex items-center space-x-2">
+                        <Download className="h-4 w-4" />
+                        <span>Export Report</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => handleExportReport("csv")}>Export as CSV</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleExportReport("excel")}>Export as Excel</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleExportReport("pdf")}>Export as PDF</DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                   <Link href="/patients/new">
                     <Button className="flex items-center space-x-2">
                       <Plus className="h-4 w-4" />
@@ -132,6 +216,11 @@ export default function Dashboard() {
             {/* Stats Cards */}
             <div className="mb-8">
               <StatsCards stats={statsData} isLoading={statsLoading} />
+            </div>
+
+            {/* Patient Changes Summary - Only for Front Desk */}
+            <div className="mb-8">
+              <PatientChangesSummary />
             </div>
 
             {/* Main Content Grid: Recent Patients and Today's Schedule side-by-side */}

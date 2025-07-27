@@ -132,6 +132,17 @@ export function NotificationBell() {
       }
       
       if (notification.data.patientId) {
+        // Check if it's a directed note notification
+        if (notification.type === "directed_note" && notification.data.noteId) {
+          // Navigate to patient detail page with notes tab
+          toast({
+            title: "Opening directed note",
+            description: "Taking you to the patient's notes...",
+          });
+          setLocation(`/patients/${notification.data.patientId}?tab=notes`);
+          return;
+        }
+        
         // Navigate to patient detail
         toast({
           title: "Opening patient",
@@ -176,6 +187,8 @@ export function NotificationBell() {
         return <Calendar className="h-4 w-4 text-blue-500" />;
       case "patient_update":
         return <User className="h-4 w-4 text-green-500" />;
+      case "directed_note":
+        return <FileText className="h-4 w-4 text-purple-500" />;
       case "system_alert":
         return <AlertTriangle className="h-4 w-4 text-red-500" />;
       case "treatment_completion":

@@ -357,23 +357,30 @@ export function DataTable<T>({
 
               {/* Export */}
               {onExport && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleExport}
-                        className="h-8 w-8 p-0"
-                      >
-                        <Download className="h-4 w-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Export data</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Export data</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => onExport()}>Export all</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onBulkAction && onBulkAction("export-csv")}>Export selected</DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
 
               {/* Settings */}
@@ -437,57 +444,7 @@ export function DataTable<T>({
               <span className="text-sm text-gray-600">
                 {selectedCount} item{selectedCount !== 1 ? "s" : ""} selected
               </span>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleBulkAction("export")}
-                  className="flex items-center gap-2"
-                >
-                  <Download className="h-4 w-4" />
-                  Export Selected
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleBulkAction("delete")}
-                  className="flex items-center gap-2"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Delete Selected
-                </Button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm">
-                      <MoreHorizontal className="h-4 w-4" />
-                      More Actions
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => handleBulkAction("copy")}>
-                      <Copy className="h-4 w-4 mr-2" />
-                      Copy Selected
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleBulkAction("star")}>
-                      <Star className="h-4 w-4 mr-2" />
-                      Mark as Important
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      onClick={() => handleBulkAction("schedule")}
-                    >
-                      <Calendar className="h-4 w-4 mr-2" />
-                      Schedule Follow-up
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => handleBulkAction("assign")}
-                    >
-                      <User className="h-4 w-4 mr-2" />
-                      Assign Therapist
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
+              {/* Removed More Actions dropdown for a cleaner UI */}
             </div>
           </div>
         )}

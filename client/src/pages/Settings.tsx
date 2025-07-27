@@ -54,12 +54,6 @@ interface NotificationSettings {
   };
 }
 
-interface AppearanceSettings {
-  theme: "light" | "dark" | "system";
-  compactMode: boolean;
-  showAnimations: boolean;
-}
-
 export default function Settings() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
@@ -86,12 +80,6 @@ export default function Settings() {
       start: "22:00",
       end: "08:00",
     },
-  });
-
-  const [appearanceSettings, setAppearanceSettings] = useState<AppearanceSettings>({
-    theme: "system",
-    compactMode: false,
-    showAnimations: true,
   });
 
   // Password change dialog
@@ -154,7 +142,7 @@ export default function Settings() {
 
   // Update settings mutation
   const updateSettingsMutation = useMutation({
-    mutationFn: async (data: { notifications: NotificationSettings; appearance: AppearanceSettings }) => {
+    mutationFn: async (data: { notifications: NotificationSettings }) => {
       const response = await fetch("/api/auth/update-settings", {
         method: "PUT",
         headers: {
@@ -261,7 +249,6 @@ export default function Settings() {
   const handleSettingsSave = () => {
     updateSettingsMutation.mutate({
       notifications: notificationSettings,
-      appearance: appearanceSettings,
     });
   };
 
@@ -379,615 +366,487 @@ export default function Settings() {
               </div>
             </div>
 
-            <Tabs defaultValue="profile" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="profile" className="flex items-center gap-2">
-                  <User className="h-4 w-4" />
-                  Profile
-                </TabsTrigger>
-                <TabsTrigger value="security" className="flex items-center gap-2">
-                  <Shield className="h-4 w-4" />
-                  Security
-                </TabsTrigger>
-                <TabsTrigger value="notifications" className="flex items-center gap-2">
-                  <Bell className="h-4 w-4" />
-                  Notifications
-                </TabsTrigger>
-                <TabsTrigger value="appearance" className="flex items-center gap-2">
-                  <Palette className="h-4 w-4" />
-                  Appearance
-                </TabsTrigger>
-              </TabsList>
-
-              {/* Profile Tab */}
-              <TabsContent value="profile" className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <User className="h-5 w-5" />
-                      Account Information
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    {/* Current Profile Display */}
-                    {!isEditingProfile && (
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h3 className="text-lg font-medium text-gray-900">
-                              {user?.firstName} {user?.lastName}
-                            </h3>
-                            <p className="text-gray-600">{user?.email}</p>
-                            <div className="flex items-center gap-2 mt-2">
-                              <Badge variant={getRoleBadgeVariant(user?.role)}>
-                                {getUserRoleDisplay(user?.role)}
-                              </Badge>
-                              <span className="text-sm text-gray-500">
-                                Member since {user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : "Unknown"}
-                              </span>
-                            </div>
-                          </div>
-                          <Button
-                            onClick={() => setIsEditingProfile(true)}
-                            className="flex items-center gap-2"
-                          >
-                            <Edit className="h-4 w-4" />
-                            Edit Profile
-                          </Button>
+            {/* Profile Section */}
+            <Card className="mb-6" id="account-info">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <User className="h-5 w-5" />
+                  Account Information
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Current Profile Display */}
+                {!isEditingProfile && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-lg font-medium text-gray-900">
+                          {user?.firstName} {user?.lastName}
+                        </h3>
+                        <p className="text-gray-600">{user?.email}</p>
+                        <div className="flex items-center gap-2 mt-2">
+                          <Badge variant={getRoleBadgeVariant(user?.role)}>
+                            {getUserRoleDisplay(user?.role)}
+                          </Badge>
+                          <span className="text-sm text-gray-500">
+                            Member since {user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : "Unknown"}
+                          </span>
                         </div>
                       </div>
-                    )}
+                      <Button
+                        onClick={() => setIsEditingProfile(true)}
+                        className="flex items-center gap-2"
+                      >
+                        <Edit className="h-4 w-4" />
+                        Edit Profile
+                      </Button>
+                    </div>
+                  </div>
+                )}
 
-                    {/* Profile Edit Form */}
-                    {isEditingProfile && (
-                      <form onSubmit={handleProfileSubmit} className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <Label htmlFor="firstName">First Name</Label>
-                            <Input
-                              id="firstName"
-                              value={profileData.firstName}
-                              onChange={(e) =>
-                                setProfileData((prev) => ({
-                                  ...prev,
-                                  firstName: e.target.value,
-                                }))
-                              }
-                              required
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor="lastName">Last Name</Label>
-                            <Input
-                              id="lastName"
-                              value={profileData.lastName}
-                              onChange={(e) =>
-                                setProfileData((prev) => ({
-                                  ...prev,
-                                  lastName: e.target.value,
-                                }))
-                              }
-                              required
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <Label htmlFor="email">Email Address</Label>
-                          <Input
-                            id="email"
-                            type="email"
-                            value={profileData.email}
-                            onChange={(e) =>
-                              setProfileData((prev) => ({
-                                ...prev,
-                                email: e.target.value,
-                              }))
-                            }
-                            required
-                          />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            type="submit"
-                            disabled={updateProfileMutation.isPending}
-                            className="flex items-center gap-2"
-                          >
-                            {updateProfileMutation.isPending ? (
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                            ) : (
-                              <Save className="h-4 w-4" />
-                            )}
-                            Save Changes
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => {
-                              setIsEditingProfile(false);
-                              setProfileData({
-                                firstName: user?.firstName || "",
-                                lastName: user?.lastName || "",
-                                email: user?.email || "",
-                              });
-                            }}
-                            className="flex items-center gap-2"
-                          >
-                            <X className="h-4 w-4" />
-                            Cancel
-                          </Button>
-                        </div>
-                      </form>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              {/* Security Tab */}
-              <TabsContent value="security" className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Shield className="h-5 w-5" />
-                      Security Settings
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between p-4 border rounded-lg">
-                        <div>
-                          <h3 className="font-medium text-gray-900">Password</h3>
-                          <p className="text-sm text-gray-600">
-                            Update your password to keep your account secure
-                          </p>
-                        </div>
-                        <Button
-                          onClick={() => setShowPasswordDialog(true)}
-                          className="flex items-center gap-2"
-                        >
-                          <Key className="h-4 w-4" />
-                          Change Password
-                        </Button>
+                {/* Profile Edit Form */}
+                {isEditingProfile && (
+                  <form onSubmit={handleProfileSubmit} className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="firstName">First Name</Label>
+                        <Input
+                          id="firstName"
+                          value={profileData.firstName}
+                          onChange={(e) =>
+                            setProfileData((prev) => ({
+                              ...prev,
+                              firstName: e.target.value,
+                            }))
+                          }
+                          required
+                        />
                       </div>
-
-                      <Separator />
-
-                      <div className="flex items-center justify-between p-4 border rounded-lg">
-                        <div>
-                          <h3 className="font-medium text-gray-900">Two-Factor Authentication</h3>
-                          <p className="text-sm text-gray-600">
-                            Add an extra layer of security to your account
-                          </p>
-                        </div>
-                        <Button variant="outline" disabled>
-                          <Info className="h-4 w-4 mr-2" />
-                          Coming Soon
-                        </Button>
-                      </div>
-
-                      <Separator />
-
-                      <div className="flex items-center justify-between p-4 border rounded-lg">
-                        <div>
-                          <h3 className="font-medium text-gray-900">Session Management</h3>
-                          <p className="text-sm text-gray-600">
-                            View and manage your active sessions
-                          </p>
-                        </div>
-                        <Button variant="outline" disabled>
-                          <Info className="h-4 w-4 mr-2" />
-                          Coming Soon
-                        </Button>
+                      <div>
+                        <Label htmlFor="lastName">Last Name</Label>
+                        <Input
+                          id="lastName"
+                          value={profileData.lastName}
+                          onChange={(e) =>
+                            setProfileData((prev) => ({
+                              ...prev,
+                              lastName: e.target.value,
+                            }))
+                          }
+                          required
+                        />
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
+                    <div>
+                      <Label htmlFor="email">Email Address</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        value={profileData.email}
+                        onChange={(e) =>
+                          setProfileData((prev) => ({
+                            ...prev,
+                            email: e.target.value,
+                          }))
+                        }
+                        required
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="submit"
+                        disabled={updateProfileMutation.isPending}
+                        className="flex items-center gap-2"
+                      >
+                        {updateProfileMutation.isPending ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        ) : (
+                          <Save className="h-4 w-4" />
+                        )}
+                        Save Changes
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setIsEditingProfile(false);
+                          setProfileData({
+                            firstName: user?.firstName || "",
+                            lastName: user?.lastName || "",
+                            email: user?.email || "",
+                          });
+                        }}
+                        className="flex items-center gap-2"
+                      >
+                        <X className="h-4 w-4" />
+                        Cancel
+                      </Button>
+                    </div>
+                  </form>
+                )}
+              </CardContent>
+            </Card>
 
-              {/* Notifications Tab */}
-              <TabsContent value="notifications" className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Bell className="h-5 w-5" />
-                      Notification Preferences
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="space-y-4">
-                      {/* Email Notifications */}
-                      <div className="flex items-center justify-between p-4 border rounded-lg">
-                        <div>
-                          <h3 className="font-medium text-gray-900 flex items-center gap-2">
-                            <Mail className="h-4 w-4" />
-                            Email Notifications
-                          </h3>
-                          <p className="text-sm text-gray-600">
-                            Receive notifications via email
-                          </p>
-                        </div>
-                        <Button
-                          variant={notificationSettings.emailNotifications ? "default" : "outline"}
-                          onClick={() =>
-                            setNotificationSettings((prev) => ({
-                              ...prev,
-                              emailNotifications: !prev.emailNotifications,
-                            }))
-                          }
-                        >
-                          {notificationSettings.emailNotifications ? (
-                            <Check className="h-4 w-4" />
-                          ) : (
-                            <X className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </div>
+            {/* Security Section */}
+            <Card className="mb-6">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="h-5 w-5" />
+                  Security Settings
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-4 border rounded-lg">
+                    <div>
+                      <h3 className="font-medium text-gray-900">Password</h3>
+                      <p className="text-sm text-gray-600">
+                        Update your password to keep your account secure
+                      </p>
+                    </div>
+                    <Button
+                      onClick={() => setShowPasswordDialog(true)}
+                      className="flex items-center gap-2"
+                    >
+                      <Key className="h-4 w-4" />
+                      Change Password
+                    </Button>
+                  </div>
 
-                      {/* In-App Notifications */}
-                      <div className="flex items-center justify-between p-4 border rounded-lg">
-                        <div>
-                          <h3 className="font-medium text-gray-900 flex items-center gap-2">
-                            <Bell className="h-4 w-4" />
-                            In-App Notifications
-                          </h3>
-                          <p className="text-sm text-gray-600">
-                            Show notifications within the application
-                          </p>
-                        </div>
-                        <Button
-                          variant={notificationSettings.inAppNotifications ? "default" : "outline"}
-                          onClick={() =>
-                            setNotificationSettings((prev) => ({
-                              ...prev,
-                              inAppNotifications: !prev.inAppNotifications,
-                            }))
-                          }
-                        >
-                          {notificationSettings.inAppNotifications ? (
-                            <Check className="h-4 w-4" />
-                          ) : (
-                            <X className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </div>
+                  <Separator />
 
-                      {/* Appointment Reminders */}
-                      <div className="flex items-center justify-between p-4 border rounded-lg">
-                        <div>
-                          <h3 className="font-medium text-gray-900 flex items-center gap-2">
-                            <Calendar className="h-4 w-4" />
-                            Appointment Reminders
-                          </h3>
-                          <p className="text-sm text-gray-600">
-                            Get reminded about upcoming appointments
-                          </p>
-                        </div>
-                        <Button
-                          variant={notificationSettings.appointmentReminders ? "default" : "outline"}
-                          onClick={() =>
-                            setNotificationSettings((prev) => ({
-                              ...prev,
-                              appointmentReminders: !prev.appointmentReminders,
-                            }))
-                          }
-                        >
-                          {notificationSettings.appointmentReminders ? (
-                            <Check className="h-4 w-4" />
-                          ) : (
-                            <X className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </div>
+                  <div className="flex items-center justify-between p-4 border rounded-lg">
+                    <div>
+                      <h3 className="font-medium text-gray-900">Two-Factor Authentication</h3>
+                      <p className="text-sm text-gray-600">
+                        Add an extra layer of security to your account
+                      </p>
+                    </div>
+                    <Button variant="outline" disabled>
+                      <Info className="h-4 w-4 mr-2" />
+                      Coming Soon
+                    </Button>
+                  </div>
 
-                      {/* Patient Updates */}
-                      <div className="flex items-center justify-between p-4 border rounded-lg">
-                        <div>
-                          <h3 className="font-medium text-gray-900 flex items-center gap-2">
-                            <User className="h-4 w-4" />
-                            Patient Updates
-                          </h3>
-                          <p className="text-sm text-gray-600">
-                            Notifications about patient status changes
-                          </p>
-                        </div>
-                        <Button
-                          variant={notificationSettings.patientUpdates ? "default" : "outline"}
-                          onClick={() =>
-                            setNotificationSettings((prev) => ({
-                              ...prev,
-                              patientUpdates: !prev.patientUpdates,
-                            }))
-                          }
-                        >
-                          {notificationSettings.patientUpdates ? (
-                            <Check className="h-4 w-4" />
-                          ) : (
-                            <X className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </div>
+                  <Separator />
 
-                      {/* System Alerts */}
-                      <div className="flex items-center justify-between p-4 border rounded-lg">
-                        <div>
-                          <h3 className="font-medium text-gray-900 flex items-center gap-2">
-                            <AlertTriangle className="h-4 w-4" />
-                            System Alerts
-                          </h3>
-                          <p className="text-sm text-gray-600">
-                            Important system notifications and updates
-                          </p>
-                        </div>
-                        <Button
-                          variant={notificationSettings.systemAlerts ? "default" : "outline"}
-                          onClick={() =>
-                            setNotificationSettings((prev) => ({
-                              ...prev,
-                              systemAlerts: !prev.systemAlerts,
-                            }))
-                          }
-                        >
-                          {notificationSettings.systemAlerts ? (
-                            <Check className="h-4 w-4" />
-                          ) : (
-                            <X className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </div>
+                  <div className="flex items-center justify-between p-4 border rounded-lg">
+                    <div>
+                      <h3 className="font-medium text-gray-900">Session Management</h3>
+                      <p className="text-sm text-gray-600">
+                        View and manage your active sessions
+                      </p>
+                    </div>
+                    <Button variant="outline" disabled>
+                      <Info className="h-4 w-4 mr-2" />
+                      Coming Soon
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
-                      <Separator />
+            {/* Notification Preferences Section */}
+            <Card className="mb-6">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Bell className="h-5 w-5" />
+                  Notification Preferences
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-4">
+                  {/* Email Notifications */}
+                  <div className="flex items-center justify-between p-4 border rounded-lg">
+                    <div>
+                      <h3 className="font-medium text-gray-900 flex items-center gap-2">
+                        <Mail className="h-4 w-4" />
+                        Email Notifications
+                      </h3>
+                      <p className="text-sm text-gray-600">
+                        Receive notifications via email
+                      </p>
+                    </div>
+                    <Button
+                      variant={notificationSettings.emailNotifications ? "default" : "outline"}
+                      onClick={() =>
+                        setNotificationSettings((prev) => ({
+                          ...prev,
+                          emailNotifications: !prev.emailNotifications,
+                        }))
+                      }
+                    >
+                      {notificationSettings.emailNotifications ? (
+                        <Check className="h-4 w-4" />
+                      ) : (
+                        <X className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
 
-                      {/* Reminder Timing */}
-                      <div className="flex items-center justify-between p-4 border rounded-lg">
-                        <div>
-                          <h3 className="font-medium text-gray-900 flex items-center gap-2">
-                            <Clock className="h-4 w-4" />
-                            Reminder Timing
-                          </h3>
-                          <p className="text-sm text-gray-600">
-                            How far in advance to send appointment reminders
-                          </p>
-                        </div>
-                        <select
-                          value={notificationSettings.reminderTiming}
+                  {/* In-App Notifications */}
+                  <div className="flex items-center justify-between p-4 border rounded-lg">
+                    <div>
+                      <h3 className="font-medium text-gray-900 flex items-center gap-2">
+                        <Bell className="h-4 w-4" />
+                        In-App Notifications
+                      </h3>
+                      <p className="text-sm text-gray-600">
+                        Show notifications within the application
+                      </p>
+                    </div>
+                    <Button
+                      variant={notificationSettings.inAppNotifications ? "default" : "outline"}
+                      onClick={() =>
+                        setNotificationSettings((prev) => ({
+                          ...prev,
+                          inAppNotifications: !prev.inAppNotifications,
+                        }))
+                      }
+                    >
+                      {notificationSettings.inAppNotifications ? (
+                        <Check className="h-4 w-4" />
+                      ) : (
+                        <X className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+
+                  {/* Appointment Reminders */}
+                  <div className="flex items-center justify-between p-4 border rounded-lg">
+                    <div>
+                      <h3 className="font-medium text-gray-900 flex items-center gap-2">
+                        <Calendar className="h-4 w-4" />
+                        Appointment Reminders
+                      </h3>
+                      <p className="text-sm text-gray-600">
+                        Get reminded about upcoming appointments
+                      </p>
+                    </div>
+                    <Button
+                      variant={notificationSettings.appointmentReminders ? "default" : "outline"}
+                      onClick={() =>
+                        setNotificationSettings((prev) => ({
+                          ...prev,
+                          appointmentReminders: !prev.appointmentReminders,
+                        }))
+                      }
+                    >
+                      {notificationSettings.appointmentReminders ? (
+                        <Check className="h-4 w-4" />
+                      ) : (
+                        <X className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+
+                  {/* Patient Updates */}
+                  <div className="flex items-center justify-between p-4 border rounded-lg">
+                    <div>
+                      <h3 className="font-medium text-gray-900 flex items-center gap-2">
+                        <User className="h-4 w-4" />
+                        Patient Updates
+                      </h3>
+                      <p className="text-sm text-gray-600">
+                        Notifications about patient status changes
+                      </p>
+                    </div>
+                    <Button
+                      variant={notificationSettings.patientUpdates ? "default" : "outline"}
+                      onClick={() =>
+                        setNotificationSettings((prev) => ({
+                          ...prev,
+                          patientUpdates: !prev.patientUpdates,
+                        }))
+                      }
+                    >
+                      {notificationSettings.patientUpdates ? (
+                        <Check className="h-4 w-4" />
+                      ) : (
+                        <X className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+
+                  {/* System Alerts */}
+                  <div className="flex items-center justify-between p-4 border rounded-lg">
+                    <div>
+                      <h3 className="font-medium text-gray-900 flex items-center gap-2">
+                        <AlertTriangle className="h-4 w-4" />
+                        System Alerts
+                      </h3>
+                      <p className="text-sm text-gray-600">
+                        Important system notifications and updates
+                      </p>
+                    </div>
+                    <Button
+                      variant={notificationSettings.systemAlerts ? "default" : "outline"}
+                      onClick={() =>
+                        setNotificationSettings((prev) => ({
+                          ...prev,
+                          systemAlerts: !prev.systemAlerts,
+                        }))
+                      }
+                    >
+                      {notificationSettings.systemAlerts ? (
+                        <Check className="h-4 w-4" />
+                      ) : (
+                        <X className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+
+                  <Separator />
+
+                  {/* Reminder Timing */}
+                  <div className="flex items-center justify-between p-4 border rounded-lg">
+                    <div>
+                      <h3 className="font-medium text-gray-900 flex items-center gap-2">
+                        <Clock className="h-4 w-4" />
+                        Reminder Timing
+                      </h3>
+                      <p className="text-sm text-gray-600">
+                        How far in advance to send appointment reminders
+                      </p>
+                    </div>
+                    <select
+                      value={notificationSettings.reminderTiming}
+                      onChange={(e) =>
+                        setNotificationSettings((prev) => ({
+                          ...prev,
+                          reminderTiming: e.target.value as "15min" | "30min" | "1hour" | "1day",
+                        }))
+                      }
+                      className="px-3 py-2 border rounded-md"
+                    >
+                      <option value="15min">15 minutes</option>
+                      <option value="30min">30 minutes</option>
+                      <option value="1hour">1 hour</option>
+                      <option value="1day">1 day</option>
+                    </select>
+                  </div>
+
+                  {/* Quiet Hours */}
+                  <div className="flex items-center justify-between p-4 border rounded-lg">
+                    <div>
+                      <h3 className="font-medium text-gray-900 flex items-center gap-2">
+                        <SettingsIcon className="h-4 w-4" />
+                        Quiet Hours
+                      </h3>
+                      <p className="text-sm text-gray-600">
+                        Pause email notifications during specific hours
+                      </p>
+                    </div>
+                    <Button
+                      variant={notificationSettings.quietHours.enabled ? "default" : "outline"}
+                      onClick={() =>
+                        setNotificationSettings((prev) => ({
+                          ...prev,
+                          quietHours: {
+                            ...prev.quietHours,
+                            enabled: !prev.quietHours.enabled,
+                          },
+                        }))
+                      }
+                    >
+                      {notificationSettings.quietHours.enabled ? (
+                        <Check className="h-4 w-4" />
+                      ) : (
+                        <X className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+
+                  {notificationSettings.quietHours.enabled && (
+                    <div className="grid grid-cols-2 gap-4 p-4 border rounded-lg bg-gray-50">
+                      <div>
+                        <Label htmlFor="quietStart">Start Time</Label>
+                        <Input
+                          id="quietStart"
+                          type="time"
+                          value={notificationSettings.quietHours.start}
                           onChange={(e) =>
-                            setNotificationSettings((prev) => ({
-                              ...prev,
-                              reminderTiming: e.target.value as "15min" | "30min" | "1hour" | "1day",
-                            }))
-                          }
-                          className="px-3 py-2 border rounded-md"
-                        >
-                          <option value="15min">15 minutes</option>
-                          <option value="30min">30 minutes</option>
-                          <option value="1hour">1 hour</option>
-                          <option value="1day">1 day</option>
-                        </select>
-                      </div>
-
-                      {/* Quiet Hours */}
-                      <div className="flex items-center justify-between p-4 border rounded-lg">
-                        <div>
-                          <h3 className="font-medium text-gray-900 flex items-center gap-2">
-                            <SettingsIcon className="h-4 w-4" />
-                            Quiet Hours
-                          </h3>
-                          <p className="text-sm text-gray-600">
-                            Pause email notifications during specific hours
-                          </p>
-                        </div>
-                        <Button
-                          variant={notificationSettings.quietHours.enabled ? "default" : "outline"}
-                          onClick={() =>
                             setNotificationSettings((prev) => ({
                               ...prev,
                               quietHours: {
                                 ...prev.quietHours,
-                                enabled: !prev.quietHours.enabled,
+                                start: e.target.value,
                               },
                             }))
                           }
-                        >
-                          {notificationSettings.quietHours.enabled ? (
-                            <Check className="h-4 w-4" />
-                          ) : (
-                            <X className="h-4 w-4" />
-                          )}
-                        </Button>
+                        />
                       </div>
-
-                      {notificationSettings.quietHours.enabled && (
-                        <div className="grid grid-cols-2 gap-4 p-4 border rounded-lg bg-gray-50">
-                          <div>
-                            <Label htmlFor="quietStart">Start Time</Label>
-                            <Input
-                              id="quietStart"
-                              type="time"
-                              value={notificationSettings.quietHours.start}
-                              onChange={(e) =>
-                                setNotificationSettings((prev) => ({
-                                  ...prev,
-                                  quietHours: {
-                                    ...prev.quietHours,
-                                    start: e.target.value,
-                                  },
-                                }))
-                              }
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor="quietEnd">End Time</Label>
-                            <Input
-                              id="quietEnd"
-                              type="time"
-                              value={notificationSettings.quietHours.end}
-                              onChange={(e) =>
-                                setNotificationSettings((prev) => ({
-                                  ...prev,
-                                  quietHours: {
-                                    ...prev.quietHours,
-                                    end: e.target.value,
-                                  },
-                                }))
-                              }
-                            />
-                          </div>
-                        </div>
-                      )}
-
-                      <Separator />
-
-                      {/* Test Notifications */}
-                      <div className="space-y-4">
-                        <h3 className="font-medium text-gray-900 flex items-center gap-2">
-                          <TestTube className="h-4 w-4" />
-                          Test Notifications
-                        </h3>
-                        <p className="text-sm text-gray-600">
-                          Send test notifications to verify your settings are working correctly
-                        </p>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <Button
-                            variant="outline"
-                            onClick={() => setShowTestDialog(true)}
-                            className="flex items-center gap-2"
-                          >
-                            <Bell className="h-4 w-4" />
-                            Test In-App Notification
-                          </Button>
-                          
-                          <Button
-                            variant="outline"
-                            onClick={() => handleTestEmail("appointment_reminder")}
-                            disabled={testEmailMutation.isPending}
-                            className="flex items-center gap-2"
-                          >
-                            <Mail className="h-4 w-4" />
-                            Test Email Notification
-                          </Button>
-                        </div>
-                      </div>
-
-                      <div className="flex justify-end">
-                        <Button
-                          onClick={handleSettingsSave}
-                          disabled={updateSettingsMutation.isPending}
-                          className="flex items-center gap-2"
-                        >
-                          {updateSettingsMutation.isPending ? (
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                          ) : (
-                            <Save className="h-4 w-4" />
-                          )}
-                          Save Settings
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              {/* Appearance Tab */}
-              <TabsContent value="appearance" className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Palette className="h-5 w-5" />
-                      Appearance Settings
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between p-4 border rounded-lg">
-                        <div>
-                          <h3 className="font-medium text-gray-900">Theme</h3>
-                          <p className="text-sm text-gray-600">
-                            Choose your preferred color theme
-                          </p>
-                        </div>
-                        <select
-                          value={appearanceSettings.theme}
+                      <div>
+                        <Label htmlFor="quietEnd">End Time</Label>
+                        <Input
+                          id="quietEnd"
+                          type="time"
+                          value={notificationSettings.quietHours.end}
                           onChange={(e) =>
-                            setAppearanceSettings((prev) => ({
+                            setNotificationSettings((prev) => ({
                               ...prev,
-                              theme: e.target.value as "light" | "dark" | "system",
+                              quietHours: {
+                                ...prev.quietHours,
+                                end: e.target.value,
+                              },
                             }))
                           }
-                          className="px-3 py-2 border rounded-md"
-                        >
-                          <option value="light">Light</option>
-                          <option value="dark">Dark</option>
-                          <option value="system">System</option>
-                        </select>
-                      </div>
-
-                      <div className="flex items-center justify-between p-4 border rounded-lg">
-                        <div>
-                          <h3 className="font-medium text-gray-900">Compact Mode</h3>
-                          <p className="text-sm text-gray-600">
-                            Reduce spacing for a more compact layout
-                          </p>
-                        </div>
-                        <Button
-                          variant={appearanceSettings.compactMode ? "default" : "outline"}
-                          onClick={() =>
-                            setAppearanceSettings((prev) => ({
-                              ...prev,
-                              compactMode: !prev.compactMode,
-                            }))
-                          }
-                        >
-                          {appearanceSettings.compactMode ? (
-                            <Check className="h-4 w-4" />
-                          ) : (
-                            <X className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </div>
-
-                      <div className="flex items-center justify-between p-4 border rounded-lg">
-                        <div>
-                          <h3 className="font-medium text-gray-900">Animations</h3>
-                          <p className="text-sm text-gray-600">
-                            Enable smooth animations and transitions
-                          </p>
-                        </div>
-                        <Button
-                          variant={appearanceSettings.showAnimations ? "default" : "outline"}
-                          onClick={() =>
-                            setAppearanceSettings((prev) => ({
-                              ...prev,
-                              showAnimations: !prev.showAnimations,
-                            }))
-                          }
-                        >
-                          {appearanceSettings.showAnimations ? (
-                            <Check className="h-4 w-4" />
-                          ) : (
-                            <X className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </div>
-
-                      <div className="flex justify-end">
-                        <Button
-                          onClick={handleSettingsSave}
-                          disabled={updateSettingsMutation.isPending}
-                          className="flex items-center gap-2"
-                        >
-                          {updateSettingsMutation.isPending ? (
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                          ) : (
-                            <Save className="h-4 w-4" />
-                          )}
-                          Save Settings
-                        </Button>
+                        />
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
+                  )}
+
+                  <Separator />
+
+                  {/* Test Notifications */}
+                  <div className="space-y-4">
+                    <h3 className="font-medium text-gray-900 flex items-center gap-2">
+                      <TestTube className="h-4 w-4" />
+                      Test Notifications
+                    </h3>
+                    <p className="text-sm text-gray-600">
+                      Send test notifications to verify your settings are working correctly
+                    </p>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowTestDialog(true)}
+                        className="flex items-center gap-2"
+                      >
+                        <Bell className="h-4 w-4" />
+                        Test In-App Notification
+                      </Button>
+                      
+                      <Button
+                        variant="outline"
+                        onClick={() => handleTestEmail("appointment_reminder")}
+                        disabled={testEmailMutation.isPending}
+                        className="flex items-center gap-2"
+                      >
+                        <Mail className="h-4 w-4" />
+                        Test Email Notification
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end">
+                    <Button
+                      onClick={handleSettingsSave}
+                      disabled={updateSettingsMutation.isPending}
+                      className="flex items-center gap-2"
+                    >
+                      {updateSettingsMutation.isPending ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      ) : (
+                        <Save className="h-4 w-4" />
+                      )}
+                      Save Settings
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </main>
       </div>

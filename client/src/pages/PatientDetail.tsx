@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useParams } from "wouter";
+import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
@@ -38,13 +38,29 @@ import type {
 } from "@shared/schema";
 import { format, parseISO, isValid } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import PatientNotes from "@/components/patients/PatientNotes";
 
 export default function PatientDetail() {
   const params = useParams();
+  const [location] = useLocation();
   const patientId = params.id as string;
   const { toast } = useToast();
   const { isAuthenticated, isLoading: authLoading, user } = useAuth();
   const queryClient = useQueryClient();
+
+  // Get tab from URL query parameter
+  const urlParams = new URLSearchParams(location.split('?')[1]);
+  const defaultTab = urlParams.get('tab') || 'overview';
+  
+  // State for active tab
+  const [activeTab, setActiveTab] = useState(defaultTab);
+
+  // Update active tab when URL changes
+  useEffect(() => {
+    const urlParams = new URLSearchParams(location.split('?')[1]);
+    const tabFromUrl = urlParams.get('tab') || 'overview';
+    setActiveTab(tabFromUrl);
+  }, [location]);
 
   // Redirect to home if not authenticated
   useEffect(() => {
@@ -332,11 +348,12 @@ export default function PatientDetail() {
               </div>
             </div>
 
-            <Tabs defaultValue="overview" className="space-y-6">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
               <TabsList>
                 <TabsTrigger value="overview">Overview</TabsTrigger>
                 <TabsTrigger value="appointments">Appointments</TabsTrigger>
                 <TabsTrigger value="records">Treatment Records</TabsTrigger>
+                <TabsTrigger value="notes">Notes</TabsTrigger>
                 <TabsTrigger value="assessment">Assessment</TabsTrigger>
               </TabsList>
 
@@ -759,6 +776,10 @@ export default function PatientDetail() {
                     )}
                   </CardContent>
                 </Card>
+              </TabsContent>
+
+              <TabsContent value="notes">
+                <PatientNotes patientId={patientId} />
               </TabsContent>
 
               <TabsContent value="assessment">
