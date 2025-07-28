@@ -64,6 +64,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
 
+  // Serve static files (React app production build)
+  app.use(express.static(path.join(process.cwd(), 'dist/public')));
+  
+  // Serve uploads
+  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+
   // Helper function for audit logging
   const logActivity = async (
     userId: string,
@@ -193,7 +199,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         let allowAll = false;
         if (user?.role === "therapist") {
           therapistId = userId;
-        } else if (user?.role === "admin") {
+        } else if (user?.role === "admin" || user?.role === "supervisor") {
           allowAll = true;
         } else if (user?.role === "staff" || user?.role === "frontdesk") {
           // Staff and front desk cannot see any appointments
@@ -1029,15 +1035,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.id;
       const user = await storage.getUser(userId);
 
-      // Only admins can view all staff
-      if (user?.role !== "admin") {
+      // Only admins and supervisors can view staff
+      if (user?.role !== "admin" && user?.role !== "supervisor") {
         return res.status(403).json({ message: "Access denied" });
       }
 
       const staff = await storage.getStaff();
-      await logActivity(userId, "view", "staff", "list");
-
-      res.json(staff);
+      
+      // If supervisor, filter out admins
+      if (user?.role === "supervisor") {
+        const filteredStaff = staff.filter((member: any) => member.role !== "admin");
+        await logActivity(userId, "view", "staff", "list");
+        res.json(filteredStaff);
+      } else {
+        await logActivity(userId, "view", "staff", "list");
+        res.json(staff);
+      }
     } catch (error) {
       console.error("Error fetching staff:", error);
       res.status(500).json({ message: "Failed to fetch staff" });
@@ -1050,8 +1063,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.id;
       const user = await storage.getUser(userId);
 
-      // Only admins can invite staff
-      if (user?.role !== "admin") {
+      // Only admins and supervisors can invite staff
+      if (user?.role !== "admin" && user?.role !== "supervisor") {
         return res.status(403).json({ message: "Access denied" });
       }
 
@@ -1075,12 +1088,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Validate role
-      const validRoles = ["admin", "therapist", "staff", "frontdesk"];
+      const validRoles = ["admin", "supervisor", "therapist", "staff", "frontdesk"];
       if (!validRoles.includes(role)) {
         console.log("Invalid role:", role);
         return res.status(400).json({
           message:
-            "Invalid role. Must be one of: admin, therapist, staff, frontdesk",
+            "Invalid role. Must be one of: admin, supervisor, therapist, staff, frontdesk",
+        });
+      }
+
+      // Supervisors cannot invite admins
+      if (user?.role === "supervisor" && role === "admin") {
+        return res.status(403).json({
+          message: "Supervisors cannot invite administrators",
+        });
+      }
+
+      // Supervisors cannot invite other supervisors
+      if (user?.role === "supervisor" && role === "supervisor") {
+        return res.status(403).json({
+          message: "Supervisors cannot invite other supervisors",
         });
       }
 
@@ -1210,8 +1237,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.id;
       const user = await storage.getUser(userId);
 
-      // Only admins can delete staff
-      if (user?.role !== "admin") {
+      // Only admins and supervisors can delete staff
+      if (user?.role !== "admin" && user?.role !== "supervisor") {
         return res.status(403).json({ message: "Access denied" });
       }
 
@@ -1223,6 +1250,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!staff) {
         return res.status(404).json({ message: "Staff member not found" });
+      }
+
+      // Supervisors cannot delete admins
+      if (user?.role === "supervisor" && staff.role === "admin") {
+        return res.status(403).json({ 
+          message: "Supervisors cannot delete administrators" 
+        });
       }
 
       await storage.deleteUser(staffId);
@@ -1727,7 +1761,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           title:
             `${rec.patient?.firstName || ""} ${rec.patient?.lastName || ""}`.trim(),
           subtitle: `Record on ${rec.sessionDate ? new Date(rec.sessionDate).toLocaleDateString() : "Unknown date"}`,
-          href: `/records/${rec.id}`,
+          href: `/patients/${rec.patient?._id || rec.patientId}`,
         }));
       console.log("Record results:", records.length);
 
@@ -2263,9 +2297,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return false;
       });
 
-      // Group notes by threads (same directedTo or general notes)
+      // Group notes by threads (parent notes and their replies)
       const groupedNotes = filteredNotes.reduce((acc: any, note) => {
-        const threadKey = note.directedTo ? `directed_${note.directedTo}` : 'general';
+        let threadKey;
+        
+        if (note.parentNoteId) {
+          // This is a reply - group it with its parent
+          threadKey = `thread_${note.parentNoteId}`;
+        } else {
+          // This is a parent note - create a new thread
+          threadKey = note.directedTo ? `directed_${note.directedTo}` : 'general';
+        }
         
         if (!acc[threadKey]) {
           acc[threadKey] = {
@@ -2323,14 +2365,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!parentNote) {
           return res.status(400).json({ message: "Parent note not found" });
         }
-        // Inherit the directedTo from the parent note for replies
-        finalDirectedTo = parentNote.directedTo;
-        finalDirectedToName = parentNote.directedToName;
+        
+        // For replies, direct the response back to the original author
+        finalDirectedTo = parentNote.authorId;
+        finalDirectedToName = parentNote.authorName;
         
         console.log(`🔍 Reply inheritance debug:`, {
           parentNoteId: parentNoteId,
-          parentDirectedTo: parentNote.directedTo,
-          parentDirectedToName: parentNote.directedToName,
+          parentAuthorId: parentNote.authorId,
+          parentAuthorName: parentNote.authorName,
           finalDirectedTo: finalDirectedTo,
           finalDirectedToName: finalDirectedToName,
           currentUserId: user.id
@@ -2359,6 +2402,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         parentNoteId,
       });
       await note.save();
+
+      console.log(`📝 Note created:`, {
+        noteId: note._id,
+        authorId: user.id,
+        authorName: `${user.firstName} ${user.lastName}`,
+        directedTo: finalDirectedTo,
+        directedToName: finalDirectedToName,
+        parentNoteId: parentNoteId,
+        isReply: !!parentNoteId,
+        content: content.trim().substring(0, 50) + '...'
+      });
 
       // Create notification if note is directed to someone specific
       if (finalDirectedTo && finalDirectedTo !== user.id) {
@@ -2467,14 +2521,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Staff list endpoint for directed notes (accessible by admins and therapists)
+  // Staff list endpoint for directed notes (accessible by admins, supervisors, and therapists)
   app.get("/api/staff/list", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
       const user = await storage.getUser(userId);
 
-      // Only admins and therapists can view staff list
-      if (user?.role !== "admin" && user?.role !== "therapist") {
+      // Only admins, supervisors, and therapists can view staff list
+      if (user?.role !== "admin" && user?.role !== "supervisor" && user?.role !== "therapist") {
         return res.status(403).json({ message: "Access denied" });
       }
 
@@ -2609,15 +2663,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
 
-      // Only front desk staff can access this (temporarily allow all for testing)
-      // if (user.role !== "frontdesk") {
-      //   return res.status(403).json({ message: "Access denied" });
-      // }
+          // Only front desk staff can access this
+    if (user.role !== "frontdesk") {
+      return res.status(403).json({ message: "Access denied" });
+    }
 
-      const { since } = req.query;
+      const { since, reset } = req.query;
       let startDate: Date;
 
-      if (since === "last-login") {
+      // If reset parameter is provided, use a shorter time range to show fresh data
+      if (reset) {
+        startDate = new Date(Date.now() - 10 * 60 * 1000); // Last 10 minutes
+        console.log(`🔍 Patient changes debug - Reset requested, using 10 minutes: ${startDate}`);
+        console.log(`🔍 Patient changes debug - Current time: ${new Date()}`);
+        console.log(`🔍 Patient changes debug - Time difference: ${Date.now() - startDate.getTime()} ms`);
+      } else if (since === "last-login") {
         // Get user's last login from audit logs
         const lastLogin = await storage.db.collection("auditlogs").findOne(
           { 
@@ -2696,31 +2756,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const isOldPatient = patient.createdAt < startDate;
           console.log(`🔍 Patient changes debug - ${patient.firstName} ${patient.lastName}: createdAt=${patient.createdAt}, startDate=${startDate}, isOldPatient=${isOldPatient}`);
           return isOldPatient;
-        }).map(patient => ({
-          id: patient._id,
-          name: `${patient.firstName} ${patient.lastName}`,
-          status: patient.status,
-          assignedTherapist: patient.assignedTherapistId ? `${(patient.assignedTherapistId as any).firstName} ${(patient.assignedTherapistId as any).lastName}` : null,
-          important: patient.important,
-          updatedAt: patient.updatedAt
-        })),
+        }).map(patient => {
+          // Find who made the most recent update for this patient
+          const patientAction = patientActions.find(log => 
+            log.resourceId === patient._id.toString() && 
+            log.action === "update_patient" &&
+            new Date(log.createdAt) >= startDate
+          );
+          
+          return {
+            id: patient._id,
+            name: `${patient.firstName} ${patient.lastName}`,
+            status: patient.status,
+            assignedTherapist: patient.assignedTherapistId ? `${(patient.assignedTherapistId as any).firstName} ${(patient.assignedTherapistId as any).lastName}` : null,
+            important: patient.important,
+            updatedAt: patient.updatedAt,
+            updatedBy: patientAction ? patientAction.userName || "Unknown" : "Unknown"
+          };
+        }),
          therapistAssignments: statusChanges.filter(patient => {
            const hasTherapist = !!patient.assignedTherapistId;
            console.log(`🔍 Therapist assignment debug - ${patient.firstName} ${patient.lastName}: hasTherapist=${hasTherapist}, assignedTherapistId=${patient.assignedTherapistId}`);
            return hasTherapist;
-         }).map(patient => ({
-           id: patient._id,
-           name: `${patient.firstName} ${patient.lastName}`,
-           therapist: patient.assignedTherapistId ? `${(patient.assignedTherapistId as any).firstName} ${(patient.assignedTherapistId as any).lastName}` : null,
-           updatedAt: patient.updatedAt
-         })),
+         }).map(patient => {
+           // Find who assigned the therapist
+           const assignmentAction = patientActions.find(log => 
+             log.resourceId === patient._id.toString() && 
+             log.action === "assign_therapist" &&
+             new Date(log.createdAt) >= startDate
+           );
+           
+           return {
+             id: patient._id,
+             name: `${patient.firstName} ${patient.lastName}`,
+             therapist: patient.assignedTherapistId ? `${(patient.assignedTherapistId as any).firstName} ${(patient.assignedTherapistId as any).lastName}` : null,
+             updatedAt: patient.updatedAt,
+             assignedBy: assignmentAction ? assignmentAction.userName || "Unknown" : "Unknown"
+           };
+         }),
         importantUpdates: statusChanges.filter(patient => 
           patient.important && patient.createdAt < startDate
-        ).map(patient => ({
-          id: patient._id,
-          name: `${patient.firstName} ${patient.lastName}`,
-          updatedAt: patient.updatedAt
-        }))
+        ).map(patient => {
+          // Find who marked the patient as important
+          const importantAction = patientActions.find((log: any) => 
+            log.resourceId === patient._id.toString() && 
+            log.action === "mark_important" &&
+            new Date(log.createdAt) >= startDate
+          );
+          
+          return {
+            id: patient._id,
+            name: `${patient.firstName} ${patient.lastName}`,
+            updatedAt: patient.updatedAt,
+            markedBy: importantAction ? importantAction.userName || "Unknown" : "Unknown"
+          };
+        })
       };
 
       res.json({
@@ -2737,10 +2827,114 @@ export async function registerRoutes(app: Express): Promise<Server> {
           end: endDate
         }
       });
+
+      // Log the response for debugging
+      if (reset) {
+        console.log(`🔍 Patient changes debug - Reset response:`, {
+          newPatientsCount: changes.newPatients.length,
+          statusChangesCount: changes.statusChanges.length,
+          therapistAssignmentsCount: changes.therapistAssignments.length,
+          importantUpdatesCount: changes.importantUpdates.length,
+          totalChanges: changes.newPatients.length + changes.statusChanges.length + changes.therapistAssignments.length + changes.importantUpdates.length,
+          dateRange: {
+            start: startDate,
+            end: endDate
+          }
+        });
+      }
     } catch (error) {
       console.error("Error fetching patient changes:", error);
       res.status(500).json({ message: "Failed to fetch patient changes" });
     }
+  });
+
+  // Staff update endpoint
+  app.put("/api/staff/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+
+      // Only admins and supervisors can update staff
+      if (user?.role !== "admin" && user?.role !== "supervisor") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const staffId = req.params.id;
+      if (!mongoose.Types.ObjectId.isValid(staffId)) {
+        return res.status(400).json({ message: "Invalid staff ID format" });
+      }
+
+      const staff = await storage.getUser(staffId);
+      if (!staff) {
+        return res.status(404).json({ message: "Staff member not found" });
+      }
+
+      const { firstName, lastName, role } = req.body;
+
+      // Validate required fields
+      if (!firstName || !lastName || !role) {
+        return res.status(400).json({
+          message: "First name, last name, and role are required",
+        });
+      }
+
+      // Validate role
+      const validRoles = ["admin", "supervisor", "therapist", "staff", "frontdesk"];
+      if (!validRoles.includes(role)) {
+        return res.status(400).json({
+          message: "Invalid role. Must be one of: admin, supervisor, therapist, staff, frontdesk",
+        });
+      }
+
+      // Supervisors cannot change users to admin role
+      if (user?.role === "supervisor" && role === "admin") {
+        return res.status(403).json({
+          message: "Supervisors cannot change users to administrator role",
+        });
+      }
+
+      // Supervisors cannot change users to supervisor role
+      if (user?.role === "supervisor" && role === "supervisor") {
+        return res.status(403).json({
+          message: "Supervisors cannot change users to supervisor role",
+        });
+      }
+
+      // Supervisors cannot modify admin users
+      if (user?.role === "supervisor" && staff.role === "admin") {
+        return res.status(403).json({
+          message: "Supervisors cannot modify administrator accounts",
+        });
+      }
+
+      const updateData = {
+        firstName,
+        lastName,
+        role,
+      };
+
+      const updatedUser = await storage.updateUser(staffId, updateData);
+      await logActivity(userId, "update", "staff", staffId);
+
+      res.json({
+        message: "Staff member updated successfully",
+        user: updatedUser,
+      });
+    } catch (error) {
+      console.error("Error updating staff member:", error);
+      res.status(500).json({ message: "Failed to update staff member" });
+    }
+  });
+
+  // Catch-all route to serve React app for all non-API routes
+  app.get('*', (req, res) => {
+    // Don't serve React app for API routes
+    if (req.path.startsWith('/api/')) {
+      return res.status(404).json({ message: 'API endpoint not found' });
+    }
+    
+    // Serve the React app's index.html for all other routes
+    res.sendFile(path.join(process.cwd(), 'dist/public/index.html'));
   });
 
   const httpServer = createServer(app);

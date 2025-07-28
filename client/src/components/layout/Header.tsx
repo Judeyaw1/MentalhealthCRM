@@ -87,6 +87,8 @@ export function Header({ onSearch }: HeaderProps) {
     switch (role) {
       case "admin":
         return "Administrator";
+      case "supervisor":
+        return "Supervisor";
       case "therapist":
         return "Licensed Therapist";
       case "staff":
@@ -272,7 +274,10 @@ export function Header({ onSearch }: HeaderProps) {
         })
         .then((data) => {
           console.log("🔍 Search API response data:", data);
-          if (!ignore) setApiResults(Array.isArray(data) ? data : []);
+          if (!ignore) {
+            console.log("🔍 Setting API results:", Array.isArray(data) ? data : []);
+            setApiResults(Array.isArray(data) ? data : []);
+          }
         })
         .catch((error) => {
           console.error("🔍 Search API error:", error);
@@ -496,8 +501,19 @@ export function Header({ onSearch }: HeaderProps) {
                   <CommandItem
                     key={result.id || idx}
                     onSelect={() => {
+                      console.log("🔍 Patient search result clicked:", result);
+                      console.log("🔍 Current auth state:", { isAuthenticated: true }); // We know user is authenticated since they can search
                       setIsSearchOpen(false);
-                      if (result.href) navigate(result.href);
+                      if (result.href) {
+                        console.log("🔍 Navigating to:", result.href);
+                        // Add query parameter to track that user came from search
+                        const searchUrl = result.href.includes('?') 
+                          ? `${result.href}&from=search` 
+                          : `${result.href}?from=search`;
+                        navigate(searchUrl);
+                      } else {
+                        console.log("🔍 No href found in result");
+                      }
                     }}
                     className="cursor-pointer hover:bg-gray-50"
                   >
@@ -525,8 +541,18 @@ export function Header({ onSearch }: HeaderProps) {
                   <CommandItem
                     key={result.id || idx}
                     onSelect={() => {
+                      console.log("🔍 Appointment search result clicked:", result);
                       setIsSearchOpen(false);
-                      if (result.href) navigate(result.href);
+                      if (result.href) {
+                        console.log("🔍 Navigating to:", result.href);
+                        // Add query parameter to track that user came from search
+                        const searchUrl = result.href.includes('?') 
+                          ? `${result.href}&from=search` 
+                          : `${result.href}?from=search`;
+                        navigate(searchUrl);
+                      } else {
+                        console.log("🔍 No href found in result");
+                      }
                     }}
                     className="cursor-pointer hover:bg-gray-50"
                   >
@@ -554,8 +580,18 @@ export function Header({ onSearch }: HeaderProps) {
                   <CommandItem
                     key={result.id || idx}
                     onSelect={() => {
+                      console.log("🔍 Record search result clicked:", result);
                       setIsSearchOpen(false);
-                      if (result.href) navigate(result.href);
+                      if (result.href) {
+                        console.log("🔍 Navigating to:", result.href);
+                        // Add query parameter to track that user came from search
+                        const searchUrl = result.href.includes('?') 
+                          ? `${result.href}&from=search` 
+                          : `${result.href}?from=search`;
+                        navigate(searchUrl);
+                      } else {
+                        console.log("🔍 No href found in result");
+                      }
                     }}
                     className="cursor-pointer hover:bg-gray-50"
                   >

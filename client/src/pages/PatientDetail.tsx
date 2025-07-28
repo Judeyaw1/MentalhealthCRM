@@ -27,6 +27,7 @@ import {
   Pencil,
   CheckCircle,
   XCircle,
+  Search,
 } from "lucide-react";
 import { Link } from "wouter";
 import { isUnauthorizedError, canSeeCreatedBy } from "@/lib/authUtils";
@@ -55,6 +56,77 @@ export default function PatientDetail() {
   // State for active tab
   const [activeTab, setActiveTab] = useState(defaultTab);
 
+  // Smart back button logic
+  const [previousPath, setPreviousPath] = useState<string>('/patients');
+  
+  // Track where user came from
+  useEffect(() => {
+    const referrer = document.referrer;
+    const currentHost = window.location.origin;
+    
+    // If they came from within our app
+    if (referrer.startsWith(currentHost)) {
+      const referrerPath = new URL(referrer).pathname;
+      
+      // Don't go back to the same page
+      if (referrerPath !== location) {
+        setPreviousPath(referrerPath);
+      }
+    }
+    
+    // Check if they came from search
+    if (location.includes('?from=search')) {
+      setPreviousPath('/dashboard');
+    }
+  }, [location]);
+
+  // Smart back button handler
+  const handleBackClick = () => {
+    // If they came from search, go to dashboard
+    if (location.includes('?from=search')) {
+      window.location.href = '/dashboard';
+      return;
+    }
+    
+    // Try to use browser history if available
+    if (window.history.length > 1) {
+      window.history.back();
+      return;
+    }
+    
+    // If they came from patients list, go back there
+    if (previousPath === '/patients') {
+      window.location.href = '/patients';
+      return;
+    }
+    
+    // If they came from dashboard, go back there
+    if (previousPath === '/dashboard') {
+      window.location.href = '/dashboard';
+      return;
+    }
+    
+    // Default fallback
+    window.location.href = '/patients';
+  };
+
+  // Get back button text based on context
+  const getBackButtonText = () => {
+    if (location.includes('?from=search')) {
+      return 'Back to Dashboard';
+    }
+    
+    if (previousPath === '/patients') {
+      return 'Back to Patients';
+    }
+    
+    if (previousPath === '/dashboard') {
+      return 'Back to Dashboard';
+    }
+    
+    return 'Back to Patients';
+  };
+
   // Update active tab when URL changes
   useEffect(() => {
     const urlParams = new URLSearchParams(location.split('?')[1]);
@@ -64,7 +136,9 @@ export default function PatientDetail() {
 
   // Redirect to home if not authenticated
   useEffect(() => {
+    console.log("🔍 PatientDetail auth check:", { authLoading, isAuthenticated, patientId });
     if (!authLoading && !isAuthenticated) {
+      console.log("🔍 User not authenticated, redirecting to login");
       toast({
         title: "Unauthorized",
         description: "You are logged out. Logging in again...",
@@ -276,16 +350,15 @@ export default function PatientDetail() {
           <div className="p-6">
             {/* Return Arrow */}
             <div className="mb-4">
-              <Link href="/patients">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Back to Patients
-                </Button>
-              </Link>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
+                onClick={handleBackClick}
+              >
+                <ArrowLeft className="h-4 w-4" />
+                {getBackButtonText()}
+              </Button>
             </div>
 
             {/* Patient Header */}

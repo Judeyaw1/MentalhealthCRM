@@ -366,7 +366,7 @@ export default function PatientNotes({ patientId }: PatientNotesProps) {
             
             <div className="flex flex-wrap gap-4 items-center">
               {/* Direct to dropdown */}
-              {(user?.role === "admin" || user?.role === "therapist") && (
+              {(user?.role === "admin" || user?.role === "supervisor" || user?.role === "therapist") && (
                 <div className="flex items-center gap-2">
                   <Select value={directedTo || "general"} onValueChange={handleDirectedToChange}>
                     <SelectTrigger className="w-48">

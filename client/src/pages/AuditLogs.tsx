@@ -315,8 +315,8 @@ export default function AuditLogs() {
     );
   }
 
-  // Check if user has permission to view audit logs (admin only)
-  if (user && user.role !== "admin") {
+  // Check if user has permission to view audit logs (admin and supervisor only)
+  if (user && user.role !== "admin" && user.role !== "supervisor") {
     return (
       <div className="min-h-screen bg-gray-50">
         <Header />
@@ -331,7 +331,7 @@ export default function AuditLogs() {
                     Access Restricted
                   </h2>
                   <p className="text-gray-600">
-                    You don't have permission to view audit logs. This section is only available to administrators.
+                    You don't have permission to view audit logs. This section is only available to administrators and supervisors.
                   </p>
                 </CardContent>
               </Card>
@@ -351,8 +351,8 @@ export default function AuditLogs() {
 
         <main className="flex-1 overflow-y-auto">
           <div className="p-6">
-            {/* Unique Logins Card (admin only, last 7 days) */}
-            {user?.role === "admin" && (
+            {/* Unique Logins Card (admin and supervisor only, last 7 days) */}
+            {(user?.role === "admin" || user?.role === "supervisor") && (
               <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                 <Card className="flex flex-col gap-2 p-4">
                   <div className="flex items-center gap-4">
@@ -401,7 +401,7 @@ export default function AuditLogs() {
                   <Filter className="h-4 w-4" />
                   Reset Filters
                 </Button>
-                {user?.role === "admin" && (
+                {(user?.role === "admin" || user?.role === "supervisor") && (
                   <Button variant="destructive" onClick={() => setShowResetDialog(true)}>
                     <Trash className="h-4 w-4 mr-2" /> Reset Logs
                   </Button>

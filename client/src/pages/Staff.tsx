@@ -68,6 +68,10 @@ export default function Staff() {
         return (
           <Badge className="bg-purple-100 text-purple-800">Administrator</Badge>
         );
+      case "supervisor":
+        return (
+          <Badge className="bg-orange-100 text-orange-800">Supervisor</Badge>
+        );
       case "therapist":
         return <Badge className="bg-blue-100 text-blue-800">Therapist</Badge>;
       case "staff":
@@ -112,8 +116,8 @@ export default function Staff() {
     );
   }
 
-  // Check if user has permission to view staff (admin only)
-  if (user && (user as any).role !== "admin") {
+  // Check if user has permission to view staff (admin and supervisor only)
+  if (user && (user as any).role !== "admin" && (user as any).role !== "supervisor") {
     return (
       <div className="min-h-screen bg-gray-50">
         <Header />
@@ -129,7 +133,7 @@ export default function Staff() {
                   </h2>
                   <p className="text-gray-600">
                     You don't have permission to view staff management. This
-                    section is only available to administrators.
+                    section is only available to administrators and supervisors.
                   </p>
                 </CardContent>
               </Card>
@@ -146,6 +150,8 @@ export default function Staff() {
       staff?.filter((member: User) => member.role === "therapist").length || 0,
     admins:
       staff?.filter((member: User) => member.role === "admin").length || 0,
+    supervisors:
+      staff?.filter((member: User) => member.role === "supervisor").length || 0,
     support:
       staff?.filter(
         (member: User) =>
@@ -188,60 +194,59 @@ export default function Staff() {
             </div>
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    Total Staff
-                  </CardTitle>
+                  <CardTitle className="text-sm font-medium">Total Staff</CardTitle>
                   <Users className="h-4 w-4 text-gray-600" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{staffStats.total}</div>
-                  <p className="text-xs text-gray-600">Active members</p>
+                  <p className="text-xs text-gray-600">Team members</p>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    Therapists
-                  </CardTitle>
-                  <UserCheck className="h-4 w-4 text-gray-600" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {staffStats.therapists}
-                  </div>
-                  <p className="text-xs text-gray-600">
-                    Licensed professionals
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    Administrators
-                  </CardTitle>
-                  <UserCog className="h-4 w-4 text-gray-600" />
+                  <CardTitle className="text-sm font-medium">Administrators</CardTitle>
+                  <Shield className="h-4 w-4 text-gray-600" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{staffStats.admins}</div>
-                  <p className="text-xs text-gray-600">System administrators</p>
+                  <p className="text-xs text-gray-600">System admins</p>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    Support Staff
-                  </CardTitle>
+                  <CardTitle className="text-sm font-medium">Supervisors</CardTitle>
+                  <UserCog className="h-4 w-4 text-gray-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{staffStats.supervisors}</div>
+                  <p className="text-xs text-gray-600">Team leaders</p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Therapists</CardTitle>
+                  <UserCheck className="h-4 w-4 text-gray-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{staffStats.therapists}</div>
+                  <p className="text-xs text-gray-600">Licensed professionals</p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Support Staff</CardTitle>
                   <Users className="h-4 w-4 text-gray-600" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{staffStats.support}</div>
-                  <p className="text-xs text-gray-600">Administrative staff</p>
+                  <p className="text-xs text-gray-600">Front desk & staff</p>
                 </CardContent>
               </Card>
             </div>
@@ -288,8 +293,8 @@ export default function Staff() {
                     {staff.map((member: User) => (
                       <Card
                         key={member.id}
-                        className={`hover:shadow-md transition-shadow ${user?.role === 'admin' ? 'cursor-pointer' : ''}`}
-                        onClick={user?.role === 'admin' ? () => handleCardClick(member) : undefined}
+                        className={`hover:shadow-md transition-shadow ${(user?.role === 'admin' || user?.role === 'supervisor') ? 'cursor-pointer' : ''}`}
+                        onClick={(user?.role === 'admin' || user?.role === 'supervisor') ? () => handleCardClick(member) : undefined}
                       >
                         <CardContent className="p-6">
                           <div className="flex items-center space-x-4 mb-4">
@@ -342,7 +347,7 @@ export default function Staff() {
                               <div className="flex flex-wrap gap-2" onClick={e => e.stopPropagation()}>
                                 <EditStaffForm staffMember={member} />
                                 <ResetPasswordForm staffMember={member} />
-                                {member.role !== "admin" && <RemoveStaffForm staffMember={member} />}
+                                {(user?.role === 'admin' || (user?.role === 'supervisor' && member.role !== 'admin')) && <RemoveStaffForm staffMember={member} />}
                               </div>
                             </div>
                           </div>
@@ -355,8 +360,8 @@ export default function Staff() {
                     {staff.map((member: User) => (
                       <Card
                         key={member.id}
-                        className={`hover:shadow-md transition-shadow ${user?.role === 'admin' ? 'cursor-pointer' : ''}`}
-                        onClick={user?.role === 'admin' ? () => handleCardClick(member) : undefined}
+                        className={`hover:shadow-md transition-shadow ${(user?.role === 'admin' || user?.role === 'supervisor') ? 'cursor-pointer' : ''}`}
+                        onClick={(user?.role === 'admin' || user?.role === 'supervisor') ? () => handleCardClick(member) : undefined}
                       >
                         <CardContent className="p-4 flex items-center gap-4">
                           <Avatar className="h-10 w-10">
@@ -377,7 +382,7 @@ export default function Staff() {
                           <div className="flex flex-col gap-2" onClick={e => e.stopPropagation()}>
                             <EditStaffForm staffMember={member} />
                             <ResetPasswordForm staffMember={member} />
-                            {member.role !== "admin" && <RemoveStaffForm staffMember={member} />}
+                            {(user?.role === 'admin' || (user?.role === 'supervisor' && member.role !== 'admin')) && <RemoveStaffForm staffMember={member} />}
                           </div>
                         </CardContent>
                       </Card>

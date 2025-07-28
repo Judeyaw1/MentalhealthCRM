@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,7 +20,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Edit, Shield, UserCheck, Users, Loader2, Save, X } from "lucide-react";
+import { Edit, Shield, UserCheck, Users, Loader2, Save, X, UserCog } from "lucide-react";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import type { User } from "@shared/schema";
 
@@ -34,29 +35,9 @@ interface EditData {
   role: string;
 }
 
-const roleOptions = [
-  {
-    value: "therapist",
-    label: "Therapist",
-    description: "Licensed mental health professional",
-    icon: UserCheck,
-  },
-  {
-    value: "staff",
-    label: "Staff Member",
-    description: "Administrative support staff",
-    icon: Users,
-  },
-  {
-    value: "admin",
-    label: "Administrator",
-    description: "System administrator with full access",
-    icon: Shield,
-  },
-];
-
 export function EditStaffForm({ staffMember, onSuccess }: EditStaffFormProps) {
   const { toast } = useToast();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
 
@@ -89,6 +70,36 @@ export function EditStaffForm({ staffMember, onSuccess }: EditStaffFormProps) {
       });
     }
   }, [currentStaffData]);
+
+  // Dynamic role options based on current user's role and staff member being edited
+  const roleOptions = [
+    {
+      value: "therapist",
+      label: "Therapist",
+      description: "Licensed mental health professional",
+      icon: UserCheck,
+    },
+    {
+      value: "staff",
+      label: "Staff Member",
+      description: "Administrative support staff",
+      icon: Users,
+    },
+    // Only show supervisor option for admins
+    ...(user?.role === "admin" ? [{
+      value: "supervisor",
+      label: "Supervisor",
+      description: "Team leader with management privileges (no admin access)",
+      icon: UserCog,
+    }] : []),
+    // Only show admin option for actual admins, and only if editing a non-admin user
+    ...(user?.role === "admin" && staffMember.role !== "admin" ? [{
+      value: "admin",
+      label: "Administrator",
+      description: "System administrator with full access",
+      icon: Shield,
+    }] : []),
+  ];
 
   const editMutation = useMutation({
     mutationFn: async (data: EditData) => {

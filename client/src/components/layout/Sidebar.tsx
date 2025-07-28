@@ -32,6 +32,8 @@ export function Sidebar({
 
   // Only show Dashboard and Patients for frontdesk
   const isFrontDesk = user?.role === "frontdesk";
+  const isSupervisor = user?.role === "supervisor";
+  const isAdmin = user?.role === "admin";
 
   const navigation = [
     {
@@ -83,7 +85,7 @@ export function Sidebar({
           : []),
       ],
     },
-    // Only show these sections if not frontdesk
+    // Show these sections for supervisors and admins (not frontdesk)
     ...(!isFrontDesk
       ? [
           {
@@ -118,12 +120,17 @@ export function Sidebar({
                 icon: UserCog,
                 current: location.startsWith("/staff"),
               },
-              {
-                name: "Settings",
-                href: "/settings",
-                icon: Settings,
-                current: location.startsWith("/settings"),
-              },
+              // Only show Settings for admins
+              ...(isAdmin
+                ? [
+                    {
+                      name: "Settings",
+                      href: "/settings",
+                      icon: Settings,
+                      current: location.startsWith("/settings"),
+                    },
+                  ]
+                : []),
             ],
           },
         ]

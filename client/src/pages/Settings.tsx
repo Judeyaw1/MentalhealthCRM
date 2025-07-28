@@ -282,6 +282,8 @@ export default function Settings() {
     switch (role) {
       case "admin":
         return "Administrator";
+      case "supervisor":
+        return "Supervisor";
       case "therapist":
         return "Therapist";
       case "staff":
@@ -297,6 +299,8 @@ export default function Settings() {
     switch (role) {
       case "admin":
         return "destructive" as const;
+      case "supervisor":
+        return "default" as const;
       case "therapist":
         return "default" as const;
       case "staff":

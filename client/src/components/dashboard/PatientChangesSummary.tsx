@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,9 @@ interface PatientChange {
   therapist?: string;
   important?: boolean;
   updatedAt?: string;
+  updatedBy?: string;
+  assignedBy?: string;
+  markedBy?: string;
 }
 
 interface ChangesSummary {
@@ -47,22 +50,29 @@ interface PatientChangesData {
 export default function PatientChangesSummary() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
-  const [refreshInterval, setRefreshInterval] = useState<NodeJS.Timeout | null>(null);
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
+  const [resetTimestamp, setResetTimestamp] = useState<number | null>(null);
 
   // Debug: Log user info
   console.log("PatientChangesSummary - User:", user);
 
-  // Only show for front desk staff (temporarily show for all to test)
-  // if (user?.role !== "frontdesk") {
-  //   return null;
-  // }
+  // Only show for front desk staff
+  if (user?.role !== "frontdesk") {
+    return null;
+  }
 
   const { data, isLoading, error, refetch } = useQuery<PatientChangesData>({
-    queryKey: ["patient-changes"],
+    queryKey: ["patient-changes", resetTimestamp],
     queryFn: async () => {
       console.log("Fetching patient changes...");
-      const response = await fetch("/api/patient-changes?since=last-login");
+      const url = resetTimestamp 
+        ? `/api/patient-changes?reset=${resetTimestamp}`
+        : "/api/patient-changes?since=last-login";
+      console.log("API URL:", url);
+      
+      const response = await fetch(url);
       console.log("Response status:", response.status);
       if (!response.ok) {
         const errorText = await response.text();
@@ -76,39 +86,12 @@ export default function PatientChangesSummary() {
     enabled: isOpen, // Only fetch when modal is open
   });
 
-  // Auto-refresh every 5 hours when modal is open
-  React.useEffect(() => {
-    if (isOpen) {
-      // Clear any existing interval
-      if (refreshInterval) {
-        clearInterval(refreshInterval);
-      }
-      
-      // Set up new interval (5 hours = 5 * 60 * 60 * 1000 milliseconds)
-      const interval = setInterval(() => {
-        console.log("Auto-refreshing patient changes data...");
-        refetch();
-      }, 5 * 60 * 60 * 1000);
-      
-      setRefreshInterval(interval);
-      
-      // Cleanup function
-      return () => {
-        if (interval) {
-          clearInterval(interval);
-        }
-      };
-    } else {
-      // Clear interval when modal is closed
-      if (refreshInterval) {
-        clearInterval(refreshInterval);
-        setRefreshInterval(null);
-      }
-    }
-  }, [isOpen, refetch]);
-
   const handleOpen = () => {
     setIsOpen(true);
+    // Set initial refresh time when modal opens
+    if (!lastRefreshed) {
+      setLastRefreshed(new Date());
+    }
   };
 
   const handleClose = () => {
@@ -151,7 +134,7 @@ ${data?.changes.therapistAssignments.map(p => `• ${p.name} - Assigned to ${p.t
 Important Updates (${data?.summary.importantUpdatesCount || 0}):
 ${data?.changes.importantUpdates.map(p => `• ${p.name} - Marked as important`).join('\n') || 'None'}
     `;
-    
+
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -159,10 +142,24 @@ ${data?.changes.importantUpdates.map(p => `• ${p.name} - Marked as important`)
     a.download = `patient-changes-${format(new Date(), 'yyyy-MM-dd')}.txt`;
     a.click();
     URL.revokeObjectURL(url);
-    
+
     toast({
       title: "Export Complete",
       description: "Patient changes summary has been downloaded",
+    });
+  };
+
+  const handleReset = () => {
+    console.log("🔍 Reset button clicked!");
+    
+    // Set a new timestamp to trigger a fresh query with reset parameter
+    const timestamp = Date.now();
+    setResetTimestamp(timestamp);
+    setLastRefreshed(new Date());
+    
+    toast({
+      title: "Data Reset",
+      description: "Patient changes data has been refreshed with latest information",
     });
   };
 
@@ -184,28 +181,47 @@ ${data?.changes.importantUpdates.map(p => `• ${p.name} - Marked as important`)
                      <div className="flex items-center gap-2">
                        <Clock className="h-5 w-5" />
                        Patient Changes Summary
-                       {isOpen && (
-                         <span className="text-xs text-gray-500 ml-2">
-                           (Auto-refresh every 5 hours)
-                         </span>
-                       )}
                      </div>
                      <div className="flex items-center gap-2">
+                       {lastRefreshed && (
+                         <span className="text-xs text-gray-500 mr-2">
+                           Last refreshed: {formatDistanceToNow(lastRefreshed, { addSuffix: true })}
+                         </span>
+                       )}
                        <Button
                          size="sm"
                          variant="outline"
-                         onClick={() => refetch()}
+                         onClick={() => {
+                           refetch();
+                           setLastRefreshed(new Date());
+                         }}
                          disabled={isLoading}
+                         title="Refresh data"
                        >
-                         <RefreshCw className="h-4 w-4" />
+                         <RefreshCw className="h-4 w-4 mr-1" />
+                         Refresh
+                       </Button>
+                       <Button
+                         size="sm"
+                         variant="outline"
+                         onClick={() => {
+                           console.log("🔍 Reset button clicked - test!");
+                           handleReset();
+                         }}
+                         disabled={isLoading}
+                         title="Reset and get fresh data"
+                       >
+                         Reset
                        </Button>
                        <Button
                          size="sm"
                          variant="outline"
                          onClick={exportToPDF}
                          disabled={!data}
+                         title="Export to file"
                        >
-                         <Download className="h-4 w-4" />
+                         <Download className="h-4 w-4 mr-1" />
+                         Export
                        </Button>
                      </div>
                    </DialogTitle>
@@ -279,7 +295,7 @@ ${data?.changes.importantUpdates.map(p => `• ${p.name} - Marked as important`)
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-green-600">
-                      <UserPlus className="h-5 w-5" />
+                      {/* UserPlus className="h-5 w-5" */}
                       New Patients ({data.changes.newPatients.length})
                     </CardTitle>
                   </CardHeader>
@@ -313,7 +329,7 @@ ${data?.changes.importantUpdates.map(p => `• ${p.name} - Marked as important`)
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-orange-600">
-                      <RefreshCw className="h-5 w-5" />
+                      {/* RefreshCw className="h-5 w-5" */}
                       Status Changes ({data.changes.statusChanges.length})
                     </CardTitle>
                   </CardHeader>
@@ -326,12 +342,12 @@ ${data?.changes.importantUpdates.map(p => `• ${p.name} - Marked as important`)
                               {getInitials(patient.name)}
                             </AvatarFallback>
                           </Avatar>
-                          <div className="flex-1">
-                            <div className="font-medium">{patient.name}</div>
-                            <div className="text-sm text-gray-600">
-                              Updated {formatDistanceToNow(new Date(patient.updatedAt || ""), { addSuffix: true })}
-                            </div>
-                          </div>
+                                                           <div className="flex-1">
+                                   <div className="font-medium">{patient.name}</div>
+                                   <div className="text-sm text-gray-600">
+                                     Updated by {patient.updatedBy || "Unknown"} • {formatDistanceToNow(new Date(patient.updatedAt || ""), { addSuffix: true })}
+                                   </div>
+                                 </div>
                           <Badge variant="secondary" className={getStatusColor(patient.status || "")}>
                             {patient.status}
                           </Badge>
@@ -347,7 +363,7 @@ ${data?.changes.importantUpdates.map(p => `• ${p.name} - Marked as important`)
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-blue-600">
-                      <UserCheck className="h-5 w-5" />
+                      {/* UserCheck className="h-5 w-5" */}
                       Therapist Assignments ({data.changes.therapistAssignments.length})
                     </CardTitle>
                   </CardHeader>
@@ -360,12 +376,12 @@ ${data?.changes.importantUpdates.map(p => `• ${p.name} - Marked as important`)
                               {getInitials(patient.name)}
                             </AvatarFallback>
                           </Avatar>
-                          <div className="flex-1">
-                            <div className="font-medium">{patient.name}</div>
-                            <div className="text-sm text-gray-600">
-                              Assigned to {patient.therapist} • {formatDistanceToNow(new Date(patient.updatedAt || ""), { addSuffix: true })}
-                            </div>
-                          </div>
+                                                           <div className="flex-1">
+                                   <div className="font-medium">{patient.name}</div>
+                                   <div className="text-sm text-gray-600">
+                                     Assigned to {patient.therapist} by {patient.assignedBy || "Unknown"} • {formatDistanceToNow(new Date(patient.updatedAt || ""), { addSuffix: true })}
+                                   </div>
+                                 </div>
                         </div>
                       ))}
                     </div>
@@ -378,7 +394,7 @@ ${data?.changes.importantUpdates.map(p => `• ${p.name} - Marked as important`)
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-purple-600">
-                      <Star className="h-5 w-5" />
+                      {/* Star className="h-5 w-5" */}
                       Important Updates ({data.changes.importantUpdates.length})
                     </CardTitle>
                   </CardHeader>
@@ -391,12 +407,12 @@ ${data?.changes.importantUpdates.map(p => `• ${p.name} - Marked as important`)
                               {getInitials(patient.name)}
                             </AvatarFallback>
                           </Avatar>
-                          <div className="flex-1">
-                            <div className="font-medium">{patient.name}</div>
-                            <div className="text-sm text-gray-600">
-                              Marked as important • {formatDistanceToNow(new Date(patient.updatedAt || ""), { addSuffix: true })}
-                            </div>
-                          </div>
+                                                           <div className="flex-1">
+                                   <div className="font-medium">{patient.name}</div>
+                                   <div className="text-sm text-gray-600">
+                                     Marked as important by {patient.markedBy || "Unknown"} • {formatDistanceToNow(new Date(patient.updatedAt || ""), { addSuffix: true })}
+                                   </div>
+                                 </div>
                           <Badge variant="secondary" className="bg-purple-100 text-purple-800">
                             Important
                           </Badge>

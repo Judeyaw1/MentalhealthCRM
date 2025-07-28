@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,6 +30,7 @@ import {
   Users,
   Loader2,
   X,
+  UserCog,
 } from "lucide-react";
 import { isUnauthorizedError } from "@/lib/authUtils";
 
@@ -44,36 +46,9 @@ interface InviteData {
   message?: string;
 }
 
-const roleOptions = [
-  {
-    value: "therapist",
-    label: "Therapist",
-    description: "Licensed mental health professional",
-    icon: UserCheck,
-  },
-  {
-    value: "staff",
-    label: "Staff Member",
-    description: "Administrative support staff",
-    icon: Users,
-  },
-  {
-    value: "frontdesk",
-    label: "Front Desk",
-    description:
-      "Receptionist/front desk user (can add/search/assign patients)",
-    icon: User,
-  },
-  {
-    value: "admin",
-    label: "Administrator",
-    description: "System administrator with full access",
-    icon: Shield,
-  },
-];
-
 export function InviteStaffForm({ onSuccess }: InviteStaffFormProps) {
   const { toast } = useToast();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
   const [formData, setFormData] = useState<InviteData>({
@@ -83,6 +58,43 @@ export function InviteStaffForm({ onSuccess }: InviteStaffFormProps) {
     role: "",
     message: "",
   });
+
+  // Dynamic role options based on current user's role
+  const roleOptions = [
+    {
+      value: "therapist",
+      label: "Therapist",
+      description: "Licensed mental health professional",
+      icon: UserCheck,
+    },
+    {
+      value: "staff",
+      label: "Staff Member",
+      description: "Administrative support staff",
+      icon: Users,
+    },
+    {
+      value: "frontdesk",
+      label: "Front Desk",
+      description:
+        "Receptionist/front desk user (can add/search/assign patients)",
+      icon: User,
+    },
+    // Only show supervisor option for admins
+    ...(user?.role === "admin" ? [{
+      value: "supervisor",
+      label: "Supervisor",
+      description: "Team leader with management privileges (no admin access)",
+      icon: UserCog,
+    }] : []),
+    // Only show admin option for actual admins
+    ...(user?.role === "admin" ? [{
+      value: "admin",
+      label: "Administrator",
+      description: "System administrator with full access",
+      icon: Shield,
+    }] : []),
+  ];
 
   const inviteMutation = useMutation({
     mutationFn: async (data: InviteData) => {

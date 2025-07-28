@@ -23,7 +23,7 @@ export const users = sqliteTable("users", {
   firstName: text("first_name"),
   lastName: text("last_name"),
   profileImageUrl: text("profile_image_url"),
-  role: text("role").notNull().default("staff"), // admin, therapist, staff, frontdesk
+  role: text("role").notNull().default("staff"), // admin, supervisor, therapist, staff, frontdesk
   password: text("password"), // For password management
   forcePasswordChange: integer("force_password_change", {
     mode: "boolean",
