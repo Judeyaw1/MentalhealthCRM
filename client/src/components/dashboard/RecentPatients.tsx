@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Eye, Edit } from "lucide-react";
 import { Link } from "wouter";
-import type { PatientWithTherapist } from "@shared/schema";
+import type { PatientWithTherapist } from "@shared/types";
 
 interface RecentPatientsProps {
   patients: PatientWithTherapist[];

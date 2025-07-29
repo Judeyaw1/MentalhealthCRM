@@ -33,7 +33,7 @@ import {
   Plus,
   Clock,
 } from "lucide-react";
-import type { InsertPatient } from "@shared/schema";
+import type { InsertPatient } from "@shared/types";
 
 export default function NewPatient() {
   const { toast } = useToast();

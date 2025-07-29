@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
-import type { InsertPatient } from "@shared/schema";
+import type { InsertPatient } from "@shared/types";
 
 export default function EditPatient() {
   const params = useParams();

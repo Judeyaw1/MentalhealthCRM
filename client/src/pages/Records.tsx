@@ -43,7 +43,7 @@ import {
 import { Link } from "wouter";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
-import type { TreatmentRecordWithDetails } from "@shared/schema";
+import type { TreatmentRecordWithDetails } from "@shared/types";
 import {
   DropdownMenu,
   DropdownMenuContent,

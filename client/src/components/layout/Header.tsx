@@ -18,7 +18,7 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import type { User } from "@shared/schema";
+import type { User } from "@shared/types";
 import {
   CommandDialog,
   CommandEmpty,

@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Key, AlertTriangle, Loader2, X, CheckCircle } from "lucide-react";
 import { isUnauthorizedError } from "@/lib/authUtils";
-import type { User } from "@shared/schema";
+import type { User } from "@shared/types";
 
 interface ResetPasswordFormProps {
   staffMember: User;

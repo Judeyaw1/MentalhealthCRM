@@ -40,7 +40,7 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import { isUnauthorizedError } from "@/lib/authUtils";
-import type { AppointmentWithDetails } from "@shared/schema";
+import type { AppointmentWithDetails } from "@shared/types";
 import {
   DropdownMenu,
   DropdownMenuContent,

@@ -36,7 +36,7 @@ import type {
   PatientWithTherapist,
   AppointmentWithDetails,
   TreatmentRecordWithDetails,
-} from "@shared/schema";
+} from "@shared/types";
 import { format, parseISO, isValid } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import PatientNotes from "@/components/patients/PatientNotes";

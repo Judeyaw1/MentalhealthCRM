@@ -17,7 +17,7 @@ import {
   Filter,
 } from "lucide-react";
 import { Link } from "wouter";
-import type { PatientWithTherapist } from "@shared/schema";
+import type { PatientWithTherapist } from "@shared/types";
 
 interface PatientDashboardProps {
   patientCount?: number;

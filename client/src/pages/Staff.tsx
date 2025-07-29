@@ -20,7 +20,7 @@ import {
   Grid3x3,
 } from "lucide-react";
 import { isUnauthorizedError } from "@/lib/authUtils";
-import type { User } from "@shared/schema";
+import type { User } from "@shared/types";
 import { InviteStaffForm } from "@/components/staff/InviteStaffForm";
 import { EditStaffForm } from "@/components/staff/EditStaffForm";
 import { RemoveStaffForm } from "@/components/staff/RemoveStaffForm";

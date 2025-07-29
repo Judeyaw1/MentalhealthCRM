@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { Edit, Shield, UserCheck, Users, Loader2, Save, X, UserCog } from "lucide-react";
 import { isUnauthorizedError } from "@/lib/authUtils";
-import type { User } from "@shared/schema";
+import type { User } from "@shared/types";
 
 interface EditStaffFormProps {
   staffMember: User;

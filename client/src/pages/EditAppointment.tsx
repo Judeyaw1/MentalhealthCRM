@@ -19,7 +19,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Save, Calendar, Clock } from "lucide-react";
 import { useLocation } from "wouter";
-import type { AppointmentWithDetails } from "@shared/schema";
+import type { AppointmentWithDetails } from "@shared/types";
 
 export default function EditAppointment() {
   const { toast } = useToast();

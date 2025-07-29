@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Trash2, AlertTriangle, Loader2, X } from "lucide-react";
 import { isUnauthorizedError } from "@/lib/authUtils";
-import type { User } from "@shared/schema";
+import type { User } from "@shared/types";
 
 interface RemoveStaffFormProps {
   staffMember: User;

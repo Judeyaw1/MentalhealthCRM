@@ -24,7 +24,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
-import type { AppointmentWithDetails } from "@shared/schema";
+import type { AppointmentWithDetails } from "@shared/types";
 
 export default function AppointmentDetail() {
   const { toast } = useToast();

@@ -55,7 +55,7 @@ import {
 import { Link } from "wouter";
 import { isUnauthorizedError, canSeeCreatedBy } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
-import type { PatientWithTherapist } from "@shared/schema";
+import type { PatientWithTherapist } from "@shared/types";
 import { RecentPatients } from "@/components/dashboard/RecentPatients";
 import { Input } from "@/components/ui/input";
 import { useDebounce } from "@/hooks/use-mobile";
