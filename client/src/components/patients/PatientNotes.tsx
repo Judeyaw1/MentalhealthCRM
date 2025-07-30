@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,6 +23,10 @@ interface PatientNote {
   directedTo?: string | null;
   directedToName?: string | null;
   parentNoteId?: string | null;
+  isArchived?: boolean;
+  archivedAt?: string;
+  archivedBy?: string;
+  archivedByName?: string;
 }
 
 interface Thread {
@@ -65,6 +70,8 @@ export default function PatientNotes({ patientId }: PatientNotesProps) {
       if (!response.ok) throw new Error("Failed to fetch notes");
       return response.json();
     },
+    refetchInterval: 3000, // Refetch every 3 seconds for real-time updates
+    refetchIntervalInBackground: true, // Continue polling even when tab is not active
   });
 
   // Fetch staff for directed notes
@@ -199,6 +206,53 @@ export default function PatientNotes({ patientId }: PatientNotesProps) {
     },
   });
 
+  // Close all threads mutation
+  const closeAllThreadsMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("POST", `/api/patients/${patientId}/notes/close-all`);
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["notes", patientId] });
+      toast({
+        title: "All Threads Closed",
+        description: `All threads closed successfully. ${data.updatedCount} notes archived. Notes will be cleared in 5 minutes.`,
+      });
+      
+      // Auto-clear archived notes after 5 minutes
+      setTimeout(() => {
+        clearArchivedNotesMutation.mutate();
+      }, 5 * 60 * 1000); // 5 minutes
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to close all threads",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Clear archived notes mutation
+  const clearArchivedNotesMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("POST", `/api/patients/${patientId}/notes/clear-archived`);
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["notes", patientId] });
+      toast({
+        title: "Notes Cleared",
+        description: `Archived notes cleared successfully. ${data.deletedCount} notes removed.`,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to clear archived notes",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newNote.trim()) return;
@@ -235,12 +289,36 @@ export default function PatientNotes({ patientId }: PatientNotesProps) {
     }
   };
 
+  const handleCloseAllThreads = () => {
+    if (confirm("Are you sure you want to close ALL threads? This will archive all notes and prevent further replies. Notes will be automatically cleared in 5 minutes.")) {
+      closeAllThreadsMutation.mutate();
+    }
+  };
+
+  const handleClearArchived = () => {
+    if (confirm("Are you sure you want to clear all archived notes? This action cannot be undone and will permanently delete all archived notes.")) {
+      clearArchivedNotesMutation.mutate();
+    }
+  };
+
   const canEditNote = (note: PatientNote) => {
     return user?.id === note.authorId || user?.role === "admin";
   };
 
   const canDeleteNote = (note: PatientNote) => {
     return user?.id === note.authorId || user?.role === "admin";
+  };
+
+  const canCloseAllThreads = () => {
+    return user?.role === "admin" || user?.role === "therapist";
+  };
+
+  const isThreadArchived = (thread: Thread) => {
+    return thread.notes.some(note => note.isArchived);
+  };
+
+  const hasArchivedNotes = () => {
+    return threads.some(thread => isThreadArchived(thread));
   };
 
   const getRoleColor = (role: string) => {
@@ -296,8 +374,32 @@ export default function PatientNotes({ patientId }: PatientNotesProps) {
             <MessageSquare className="h-5 w-5" />
             Notes
           </div>
-          {user?.role === "admin" && (
-            <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2">
+            {canCloseAllThreads() && threads.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCloseAllThreads}
+                disabled={closeAllThreadsMutation.isPending}
+                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+              >
+                <X className="h-4 w-4 mr-2" />
+                {closeAllThreadsMutation.isPending ? "Closing..." : "Close All Threads"}
+              </Button>
+            )}
+            {canCloseAllThreads() && hasArchivedNotes() && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleClearArchived}
+                disabled={clearArchivedNotesMutation.isPending}
+                className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                {clearArchivedNotesMutation.isPending ? "Clearing..." : "Clear Archived"}
+              </Button>
+            )}
+            {user?.role === "admin" && (
               <Button
                 variant="outline"
                 size="sm"
@@ -306,8 +408,8 @@ export default function PatientNotes({ patientId }: PatientNotesProps) {
                 <Clock className="h-4 w-4 mr-2" />
                 Cleanup
               </Button>
-            </div>
-          )}
+            )}
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -422,153 +524,162 @@ export default function PatientNotes({ patientId }: PatientNotesProps) {
               No notes yet. Start the conversation!
             </div>
           ) : (
-            threads.map((thread: Thread) => (
-              <div key={thread.threadId} className="space-y-3">
-                {/* Thread header */}
-                <div className="flex items-center gap-2">
-                  {thread.isGeneral ? (
-                    <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                      <Users className="h-3 w-3 mr-1" />
-                      General Thread
-                    </Badge>
-                  ) : (
-                    <Badge variant="secondary" className="bg-purple-100 text-purple-800">
-                      <User className="h-3 w-3 mr-1" />
-                      To: {thread.directedToName}
-                    </Badge>
-                  )}
-                </div>
+            threads.map((thread: Thread) => {
+              const archived = isThreadArchived(thread);
+              return (
+                <div key={thread.threadId} className={`space-y-3 ${archived ? 'opacity-60' : ''}`}>
+                  {/* Thread header */}
+                  <div className="flex items-center gap-2">
+                    {thread.isGeneral ? (
+                      <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                        <Users className="h-3 w-3 mr-1" />
+                        General Thread
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary" className="bg-purple-100 text-purple-800">
+                        <User className="h-3 w-3 mr-1" />
+                        To: {thread.directedToName}
+                      </Badge>
+                    )}
+                    {archived && (
+                      <Badge variant="outline" className="bg-gray-100 text-gray-600">
+                        <Clock className="h-3 w-3 mr-1" />
+                        Archived
+                      </Badge>
+                    )}
+                  </div>
 
-                {/* Notes in thread */}
-                <div className="space-y-3 ml-4">
-                  {thread.notes.map((note: PatientNote) => (
-                    <div key={note._id} className="space-y-2">
-                      {/* Main note */}
-                      <div className="flex gap-3">
-                        <Avatar className="h-8 w-8">
-                          <AvatarFallback className="text-xs">
-                            {getInitials(note.authorName)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-sm">{note.authorName}</span>
-                            <span className="text-xs text-gray-500">
-                              {formatDistanceToNow(new Date(note.createdAt), { addSuffix: true })}
-                            </span>
-                            {note.isPrivate && (
-                              <Badge variant="outline" className="text-xs">Private</Badge>
+                  {/* Notes in thread */}
+                  <div className="space-y-3 ml-4">
+                    {thread.notes.map((note: PatientNote) => (
+                      <div key={note._id} className="space-y-2">
+                        {/* Main note */}
+                        <div className="flex gap-3">
+                          <Avatar className="h-8 w-8">
+                            <AvatarFallback className="text-xs">
+                              {getInitials(note.authorName)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-sm">{note.authorName}</span>
+                              <span className="text-xs text-gray-500">
+                                {formatDistanceToNow(new Date(note.createdAt), { addSuffix: true })}
+                              </span>
+                              {note.isPrivate && (
+                                <Badge variant="outline" className="text-xs">Private</Badge>
+                              )}
+                            </div>
+                            
+                            {editingNote === note._id ? (
+                              <div className="space-y-2">
+                                <Textarea
+                                  value={editContent}
+                                  onChange={(e) => setEditContent(e.target.value)}
+                                  placeholder="Edit your note..."
+                                  className="min-h-[60px]"
+                                />
+                                <div className="flex gap-2">
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleEditSubmit(note._id)}
+                                    disabled={editNoteMutation.isPending}
+                                  >
+                                    Save
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      setEditingNote(null);
+                                      setEditContent("");
+                                    }}
+                                  >
+                                    Cancel
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className={`rounded-lg p-3 ${
+                                note.directedTo ? 'bg-purple-50 border-l-2 border-purple-200' : 'bg-gray-50'
+                              }`}>
+                                <p className="text-sm whitespace-pre-wrap">{note.content}</p>
+                              </div>
                             )}
+                            
+                            <div className="flex gap-2">
+                              {user?.role !== "frontdesk" && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => setReplyingTo(note._id)}
+                                >
+                                  <Reply className="h-3 w-3 mr-1" />
+                                  Reply
+                                </Button>
+                              )}
+                              {canEditNote(note) && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleEdit(note._id, note.content)}
+                                >
+                                  <Edit className="h-3 w-3 mr-1" />
+                                  Edit
+                                </Button>
+                              )}
+                              {canDeleteNote(note) && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleDelete(note._id)}
+                                >
+                                  <Trash2 className="h-3 w-3 mr-1" />
+                                  Delete
+                                </Button>
+                              )}
+                            </div>
                           </div>
-                          
-                          {editingNote === note._id ? (
-                            <div className="space-y-2">
+                        </div>
+
+                        {/* Reply form */}
+                        {replyingTo === note._id && (
+                          <div className="ml-8 mt-2">
+                            <form onSubmit={handleSubmit} className="space-y-2">
                               <Textarea
-                                value={editContent}
-                                onChange={(e) => setEditContent(e.target.value)}
-                                placeholder="Edit your note..."
+                                value={newNote}
+                                onChange={(e) => setNewNote(e.target.value)}
+                                placeholder="Write your reply..."
                                 className="min-h-[60px]"
                               />
                               <div className="flex gap-2">
                                 <Button
+                                  type="submit"
                                   size="sm"
-                                  onClick={() => handleEditSubmit(note._id)}
-                                  disabled={editNoteMutation.isPending}
+                                  disabled={addNoteMutation.isPending || !newNote.trim()}
                                 >
-                                  Save
+                                  <Send className="h-3 w-3 mr-1" />
+                                  Send Reply
                                 </Button>
                                 <Button
+                                  type="button"
                                   size="sm"
                                   variant="outline"
-                                  onClick={() => {
-                                    setEditingNote(null);
-                                    setEditContent("");
-                                  }}
+                                  onClick={() => setReplyingTo(null)}
                                 >
+                                  <X className="h-3 w-3 mr-1" />
                                   Cancel
                                 </Button>
                               </div>
-                            </div>
-                          ) : (
-                            <div className={`rounded-lg p-3 ${
-                              note.directedTo ? 'bg-purple-50 border-l-2 border-purple-200' : 'bg-gray-50'
-                            }`}>
-                              <p className="text-sm whitespace-pre-wrap">{note.content}</p>
-                            </div>
-                          )}
-                          
-                          <div className="flex gap-2">
-                            {user?.role !== "frontdesk" && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => setReplyingTo(note._id)}
-                              >
-                                <Reply className="h-3 w-3 mr-1" />
-                                Reply
-                              </Button>
-                            )}
-                            {canEditNote(note) && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => handleEdit(note._id, note.content)}
-                              >
-                                <Edit className="h-3 w-3 mr-1" />
-                                Edit
-                              </Button>
-                            )}
-                            {canDeleteNote(note) && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => handleDelete(note._id)}
-                              >
-                                <Trash2 className="h-3 w-3 mr-1" />
-                                Delete
-                              </Button>
-                            )}
+                            </form>
                           </div>
-                        </div>
+                        )}
                       </div>
-
-                      {/* Reply form */}
-                      {replyingTo === note._id && (
-                        <div className="ml-8 mt-2">
-                          <form onSubmit={handleSubmit} className="space-y-2">
-                            <Textarea
-                              value={newNote}
-                              onChange={(e) => setNewNote(e.target.value)}
-                              placeholder="Write your reply..."
-                              className="min-h-[60px]"
-                            />
-                            <div className="flex gap-2">
-                              <Button
-                                type="submit"
-                                size="sm"
-                                disabled={addNoteMutation.isPending || !newNote.trim()}
-                              >
-                                <Send className="h-3 w-3 mr-1" />
-                                Send Reply
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setReplyingTo(null)}
-                              >
-                                <X className="h-3 w-3 mr-1" />
-                                Cancel
-                              </Button>
-                            </div>
-                          </form>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </CardContent>

@@ -24,7 +24,8 @@ export type NotificationType =
   | 'staff_invitation'
   | 'password_reset'
   | 'directed_note'
-  | 'general';
+  | 'general'
+  | 'patient_assigned';
 
 export interface NotificationPreferences {
   emailNotifications: boolean;
@@ -329,6 +330,32 @@ export class NotificationService {
     );
   }
 
+  // Send patient assignment notification
+  async sendPatientAssignmentNotification(
+    therapistId: string,
+    patientData: {
+      patientName: string;
+      patientId: string;
+      reasonForVisit?: string;
+      status?: string;
+      assignedAt: Date;
+    }
+  ): Promise<void> {
+    const title = 'New Patient Assigned';
+    const message = `You have been assigned a new patient: ${patientData.patientName}`;
+    
+    await this.createNotification(
+      therapistId,
+      'patient_assigned',
+      title,
+      message,
+      { 
+        patientData,
+        patientId: patientData.patientId // Add patientId directly for frontend navigation
+      }
+    );
+  }
+
   // Send staff invitation notification
   async sendStaffInvitation(
     userEmail: string,
@@ -404,6 +431,7 @@ export class NotificationService {
       password_reset: 0,
       directed_note: 0,
       general: 0,
+      patient_assigned: 0,
     };
     
     notifications.forEach(notification => {

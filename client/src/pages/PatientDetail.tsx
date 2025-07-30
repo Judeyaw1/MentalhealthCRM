@@ -39,6 +39,7 @@ import type {
 } from "@shared/types";
 import { format, parseISO, isValid } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+
 import PatientNotes from "@/components/patients/PatientNotes";
 
 export default function PatientDetail() {
@@ -58,6 +59,9 @@ export default function PatientDetail() {
 
   // Smart back button logic
   const [previousPath, setPreviousPath] = useState<string>('/patients');
+  
+  // Delete confirmation state
+  const [isDeleting, setIsDeleting] = useState(false);
   
   // Track where user came from
   useEffect(() => {
@@ -165,6 +169,8 @@ export default function PatientDetail() {
     queryKey: [`/api/patients/${patientId}`],
     retry: false,
     enabled: !!patientId,
+    refetchInterval: 5000, // Refetch every 5 seconds for real-time updates
+    refetchIntervalInBackground: true, // Continue polling even when tab is not active
   }) as { data: any; isLoading: boolean };
 
   const { data: appointments, isLoading: appointmentsLoading } = useQuery({
@@ -173,12 +179,16 @@ export default function PatientDetail() {
     enabled: !!patientId,
     staleTime: 0, // Force fresh fetch
     refetchOnMount: true,
+    refetchInterval: 5000, // Refetch every 5 seconds for real-time updates
+    refetchIntervalInBackground: true, // Continue polling even when tab is not active
   }) as { data: any[]; isLoading: boolean };
 
   const { data: records, isLoading: recordsLoading } = useQuery({
     queryKey: [`/api/patients/${patientId}/records`],
     retry: false,
     enabled: !!patientId,
+    refetchInterval: 5000, // Refetch every 5 seconds for real-time updates
+    refetchIntervalInBackground: true, // Continue polling even when tab is not active
   }) as { data: any[]; isLoading: boolean };
 
   const updateStatusMutation = useMutation({
@@ -245,6 +255,10 @@ export default function PatientDetail() {
       });
     },
   });
+
+
+
+
 
   if (authLoading || patientLoading) {
     return (
@@ -417,6 +431,50 @@ export default function PatientDetail() {
                   >
                     {patient.status === "active" ? "Deactivate" : "Activate"}
                   </Button>
+
+                  {/* Simple delete button */}
+                  <button
+                    type="button"
+                    className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 flex items-center space-x-2"
+                    onClick={async () => {
+                      if (!patient) {
+                        alert("Patient not found");
+                        return;
+                      }
+                      
+                      if (confirm(`Are you sure you want to delete ${patient.firstName} ${patient.lastName}?`)) {
+                        try {
+                          const response = await fetch(`/api/patients/${patientId}`, {
+                            method: "DELETE",
+                          });
+                          
+                          if (!response.ok) {
+                            throw new Error("Failed to delete patient");
+                          }
+                          
+                          toast({
+                            title: "Patient deleted",
+                            description: `${patient.firstName} ${patient.lastName} has been deleted successfully.`,
+                          });
+                          
+                          // Navigate back to patients list
+                          window.location.href = '/patients';
+                        } catch (error) {
+                          console.error("Error deleting patient:", error);
+                          toast({
+                            title: "Delete failed",
+                            description: "Failed to delete patient. Please try again.",
+                            variant: "destructive"
+                          });
+                        }
+                      }
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    <span>Delete Patient</span>
+                  </button>
+                  
+                  
                 </div>
               </div>
             </div>
@@ -1209,6 +1267,8 @@ function AssessmentsSection({ patientId, patient }: { patientId: string, patient
           </div>
         </DialogContent>
       </Dialog>
+
+
     </div>
   );
 }

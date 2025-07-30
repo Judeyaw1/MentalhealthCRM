@@ -64,8 +64,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
 
-  // Serve static files (React app production build)
-  app.use(express.static(path.join(process.cwd(), 'dist/public')));
+  // Serve static files (React app production build) - only in production
+  if (process.env.NODE_ENV === 'production') {
+    app.use(express.static(path.join(process.cwd(), 'dist/public')));
+  }
   
   // Serve uploads
   app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
@@ -301,7 +303,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         patientData = req.body;
       }
       // Parse/validate
-      const parsed = insertPatientSchema.parse(patientData);
+      // Validate required fields manually since we removed the schema
+      if (!patientData.firstName || !patientData.lastName || !patientData.dateOfBirth) {
+        return res.status(400).json({ message: "First name, last name, and date of birth are required" });
+      }
+      const parsed = patientData;
       // Add the current user as the creator
       const patientWithCreator = {
         ...parsed,
@@ -344,7 +350,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           updates.photoUrl = `/uploads/${req.files.photo[0].filename}`;
         }
       } else {
-        updates = insertPatientSchema.partial().parse(req.body);
+        updates = req.body;
       }
       // Clean up ObjectId fields - convert empty strings to null
       const cleanedUpdates = {
@@ -2207,6 +2213,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
+  // Debug notification endpoint (no auth required)
+  app.post(
+    "/api/notifications/debug",
+    async (req: any, res) => {
+      try {
+        const { userId, type, title, message, data } = req.body;
+        
+        console.log("🔍 Debug notification request:", { userId, type, title, message, data });
+
+        const notification = await notificationService.createNotification(
+          userId,
+          type || 'patient_assigned',
+          title || 'Debug Test Notification',
+          message || 'This is a debug test notification',
+          data
+        );
+
+        console.log("✅ Debug notification created:", notification);
+
+        res.json({ 
+          message: "Debug notification created", 
+          notification 
+        });
+      } catch (error: any) {
+        console.error("❌ Error creating debug notification:", error);
+        res.status(500).json({ message: "Failed to create debug notification", error: error.message });
+      }
+    },
+  );
+
   // Email test endpoint
   app.post(
     "/api/email/test",
@@ -2654,6 +2690,108 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Close/Archive all threads for a patient (admin and therapists only)
+  app.post("/api/patients/:patientId/notes/close-all", isAuthenticated, async (req: any, res) => {
+    try {
+      const { patientId } = req.params;
+      const user = await storage.getUser(req.user.id);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Only admins and therapists can close all threads
+      if (user.role !== "admin" && user.role !== "therapist") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      // Find all notes for the patient and mark them as archived
+      const result = await PatientNote.updateMany(
+        { 
+          patientId: patientId,
+          isArchived: { $ne: true } // Only archive non-archived notes
+        },
+        { 
+          $set: { 
+            isArchived: true,
+            archivedAt: new Date(),
+            archivedBy: user.id,
+            archivedByName: `${user.firstName} ${user.lastName}`
+          }
+        }
+      );
+
+      console.log(`🔒 All threads closed for patient:`, {
+        patientId,
+        updatedCount: result.modifiedCount,
+        closedBy: `${user.firstName} ${user.lastName}`,
+        closedAt: new Date()
+      });
+
+      // Log activity
+      await logActivity(user.id, "close_all_threads", "patient", patientId, {
+        patientId,
+        updatedCount: result.modifiedCount
+      });
+
+      res.json({ 
+        message: `All threads closed successfully`,
+        updatedCount: result.modifiedCount,
+        patientId
+      });
+    } catch (error) {
+      console.error("Error closing all threads:", error);
+      res.status(500).json({ message: "Failed to close all threads" });
+    }
+  });
+
+  // Auto-clear archived notes after 5 minutes
+  app.post("/api/patients/:patientId/notes/clear-archived", isAuthenticated, async (req: any, res) => {
+    try {
+      const { patientId } = req.params;
+      const user = await storage.getUser(req.user.id);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Only admins and therapists can clear archived notes
+      if (user.role !== "admin" && user.role !== "therapist") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      // Find all archived notes for the patient and delete them
+      const result = await PatientNote.deleteMany(
+        { 
+          patientId: patientId,
+          isArchived: true
+        }
+      );
+
+      console.log(`🗑️ Archived notes cleared for patient:`, {
+        patientId,
+        deletedCount: result.deletedCount,
+        clearedBy: `${user.firstName} ${user.lastName}`,
+        clearedAt: new Date()
+      });
+
+      // Log activity
+      await logActivity(user.id, "clear_archived_notes", "patient", patientId, {
+        patientId,
+        deletedCount: result.deletedCount
+      });
+
+      res.json({ 
+        message: `Archived notes cleared successfully`,
+        deletedCount: result.deletedCount,
+        patientId
+      });
+    } catch (error) {
+      console.error("Error clearing archived notes:", error);
+      res.status(500).json({ message: "Failed to clear archived notes" });
+    }
+  });
+
   // Get patient changes summary for front desk
   app.get("/api/patient-changes", isAuthenticated, async (req: any, res) => {
     try {
@@ -2673,7 +2811,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // If reset parameter is provided, use a shorter time range to show fresh data
       if (reset) {
-        startDate = new Date(Date.now() - 10 * 60 * 1000); // Last 10 minutes
+        startDate = new Date(Date.now() - 10 * 60 * 1000); // Last 10 minutes for refresh
         console.log(`🔍 Patient changes debug - Reset requested, using 10 minutes: ${startDate}`);
         console.log(`🔍 Patient changes debug - Current time: ${new Date()}`);
         console.log(`🔍 Patient changes debug - Time difference: ${Date.now() - startDate.getTime()} ms`);
@@ -2734,8 +2872,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         createdAt: { $gte: startDate, $lte: endDate },
         resourceType: "patient",
         $or: [
-          { action: "create_patient" },
-          { action: "update_patient" },
+          { action: "create" },
+          { action: "update" },
           { action: "assign_therapist" },
           { action: "mark_important" }
         ]
@@ -2751,18 +2889,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
           status: patient.status,
           assignedTherapist: patient.assignedTherapistId ? `${(patient.assignedTherapistId as any).firstName} ${(patient.assignedTherapistId as any).lastName}` : null
         })),
-        statusChanges: statusChanges.filter(patient => {
-          // Only include if there were actual changes (not just new patients)
-          const isOldPatient = patient.createdAt < startDate;
-          console.log(`🔍 Patient changes debug - ${patient.firstName} ${patient.lastName}: createdAt=${patient.createdAt}, startDate=${startDate}, isOldPatient=${isOldPatient}`);
-          return isOldPatient;
-        }).map(patient => {
-          // Find who made the most recent update for this patient
+        statusChanges: await Promise.all(statusChanges.filter(patient => {
+          // Include patients that were updated within the time range (regardless of when they were created)
+          const wasUpdatedInTimeRange = patient.updatedAt >= startDate;
+          console.log(`🔍 Patient changes debug - ${patient.firstName} ${patient.lastName}: createdAt=${patient.createdAt}, updatedAt=${patient.updatedAt}, startDate=${startDate}, wasUpdatedInTimeRange=${wasUpdatedInTimeRange}`);
+          return wasUpdatedInTimeRange;
+        }).map(async patient => {
+          // Find who made the most recent update for this patient from audit logs
           const patientAction = patientActions.find(log => 
             log.resourceId === patient._id.toString() && 
-            log.action === "update_patient" &&
+            log.action === "update" &&
             new Date(log.createdAt) >= startDate
           );
+          
+          // Get the user who made the change from audit logs
+          let updatedBy = "Unknown";
+          if (patientAction && patientAction.userId) {
+            try {
+              const user = await storage.getUser(patientAction.userId);
+              if (user) {
+                updatedBy = `${user.firstName} ${user.lastName}`;
+              }
+            } catch (error) {
+              console.error(`Failed to get user for audit log: ${patientAction.userId}`, error);
+            }
+          }
           
           return {
             id: patient._id,
@@ -2771,9 +2922,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             assignedTherapist: patient.assignedTherapistId ? `${(patient.assignedTherapistId as any).firstName} ${(patient.assignedTherapistId as any).lastName}` : null,
             important: patient.important,
             updatedAt: patient.updatedAt,
-            updatedBy: patientAction ? patientAction.userName || "Unknown" : "Unknown"
+            updatedBy: updatedBy
           };
-        }),
+        })),
          therapistAssignments: statusChanges.filter(patient => {
            const hasTherapist = !!patient.assignedTherapistId;
            console.log(`🔍 Therapist assignment debug - ${patient.firstName} ${patient.lastName}: hasTherapist=${hasTherapist}, assignedTherapistId=${patient.assignedTherapistId}`);
@@ -2926,16 +3077,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Catch-all route to serve React app for all non-API routes
-  app.get('*', (req, res) => {
-    // Don't serve React app for API routes
-    if (req.path.startsWith('/api/')) {
-      return res.status(404).json({ message: 'API endpoint not found' });
-    }
-    
-    // Serve the React app's index.html for all other routes
-    res.sendFile(path.join(process.cwd(), 'dist/public/index.html'));
-  });
+  // Catch-all route to serve React app for all non-API routes - only in production
+  if (process.env.NODE_ENV === 'production') {
+    app.get('*', (req, res) => {
+      // Don't serve React app for API routes
+      if (req.path.startsWith('/api/')) {
+        return res.status(404).json({ message: 'API endpoint not found' });
+      }
+      
+      // Serve the React app's index.html for all other routes
+      res.sendFile(path.join(process.cwd(), 'dist/public/index.html'));
+    });
+  }
 
   const httpServer = createServer(app);
   return httpServer;

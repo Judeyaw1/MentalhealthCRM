@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Clock, UserPlus, RefreshCw, UserCheck, Star, Calendar, Download } from "lucide-react";
+import { Clock, UserPlus, UserCheck, Star, Calendar, Download, RefreshCw } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
 
 interface PatientChange {
@@ -53,7 +53,45 @@ export default function PatientChangesSummary() {
   const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
-  const [resetTimestamp, setResetTimestamp] = useState<number | null>(null);
+  const [isClearing, setIsClearing] = useState(false);
+  const [shouldShowEmpty, setShouldShowEmpty] = useState(false);
+  
+  // Get today's date as a string for daily reset
+  const today = new Date().toDateString();
+  
+  // Use localStorage to persist the daily refresh counter
+  const [forceRefresh, setForceRefresh] = useState(() => {
+    const stored = localStorage.getItem('patient-changes-refresh');
+    const storedDate = localStorage.getItem('patient-changes-date');
+    
+    console.log("🔍 PatientChangesSummary - Initializing forceRefresh:");
+    console.log("  - stored:", stored);
+    console.log("  - storedDate:", storedDate);
+    console.log("  - today:", today);
+    
+    // If it's a new day, reset the counter
+    if (storedDate !== today) {
+      console.log("  - New day detected, resetting to 0");
+      localStorage.setItem('patient-changes-date', today);
+      return 0;
+    }
+    
+    const result = stored ? parseInt(stored) : 0;
+    console.log("  - Using stored value:", result);
+    return result;
+  });
+
+  // Update localStorage whenever forceRefresh changes
+  React.useEffect(() => {
+    localStorage.setItem('patient-changes-refresh', forceRefresh.toString());
+  }, [forceRefresh]);
+
+  // Don't auto-increment on user change - let localStorage handle persistence
+  // React.useEffect(() => {
+  //   if (user?.id) {
+  //     setForceRefresh(prev => prev + 1);
+  //   }
+  // }, [user?.id]);
 
   // Debug: Log user info
   console.log("PatientChangesSummary - User:", user);
@@ -64,11 +102,11 @@ export default function PatientChangesSummary() {
   }
 
   const { data, isLoading, error, refetch } = useQuery<PatientChangesData>({
-    queryKey: ["patient-changes", resetTimestamp],
+    queryKey: ["patient-changes", forceRefresh, user?.id], // Simple query key
     queryFn: async () => {
       console.log("Fetching patient changes...");
-      const url = resetTimestamp 
-        ? `/api/patient-changes?reset=${resetTimestamp}`
+      const url = forceRefresh > 0 
+        ? `/api/patient-changes?reset=${forceRefresh}`
         : "/api/patient-changes?since=last-login";
       console.log("API URL:", url);
       
@@ -83,19 +121,44 @@ export default function PatientChangesSummary() {
       console.log("Patient changes data:", data);
       return data;
     },
-    enabled: isOpen, // Only fetch when modal is open
+    enabled: isOpen && !!user?.id && !shouldShowEmpty, // Don't fetch when showing empty state
+    staleTime: 0, // Always consider data stale
+    gcTime: 0, // Don't cache this data
   });
 
   const handleOpen = () => {
     setIsOpen(true);
-    // Set initial refresh time when modal opens
-    if (!lastRefreshed) {
-      setLastRefreshed(new Date());
-    }
+    // Reset states when opening
+    setShouldShowEmpty(false);
+    setIsClearing(false);
+    // Force fresh data by incrementing the refresh counter
+    setForceRefresh(prev => prev + 1);
+    setLastRefreshed(new Date());
+  };
+
+  const handleRefresh = () => {
+    // Reset the empty state
+    setShouldShowEmpty(false);
+    
+    // Force fresh data by incrementing the refresh counter
+    setForceRefresh(prev => prev + 1);
+    setLastRefreshed(new Date());
+    
+    // Clear the data after a short delay to show empty state
+    setTimeout(() => {
+      setIsClearing(true);
+      setShouldShowEmpty(true);
+      // Clear the React Query cache to ensure no stale data
+      queryClient.setQueryData(["patient-changes", forceRefresh, user?.id], null);
+      setIsClearing(false);
+    }, 2000); // Show refresh results for 2 seconds, then clear
   };
 
   const handleClose = () => {
     setIsOpen(false);
+    // Reset states when closing
+    setShouldShowEmpty(false);
+    setIsClearing(false);
   };
 
   const getInitials = (name: string) => {
@@ -149,19 +212,7 @@ ${data?.changes.importantUpdates.map(p => `• ${p.name} - Marked as important`)
     });
   };
 
-  const handleReset = () => {
-    console.log("🔍 Reset button clicked!");
-    
-    // Set a new timestamp to trigger a fresh query with reset parameter
-    const timestamp = Date.now();
-    setResetTimestamp(timestamp);
-    setLastRefreshed(new Date());
-    
-    toast({
-      title: "Data Reset",
-      description: "Patient changes data has been refreshed with latest information",
-    });
-  };
+
 
   return (
     <>
@@ -188,30 +239,17 @@ ${data?.changes.importantUpdates.map(p => `• ${p.name} - Marked as important`)
                            Last refreshed: {formatDistanceToNow(lastRefreshed, { addSuffix: true })}
                          </span>
                        )}
+
+                       {/* REFRESH AND EXPORT BUTTONS */}
                        <Button
                          size="sm"
                          variant="outline"
-                         onClick={() => {
-                           refetch();
-                           setLastRefreshed(new Date());
-                         }}
+                         onClick={handleRefresh}
                          disabled={isLoading}
                          title="Refresh data"
                        >
-                         <RefreshCw className="h-4 w-4 mr-1" />
+                         <RefreshCw className={`h-4 w-4 mr-1 ${isLoading ? 'animate-spin' : ''}`} />
                          Refresh
-                       </Button>
-                       <Button
-                         size="sm"
-                         variant="outline"
-                         onClick={() => {
-                           console.log("🔍 Reset button clicked - test!");
-                           handleReset();
-                         }}
-                         disabled={isLoading}
-                         title="Reset and get fresh data"
-                       >
-                         Reset
                        </Button>
                        <Button
                          size="sm"
@@ -243,7 +281,7 @@ ${data?.changes.importantUpdates.map(p => `• ${p.name} - Marked as important`)
             </div>
           )}
 
-          {data && (
+          {data && !shouldShowEmpty && (
             <div className="space-y-6">
               {/* Summary Cards */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -423,12 +461,19 @@ ${data?.changes.importantUpdates.map(p => `• ${p.name} - Marked as important`)
                 </Card>
               )}
 
-              {/* No Changes */}
-              {data.summary.totalChanges === 0 && (
+              {/* No Changes or Empty State */}
+              {(data.summary.totalChanges === 0 || shouldShowEmpty) && (
                 <div className="text-center py-8 text-gray-500">
                   <Clock className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                  <p className="text-lg font-medium">No Changes Found</p>
-                  <p className="text-sm">No patient changes occurred during this time period.</p>
+                  <p className="text-lg font-medium">
+                    {isClearing ? "Clearing..." : "No New Changes"}
+                  </p>
+                  <p className="text-sm">
+                    {isClearing 
+                      ? "Data will be cleared shortly" 
+                      : "Click refresh to check for new patient changes."
+                    }
+                  </p>
                 </div>
               )}
             </div>

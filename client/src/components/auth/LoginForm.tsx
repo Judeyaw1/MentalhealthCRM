@@ -50,6 +50,9 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
         data.forcePasswordChange ? "true" : "false",
       );
 
+      // Don't clear patient changes refresh state on login - let it persist
+      // This allows users to see the same fresh data they requested before logout
+
       toast({
         title: "Login Successful",
         description: `Welcome back, ${data.user.firstName}!`,

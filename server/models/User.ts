@@ -36,9 +36,6 @@ UserSchema.pre('findOneAndUpdate', function(next) {
   next();
 });
 
-UserSchema.pre('findByIdAndUpdate', function(next) {
-  this.set({ updatedAt: new Date() });
-  next();
-});
+// Removed findByIdAndUpdate middleware due to TypeScript issues
 
 export const User = mongoose.model("User", UserSchema);

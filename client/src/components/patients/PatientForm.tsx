@@ -33,12 +33,26 @@ interface PatientFormProps {
 }
 
 // Define a form schema that accepts dateOfBirth as a string
-const patientFormSchema = insertPatientSchema.extend({
+const patientFormSchema = z.object({
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
   dateOfBirth: z
     .string()
     .refine((val) => !isNaN(new Date(val).getTime()), {
       message: "Invalid date",
     }),
+  gender: z.string().optional(),
+  email: z.string().email().optional().or(z.literal("")),
+  phone: z.string().optional(),
+  emergencyContact: z.string().optional(),
+  address: z.string().optional(),
+  insurance: z.string().optional(),
+  reasonForVisit: z.string().optional(),
+  status: z.enum(["active", "inactive", "discharged"]).optional(),
+  hipaaConsent: z.boolean().optional(),
+  assignedTherapistId: z.string().optional(),
+  loc: z.string().optional(),
+  authNumber: z.string().optional(),
 });
 
 type PatientFormValues = {

@@ -169,6 +169,41 @@ export class DatabaseStorage {
         hasCreatedBy: !!populatedPatient.createdBy,
       });
 
+      // Send notification if a therapist is assigned during creation
+      console.log("🔍 Checking for therapist assignment:", {
+        hasAssignedTherapist: !!populatedPatient.assignedTherapistId,
+        therapistId: populatedPatient.assignedTherapistId?._id?.toString(),
+        patientName: `${populatedPatient.firstName} ${populatedPatient.lastName}`
+      });
+      
+      if (populatedPatient.assignedTherapistId) {
+        try {
+          console.log("📞 Attempting to send notification to therapist:", populatedPatient.assignedTherapistId._id.toString());
+          const { notificationService } = await import("./notificationService");
+          const patientName = `${populatedPatient.firstName} ${populatedPatient.lastName}`;
+          
+          await notificationService.sendPatientAssignmentNotification(
+            populatedPatient.assignedTherapistId._id.toString(),
+            {
+              patientName,
+              patientId: populatedPatient._id.toString(),
+              reasonForVisit: populatedPatient.reasonForVisit,
+              status: populatedPatient.status,
+              assignedAt: new Date(),
+            }
+          );
+          
+          console.log("✅ New patient assignment notification sent to therapist:", populatedPatient.assignedTherapistId._id.toString());
+        } catch (error) {
+          console.error("❌ Failed to send new patient assignment notification:", error);
+          if (error instanceof Error) {
+            console.error("❌ Error details:", error.message, error.stack);
+          }
+        }
+      } else {
+        console.log("ℹ️ No therapist assigned, skipping notification");
+      }
+
       const { _id, ...rest } = populatedPatient;
       return {
         ...rest,
@@ -205,7 +240,10 @@ export class DatabaseStorage {
     const prevTherapistId = currentPatient.assignedTherapistId?.toString();
     const newTherapistId = cleanedPatient.assignedTherapistId?.toString();
 
-    const updatedPatient = await PatientModel.findByIdAndUpdate(id, cleanedPatient, {
+    const updatedPatient = await PatientModel.findByIdAndUpdate(id, {
+      ...cleanedPatient,
+      updatedAt: new Date()
+    }, {
       new: true,
     }).lean();
     if (!updatedPatient) return undefined;
@@ -213,26 +251,26 @@ export class DatabaseStorage {
     // Send notification if therapist assignment changed
     if (newTherapistId && newTherapistId !== prevTherapistId) {
       try {
-        const { notificationService } = require("./notificationService");
+        const { notificationService } = await import("./notificationService");
         const patientName = `${updatedPatient.firstName} ${updatedPatient.lastName}`;
-        const notificationTitle = "New Patient Assigned";
-        const notificationMessage = `You have been assigned patient ${patientName}.`;
-        const notificationData = {
-          patientId: updatedPatient._id.toString(),
-          patientName,
-          reasonForVisit: updatedPatient.reasonForVisit,
-          status: updatedPatient.status,
-        };
-
-        await notificationService.createNotification(
+        
+        await notificationService.sendPatientAssignmentNotification(
           newTherapistId,
-          "patient_assigned",
-          notificationTitle,
-          notificationMessage,
-          notificationData
+          {
+            patientName,
+            patientId: updatedPatient._id.toString(),
+            reasonForVisit: updatedPatient.reasonForVisit,
+            status: updatedPatient.status,
+            assignedAt: new Date(),
+          }
         );
+        
+        console.log("✅ Patient assignment notification sent to therapist:", newTherapistId);
       } catch (error) {
-        console.error("Failed to send patient assignment notification:", error);
+        console.error("❌ Failed to send patient assignment notification:", error);
+        if (error instanceof Error) {
+          console.error("❌ Error details:", error.message, error.stack);
+        }
       }
     }
 
@@ -455,13 +493,17 @@ export class DatabaseStorage {
     // Send notification to the assigned therapist
     try {
       const { notificationService } = await import("./notificationService");
-      const patientName = `${populatedAppointment.patientId.firstName} ${populatedAppointment.patientId.lastName}`;
+      // Type-safe access to populated patient data
+      const patientData = populatedAppointment.patientId as any;
+      const patientName = patientData && typeof patientData === 'object' && 'firstName' in patientData && 'lastName' in patientData
+        ? `${patientData.firstName} ${patientData.lastName}`
+        : 'Unknown Patient';
       const appointmentDate = new Date(populatedAppointment.appointmentDate).toLocaleDateString();
       const notificationTitle = "New Appointment Assigned";
       const notificationMessage = `You have a new appointment with ${patientName} on ${appointmentDate}.`;
       const notificationData = {
         appointmentId: populatedAppointment._id.toString(),
-        patientId: populatedAppointment.patientId._id.toString(),
+        patientId: patientData && patientData._id ? patientData._id.toString() : "",
         patientName,
         appointmentDate: populatedAppointment.appointmentDate,
         appointmentType: populatedAppointment.type,
@@ -778,13 +820,17 @@ export class DatabaseStorage {
     // Send notification to the assigned therapist
     try {
       const { notificationService } = require("./notificationService");
-      const patientName = `${populatedRecord.patientId.firstName} ${populatedRecord.patientId.lastName}`;
+      // Type-safe access to populated patient data
+      const patientData = populatedRecord.patientId as any;
+      const patientName = patientData && typeof patientData === 'object' && 'firstName' in patientData && 'lastName' in patientData
+        ? `${patientData.firstName} ${patientData.lastName}`
+        : 'Unknown Patient';
       const sessionDate = new Date(populatedRecord.sessionDate).toLocaleDateString();
       const notificationTitle = "New Treatment Record Assigned";
       const notificationMessage = `You have a new treatment record for ${patientName} from ${sessionDate}.`;
       const notificationData = {
         treatmentRecordId: populatedRecord._id.toString(),
-        patientId: populatedRecord.patientId._id.toString(),
+        patientId: patientData && patientData._id ? patientData._id.toString() : "",
         patientName,
         sessionDate: populatedRecord.sessionDate,
         sessionType: populatedRecord.sessionType,
@@ -1004,7 +1050,7 @@ export class DatabaseStorage {
       // Sort logs to prioritize system activities at the top
       const systemActions = ['login', 'logout', 'password_reset', 'emergency_access'];
       
-      const sortedLogs = logs.sort((a, b) => {
+      const sortedLogs = logs.sort((a: any, b: any) => {
         const aIsSystem = systemActions.includes(a.action);
         const bIsSystem = systemActions.includes(b.action);
         
@@ -1340,7 +1386,18 @@ export class DatabaseStorage {
     }
 
     const notifications = await queryBuilder.lean();
-    return notifications;
+    // Transform the lean result to match the Notification interface
+    return notifications.map((notification: any) => ({
+      id: notification.id,
+      userId: notification.userId,
+      type: notification.type as NotificationType,
+      title: notification.title,
+      message: notification.message,
+      data: notification.data,
+      read: notification.read,
+      createdAt: notification.createdAt,
+      expiresAt: notification.expiresAt,
+    }));
   }
 
   async markNotificationAsRead(notificationId: string, userId: string): Promise<boolean> {

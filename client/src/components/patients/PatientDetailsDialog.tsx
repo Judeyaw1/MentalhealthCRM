@@ -20,6 +20,9 @@ interface PatientDetailsDialogProps {
 }
 
 export function PatientDetailsDialog({ patientId, isOpen, onClose }: PatientDetailsDialogProps) {
+  console.log("🎭 PatientDetailsDialog props:", { patientId, isOpen });
+  console.log("🎭 PatientDetailsDialog render triggered");
+  
   const { user } = useAuth();
   const { toast } = useToast();
   const [editMode, setEditMode] = useState(false);
@@ -40,6 +43,7 @@ export function PatientDetailsDialog({ patientId, isOpen, onClose }: PatientDeta
 
   const handleEdit = () => setEditMode(true);
   const handleCancelEdit = () => setEditMode(false);
+  
   const handleSave = async (data: any) => {
     try {
       const response = await fetch(`/api/patients/${patientId}`, {
@@ -56,6 +60,8 @@ export function PatientDetailsDialog({ patientId, isOpen, onClose }: PatientDeta
     }
   };
 
+  console.log("🎭 PatientDetailsDialog returning JSX, isOpen:", isOpen);
+  
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl">
@@ -192,9 +198,13 @@ export function PatientDetailsDialog({ patientId, isOpen, onClose }: PatientDeta
                 </div>
               </CardContent>
             </Card>
-            {canEdit && (
-              <Button onClick={handleEdit} className="mt-2">Edit Patient</Button>
-            )}
+            <div className="flex gap-2 mt-4">
+              {canEdit && (
+                <Button onClick={handleEdit} variant="outline">
+                  Edit Patient
+                </Button>
+              )}
+            </div>
           </div>
         )}
       </DialogContent>

@@ -9,12 +9,14 @@ export interface User {
   role: 'admin' | 'supervisor' | 'therapist' | 'staff' | 'frontdesk';
   password?: string;
   forcePasswordChange?: boolean;
+  profileImageUrl?: string;
   createdAt?: Date;
   updatedAt?: Date;
 }
 
 export interface Patient {
   id: string;
+  _id?: string;
   firstName: string;
   lastName: string;
   dateOfBirth: Date;
@@ -103,6 +105,7 @@ export interface InsertPatient {
   assignedTherapistId?: string;
   loc?: string;
   important?: boolean;
+  authNumber?: string;
 }
 
 export interface InsertAppointment {

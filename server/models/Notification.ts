@@ -17,7 +17,8 @@ const NotificationSchema = new mongoose.Schema({
       'password_reset',
       'directed_note',
       'general',
-      'assessment_followup'
+      'assessment_followup',
+      'patient_assigned'
     ]
   },
   title: { type: String, required: true },

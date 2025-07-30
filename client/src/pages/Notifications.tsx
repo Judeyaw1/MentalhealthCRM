@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Bell, Check, X, Clock, AlertTriangle, User, Calendar, FileText, ChevronRight, Filter, Search } from "lucide-react";
+import { Bell, Check, X, Clock, AlertTriangle, User, Calendar, FileText, ChevronRight, Filter, Search, UserCheck, Mail, Users, Lock, ClipboardCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { ArrowLeft } from "lucide-react";
+import { usePatientDialog } from "@/contexts/PatientDialogContext";
 
 interface Notification {
   id: string;
@@ -27,6 +28,7 @@ export default function Notifications() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
+  const { openPatientDialog } = usePatientDialog();
 
   // Fetch all notifications
   const { data: notifications = [], isLoading } = useQuery({
@@ -104,8 +106,9 @@ export default function Notifications() {
     // Mark as read first
     handleMarkAsRead(notification.id);
 
-    // Navigate based on notification data
+    // Navigate based on notification type and data
     if (notification.data) {
+      // Appointment notifications
       if (notification.data.appointmentId) {
         toast({
           title: "Opening appointment",
@@ -115,7 +118,29 @@ export default function Notifications() {
         return;
       }
       
+      // Patient-related notifications
       if (notification.data.patientId) {
+        if (notification.type === "patient_assigned") {
+          // Open patient dialog for patient assignment notifications
+          toast({
+            title: "Opening patient details",
+            description: "Opening patient details dialog...",
+          });
+          openPatientDialog(notification.data.patientId);
+          return;
+        }
+        
+        if (notification.type === "directed_note" && notification.data.noteId) {
+          // Navigate to patient detail page with notes tab
+          toast({
+            title: "Opening directed note",
+            description: "Taking you to the patient's notes...",
+          });
+          setLocation(`/patients/${notification.data.patientId}?tab=notes`);
+          return;
+        }
+        
+        // For patient_update, discharge_reminder, assessment_followup
         toast({
           title: "Opening patient",
           description: "Taking you to the patient details...",
@@ -124,6 +149,7 @@ export default function Notifications() {
         return;
       }
       
+      // Treatment record notifications
       if (notification.data.treatmentRecordId) {
         toast({
           title: "Opening patient records",
@@ -133,6 +159,7 @@ export default function Notifications() {
         return;
       }
       
+      // Inquiry notifications
       if (notification.data.inquiryId) {
         toast({
           title: "Opening inquiries",
@@ -143,12 +170,41 @@ export default function Notifications() {
       }
     }
 
-    // Default: navigate to dashboard
-    toast({
-      title: "Opening dashboard",
-      description: "Taking you to the dashboard...",
-    });
-    setLocation("/dashboard");
+    // Handle notifications without specific data
+    switch (notification.type) {
+      case "staff_invitation":
+        toast({
+          title: "Opening staff management",
+          description: "Taking you to the staff page...",
+        });
+        setLocation("/staff");
+        return;
+      
+      case "password_reset":
+        toast({
+          title: "Password reset",
+          description: "Please check your email for reset instructions...",
+        });
+        setLocation("/settings");
+        return;
+      
+      case "system_alert":
+      case "general":
+        toast({
+          title: "System notification",
+          description: "Taking you to the dashboard...",
+        });
+        setLocation("/dashboard");
+        return;
+      
+      default:
+        // Default: navigate to dashboard
+        toast({
+          title: "Opening dashboard",
+          description: "Taking you to the dashboard...",
+        });
+        setLocation("/dashboard");
+    }
   };
 
   const getNotificationIcon = (type: string) => {
@@ -157,10 +213,26 @@ export default function Notifications() {
         return <Calendar className="h-4 w-4 text-blue-500" />;
       case "patient_update":
         return <User className="h-4 w-4 text-green-500" />;
+      case "patient_assigned":
+        return <User className="h-4 w-4 text-indigo-500" />;
+      case "discharge_reminder":
+        return <UserCheck className="h-4 w-4 text-orange-500" />;
+      case "inquiry_received":
+        return <Mail className="h-4 w-4 text-cyan-500" />;
+      case "staff_invitation":
+        return <Users className="h-4 w-4 text-violet-500" />;
+      case "password_reset":
+        return <Lock className="h-4 w-4 text-amber-500" />;
+      case "directed_note":
+        return <FileText className="h-4 w-4 text-emerald-500" />;
+      case "assessment_followup":
+        return <ClipboardCheck className="h-4 w-4 text-teal-500" />;
       case "system_alert":
         return <AlertTriangle className="h-4 w-4 text-red-500" />;
       case "treatment_completion":
         return <FileText className="h-4 w-4 text-purple-500" />;
+      case "general":
+        return <Bell className="h-4 w-4 text-gray-500" />;
       default:
         return <Bell className="h-4 w-4 text-gray-500" />;
     }

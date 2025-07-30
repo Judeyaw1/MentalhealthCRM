@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Bell, Check, X, Clock, AlertTriangle, User, Calendar, FileText, ChevronRight } from "lucide-react";
+import { Bell, Check, X, Clock, AlertTriangle, User, Calendar, FileText, ChevronRight, UserCheck, Mail, Users, Lock, ClipboardCheck } from "lucide-react";
 import { Button } from "./button";
 import { Badge } from "./badge";
 import {
@@ -12,6 +12,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import { usePatientDialog } from "@/contexts/PatientDialogContext";
 
 interface Notification {
   id: string;
@@ -28,6 +29,7 @@ export function NotificationBell() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
+  const { openPatientDialog } = usePatientDialog();
 
   // Fetch notifications
   const { data: notifications = [], refetch } = useQuery({
@@ -35,8 +37,21 @@ export function NotificationBell() {
     queryFn: async () => {
       const response = await fetch("/api/notifications?limit=10");
       if (!response.ok) throw new Error("Failed to fetch notifications");
-      return response.json();
+      const data = await response.json();
+      console.log("📋 Fetched notifications:", data);
+      console.log("📋 Notifications count:", data.length);
+      data.forEach((notification: any, index: number) => {
+        console.log(`📋 Notification ${index}:`, {
+          id: notification.id,
+          type: notification.type,
+          title: notification.title,
+          data: notification.data
+        });
+      });
+      return data;
     },
+    refetchInterval: 5000, // Refetch every 5 seconds for real-time updates
+    refetchIntervalInBackground: true, // Continue polling even when tab is not active
   });
 
   // Fetch unread count
@@ -48,6 +63,8 @@ export function NotificationBell() {
       const data = await response.json();
       return data.count;
     },
+    refetchInterval: 5000, // Refetch every 5 seconds for real-time updates
+    refetchIntervalInBackground: true, // Continue polling even when tab is not active
   });
 
   // Mark as read mutation
@@ -113,16 +130,23 @@ export function NotificationBell() {
 
   // Handle notification click and navigation
   const handleNotificationClick = (notification: Notification) => {
+    console.log("🔔 Notification clicked:", notification);
+    console.log("🔍 Notification type:", notification.type);
+    console.log("🔍 Notification data:", notification.data);
+    
     // Mark as read first
     handleMarkAsRead(notification.id);
     
     // Close the dropdown
     setIsOpen(false);
 
-    // Navigate based on notification data
+    // Navigate based on notification type and data
     if (notification.data) {
+      console.log("📋 Notification data:", notification.data);
+      
+      // Appointment notifications
       if (notification.data.appointmentId) {
-        // Navigate to appointment detail
+        console.log("📅 Appointment notification detected");
         toast({
           title: "Opening appointment",
           description: "Taking you to the appointment details...",
@@ -131,8 +155,34 @@ export function NotificationBell() {
         return;
       }
       
+      // Patient-related notifications
       if (notification.data.patientId) {
-        // Check if it's a directed note notification
+        console.log("👤 Patient ID found:", notification.data.patientId);
+        console.log("📝 Notification type:", notification.type);
+        console.log("🔍 Type comparison result:", notification.type === "patient_assigned");
+        
+        if (notification.type === "patient_assigned") {
+          console.log("🎯 Opening patient dialog for patient assignment");
+          console.log("🔍 Patient ID from notification:", notification.data.patientId);
+          console.log("🔍 Notification type check:", notification.type === "patient_assigned");
+          
+          // Open patient dialog for patient assignment notifications
+          toast({
+            title: "Opening patient details",
+            description: "Opening patient details dialog...",
+          });
+          
+          try {
+            openPatientDialog(notification.data.patientId);
+            console.log("✅ openPatientDialog called successfully");
+          } catch (error) {
+            console.error("❌ Error calling openPatientDialog:", error);
+          }
+          return;
+        } else {
+          console.log("❌ Notification type is not 'patient_assigned', it is:", notification.type);
+        }
+        
         if (notification.type === "directed_note" && notification.data.noteId) {
           // Navigate to patient detail page with notes tab
           toast({
@@ -143,7 +193,7 @@ export function NotificationBell() {
           return;
         }
         
-        // Navigate to patient detail
+        // For patient_update, discharge_reminder, assessment_followup
         toast({
           title: "Opening patient",
           description: "Taking you to the patient details...",
@@ -152,8 +202,8 @@ export function NotificationBell() {
         return;
       }
       
+      // Treatment record notifications
       if (notification.data.treatmentRecordId) {
-        // Navigate to patient detail page (records are shown as a tab)
         toast({
           title: "Opening patient records",
           description: "Taking you to the patient's treatment records...",
@@ -162,8 +212,8 @@ export function NotificationBell() {
         return;
       }
       
+      // Inquiry notifications
       if (notification.data.inquiryId) {
-        // Navigate to inquiries page
         toast({
           title: "Opening inquiries",
           description: "Taking you to the inquiries page...",
@@ -173,12 +223,70 @@ export function NotificationBell() {
       }
     }
 
-    // Default: navigate to dashboard
-    toast({
-      title: "Opening dashboard",
-      description: "Taking you to the dashboard...",
-    });
-    setLocation("/dashboard");
+    // Handle notifications without specific data
+    switch (notification.type) {
+      case "patient_assigned":
+        console.log("🎯 patient_assigned case in switch statement");
+        console.log("🎯 Full notification data:", notification.data);
+        console.log("🎯 PatientId in data:", notification.data?.patientId);
+        console.log("🎯 PatientData in data:", notification.data?.patientData);
+        
+        // Check if patientId is in the main data or in patientData
+        const patientId = notification.data?.patientId || notification.data?.patientData?.patientId;
+        
+        if (patientId) {
+          console.log("🎯 Opening patient dialog for patient assignment with patientId:", patientId);
+          toast({
+            title: "Opening patient details",
+            description: "Opening patient details dialog...",
+          });
+          try {
+            openPatientDialog(patientId);
+            console.log("✅ openPatientDialog called successfully");
+          } catch (error) {
+            console.error("❌ Error calling openPatientDialog:", error);
+          }
+          return;
+        } else {
+          console.log("❌ No patientId found in notification data");
+          console.log("❌ Available data keys:", Object.keys(notification.data || {}));
+        }
+        break;
+        
+      case "staff_invitation":
+        toast({
+          title: "Opening staff management",
+          description: "Taking you to the staff page...",
+        });
+        setLocation("/staff");
+        return;
+      
+      case "password_reset":
+        toast({
+          title: "Password reset",
+          description: "Please check your email for reset instructions...",
+        });
+        setLocation("/settings");
+        return;
+      
+      case "system_alert":
+      case "general":
+        toast({
+          title: "System notification",
+          description: "Taking you to the dashboard...",
+        });
+        setLocation("/dashboard");
+        return;
+      
+      default:
+        console.log("🏠 Default case - navigating to dashboard");
+        // Default: navigate to dashboard
+        toast({
+          title: "Opening dashboard",
+          description: "Taking you to the dashboard...",
+        });
+        setLocation("/dashboard");
+    }
   };
 
   const getNotificationIcon = (type: string) => {
@@ -187,12 +295,26 @@ export function NotificationBell() {
         return <Calendar className="h-4 w-4 text-blue-500" />;
       case "patient_update":
         return <User className="h-4 w-4 text-green-500" />;
+      case "patient_assigned":
+        return <User className="h-4 w-4 text-indigo-500" />;
+      case "discharge_reminder":
+        return <UserCheck className="h-4 w-4 text-orange-500" />;
+      case "inquiry_received":
+        return <Mail className="h-4 w-4 text-cyan-500" />;
+      case "staff_invitation":
+        return <Users className="h-4 w-4 text-violet-500" />;
+      case "password_reset":
+        return <Lock className="h-4 w-4 text-amber-500" />;
       case "directed_note":
-        return <FileText className="h-4 w-4 text-purple-500" />;
+        return <FileText className="h-4 w-4 text-emerald-500" />;
+      case "assessment_followup":
+        return <ClipboardCheck className="h-4 w-4 text-teal-500" />;
       case "system_alert":
         return <AlertTriangle className="h-4 w-4 text-red-500" />;
       case "treatment_completion":
         return <FileText className="h-4 w-4 text-purple-500" />;
+      case "general":
+        return <Bell className="h-4 w-4 text-gray-500" />;
       default:
         return <Bell className="h-4 w-4 text-gray-500" />;
     }
@@ -248,58 +370,73 @@ export function NotificationBell() {
           </div>
         ) : (
           <div className="space-y-1">
-            {notifications.map((notification: Notification) => (
-              <DropdownMenuItem
-                key={notification.id}
-                className={`p-3 cursor-pointer hover:bg-gray-50 transition-colors ${
-                  !notification.read ? "bg-blue-50" : ""
-                }`}
-                onClick={() => handleNotificationClick(notification)}
-              >
-                <div className="flex items-start gap-3 w-full">
-                  <div className="flex-shrink-0 mt-0.5">
-                    {getNotificationIcon(notification.type)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between">
-                      <p className={`text-sm font-medium ${
-                        !notification.read ? "text-gray-900" : "text-gray-700"
-                      }`}>
-                        {notification.title}
+            {notifications.map((notification: Notification, index: number) => {
+              console.log(`🔔 Rendering notification ${index}:`, {
+                id: notification.id,
+                type: notification.type,
+                title: notification.title,
+                data: notification.data
+              });
+              return (
+                <DropdownMenuItem
+                  key={notification.id}
+                  className={`p-3 cursor-pointer hover:bg-gray-50 transition-colors ${
+                    !notification.read ? "bg-blue-50" : ""
+                  }`}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log("🖱️ Notification clicked:", notification);
+                    console.log("🖱️ Notification type:", notification.type);
+                    console.log("🖱️ Notification data:", notification.data);
+                    handleNotificationClick(notification);
+                  }}
+                >
+                  <div className="flex items-start gap-3 w-full">
+                    <div className="flex-shrink-0 mt-0.5">
+                      {getNotificationIcon(notification.type)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between">
+                        <p className={`text-sm font-medium ${
+                          !notification.read ? "text-gray-900" : "text-gray-700"
+                        }`}>
+                          {notification.title}
+                        </p>
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs text-gray-500">
+                            {formatTimeAgo(notification.createdAt)}
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-4 w-4 p-0"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteNotification(notification.id);
+                            }}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                      <p className="text-sm text-gray-600 mt-1 line-clamp-2">
+                        {notification.message}
                       </p>
-                      <div className="flex items-center gap-1">
-                        <span className="text-xs text-gray-500">
-                          {formatTimeAgo(notification.createdAt)}
-                        </span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-4 w-4 p-0"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteNotification(notification.id);
-                          }}
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
+                      <div className="flex items-center justify-between mt-2">
+                        {!notification.read && (
+                          <div className="flex items-center gap-1">
+                            <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                            <span className="text-xs text-blue-600">New</span>
+                          </div>
+                        )}
+                        <ChevronRight className="h-3 w-3 text-gray-400 ml-auto" />
                       </div>
                     </div>
-                    <p className="text-sm text-gray-600 mt-1 line-clamp-2">
-                      {notification.message}
-                    </p>
-                    <div className="flex items-center justify-between mt-2">
-                      {!notification.read && (
-                        <div className="flex items-center gap-1">
-                          <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                          <span className="text-xs text-blue-600">New</span>
-                        </div>
-                      )}
-                      <ChevronRight className="h-3 w-3 text-gray-400 ml-auto" />
-                    </div>
                   </div>
-                </div>
-              </DropdownMenuItem>
-            ))}
+                </DropdownMenuItem>
+              );
+            })}
           </div>
         )}
 

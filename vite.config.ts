@@ -35,8 +35,6 @@ export default defineConfig({
       strict: true,
       deny: ["**/.*"],
     },
-    allowedHosts: [
-      "07c3c6ffa8d0.ngrok-free.app"
-    ],
+    allowedHosts: true,
   },
 });

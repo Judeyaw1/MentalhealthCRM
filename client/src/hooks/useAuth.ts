@@ -33,9 +33,12 @@ export function useAuth() {
       // Clear local storage
       localStorage.removeItem("isLoggedIn");
       localStorage.removeItem("user");
+      localStorage.removeItem("patient-changes-refresh");
+      localStorage.removeItem("patient-changes-date");
 
       // Clear any cached data
       queryClient.clear();
+      
       toast({
         title: "Logged out",
         description: "You have been logged out successfully.",

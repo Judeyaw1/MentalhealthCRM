@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ChangePasswordForm } from "@/components/staff/ChangePasswordForm";
+import { PatientDialogProvider } from "@/contexts/PatientDialogContext";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
 import Login from "@/pages/Login";
@@ -98,17 +99,17 @@ function RouterComponent() {
   );
 }
 
-function App() {
+export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <Toaster />
-        <WouterRouter>
-          <RouterComponent />
-        </WouterRouter>
+        <PatientDialogProvider>
+          <WouterRouter>
+            <RouterComponent />
+            <Toaster />
+          </WouterRouter>
+        </PatientDialogProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );
 }
-
-export default App;
