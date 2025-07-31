@@ -2842,8 +2842,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // If reset parameter is provided, use a shorter time range to show fresh data
       if (reset) {
-        startDate = new Date(Date.now() - 10 * 60 * 1000); // Last 10 minutes for refresh
-        console.log(`🔍 Patient changes debug - Reset requested, using 10 minutes: ${startDate}`);
+        startDate = new Date(Date.now() - 60 * 60 * 1000); // Last 1 hour for refresh (increased from 10 minutes)
+        console.log(`🔍 Patient changes debug - Reset requested, using 1 hour: ${startDate}`);
         console.log(`🔍 Patient changes debug - Current time: ${new Date()}`);
         console.log(`🔍 Patient changes debug - Time difference: ${Date.now() - startDate.getTime()} ms`);
       } else if (since === "last-login") {
