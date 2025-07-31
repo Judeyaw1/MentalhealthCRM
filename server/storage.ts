@@ -974,14 +974,8 @@ export class DatabaseStorage {
         return null;
       }
 
-      // Skip logging for admin users
-      if (log.userId) {
-        const user = await this.getUser(log.userId);
-        if (user && user.role === 'admin') {
-          console.log("Skipping audit log for admin user:", user.email);
-          return null;
-        }
-      }
+      // Log all user activities (including admin users) for proper tracking
+      // Removed admin user exclusion to ensure proper audit trail
 
       const auditLog = {
         _id: new mongoose.Types.ObjectId(),
