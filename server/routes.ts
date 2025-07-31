@@ -2944,6 +2944,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
             } catch (error) {
               console.error(`Failed to get user for audit log: ${patientAction.userId}`, error);
             }
+          } else if (patient.createdBy) {
+            // Fallback to patient's createdBy field if audit log doesn't have user info
+            try {
+              const user = await storage.getUser(patient.createdBy);
+              if (user) {
+                updatedBy = `${user.firstName} ${user.lastName}`;
+              }
+            } catch (error) {
+              console.error(`Failed to get user from patient createdBy: ${patient.createdBy}`, error);
+            }
           }
           
           return {
@@ -2968,12 +2978,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
              new Date(log.createdAt) >= startDate
            );
            
+           // Get the user who assigned the therapist
+           let assignedBy = "Unknown";
+           if (assignmentAction && assignmentAction.userId) {
+             try {
+               const user = await storage.getUser(assignmentAction.userId);
+               if (user) {
+                 assignedBy = `${user.firstName} ${user.lastName}`;
+               }
+             } catch (error) {
+               console.error(`Failed to get user for assignment: ${assignmentAction.userId}`, error);
+             }
+           } else if (patient.createdBy) {
+             // Fallback to patient's createdBy field
+             try {
+               const user = await storage.getUser(patient.createdBy);
+               if (user) {
+                 assignedBy = `${user.firstName} ${user.lastName}`;
+               }
+             } catch (error) {
+               console.error(`Failed to get user from patient createdBy: ${patient.createdBy}`, error);
+             }
+           }
+           
            return {
              id: patient._id,
              name: `${patient.firstName} ${patient.lastName}`,
              therapist: patient.assignedTherapistId ? `${(patient.assignedTherapistId as any).firstName} ${(patient.assignedTherapistId as any).lastName}` : null,
              updatedAt: patient.updatedAt,
-             assignedBy: assignmentAction ? assignmentAction.userName || "Unknown" : "Unknown"
+             assignedBy: assignedBy
            };
          }),
         importantUpdates: statusChanges.filter(patient => 
