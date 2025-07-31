@@ -22,8 +22,12 @@ const insertTreatmentRecordSchema = z.object({
   patientId: z.string().min(1, "Patient ID is required"),
   therapistId: z.string().min(1, "Therapist ID is required"),
   sessionDate: z
-    .union([z.date(), z.string()])
-    .transform((val) => (typeof val === "string" ? new Date(val) : val)),
+    .union([z.date(), z.string(), z.number()])
+    .transform((val) => {
+      if (typeof val === "string") return new Date(val);
+      if (typeof val === "number") return new Date(val);
+      return val;
+    }),
   sessionType: z.string().min(1, "Session type is required"),
   notes: z.string().optional(),
   goals: z.string().optional(),
