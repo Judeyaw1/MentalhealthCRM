@@ -39,6 +39,23 @@ export default function NewRecord() {
   const urlParams = new URLSearchParams(window.location.search);
   const preselectedPatientId = urlParams.get("patientId");
 
+  // Get pre-filled data from sessionStorage (from appointment)
+  const getPrefilledData = () => {
+    try {
+      const storedData = sessionStorage.getItem('prefilledRecordData');
+      if (storedData) {
+        const data = JSON.parse(storedData);
+        sessionStorage.removeItem('prefilledRecordData'); // Clear after use
+        return data;
+      }
+    } catch (error) {
+      console.error('Error parsing pre-filled data:', error);
+    }
+    return null;
+  };
+
+  const prefilledData = getPrefilledData();
+
   // Redirect to home if not authenticated
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -157,11 +174,11 @@ export default function NewRecord() {
             <div className="max-w-4xl">
               <TreatmentRecordForm
                 initialData={{
-                  patientId: preselectedPatientId ? preselectedPatientId : "",
-                  therapistId: user?.id || "",
-                  sessionDate: new Date(),
-                  sessionType: "therapy",
-                  notes: "",
+                  patientId: prefilledData?.patientId || preselectedPatientId || "",
+                  therapistId: prefilledData?.therapistId || user?.id || "",
+                  sessionDate: prefilledData?.sessionDate || new Date().getTime(),
+                  sessionType: prefilledData?.sessionType || "therapy",
+                  notes: prefilledData?.notes || "",
                   goals: "",
                   interventions: "",
                   progress: "",

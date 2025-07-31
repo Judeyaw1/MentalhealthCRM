@@ -37,6 +37,7 @@ import {
   CalendarDays,
   MapPin,
   Stethoscope,
+  ClipboardList,
 } from "lucide-react";
 import { Link } from "wouter";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -343,6 +344,10 @@ export default function Appointments() {
               <FileText className="h-4 w-4 mr-2" />
               View Records
             </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleAddTreatmentRecord(row)}>
+              <ClipboardList className="h-4 w-4 mr-2" />
+              Add Treatment Record
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => handleSendReminder(row.id)}>
               <Bell className="h-4 w-4 mr-2" />
               Send Reminder
@@ -601,6 +606,23 @@ export default function Appointments() {
       return;
     }
     deleteMutation.mutate(appointmentId);
+  };
+
+  const handleAddTreatmentRecord = (appointment: AppointmentWithDetails) => {
+    // Navigate to new record page with pre-filled data from appointment
+    const recordData = {
+      patientId: appointment.patient?.id,
+      therapistId: appointment.therapist?.id,
+      sessionDate: new Date(appointment.appointmentDate).getTime(),
+      sessionType: appointment.type,
+      notes: `Treatment record for appointment on ${formatDateTime(appointment.appointmentDate)}`,
+    };
+    
+    // Store the data in sessionStorage for the new record form
+    sessionStorage.setItem('prefilledRecordData', JSON.stringify(recordData));
+    
+    // Navigate to new record page
+    setLocation('/records/new');
   };
 
   const handleRefresh = () => {
