@@ -22,6 +22,7 @@ import AppointmentDetail from "@/pages/AppointmentDetail";
 import EditAppointment from "@/pages/EditAppointment";
 import Records from "@/pages/Records";
 import NewRecord from "@/pages/NewRecord";
+import EditRecord from "@/pages/EditRecord";
 import Staff from "@/pages/Staff";
 import Reports from "@/pages/Reports";
 import AuditLogs from "@/pages/AuditLogs";
@@ -66,8 +67,9 @@ function RouterComponent() {
             <Route path="/appointments/new" component={NewAppointment} />
             <Route path="/appointments/:id" component={AppointmentDetail} />
             <Route path="/appointments/:id/edit" component={EditAppointment} />
-            <Route path="/records" component={Records} />
-            <Route path="/records/new" component={NewRecord} />
+                    <Route path="/records" component={Records} />
+        <Route path="/records/new" component={NewRecord} />
+        <Route path="/records/:id/edit" component={EditRecord} />
             <Route path="/staff" component={Staff} />
             <Route path="/reports" component={Reports} />
             <Route path="/audit" component={AuditLogs} />

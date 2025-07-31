@@ -862,6 +862,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.put("/api/records/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const recordId = req.params.id;
+      const record = await storage.getTreatmentRecord(recordId);
+      if (!record) {
+        return res.status(404).json({ message: "Treatment record not found" });
+      }
+      
+      const updateData = insertTreatmentRecordSchema.parse(req.body);
+      const updatedRecord = await storage.updateTreatmentRecord(recordId, updateData);
+      
+      await logActivity(
+        userId,
+        "update",
+        "treatment_record",
+        recordId.toString(),
+        updateData,
+      );
+      
+      res.json(updatedRecord);
+    } catch (error) {
+      console.error("Error updating treatment record:", error);
+      res.status(500).json({ message: "Failed to update treatment record" });
+    }
+  });
+
   // Appointment routes
   app.get("/api/appointments", isAuthenticated, async (req: any, res) => {
     try {
