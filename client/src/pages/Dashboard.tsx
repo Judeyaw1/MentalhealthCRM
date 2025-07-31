@@ -54,6 +54,7 @@ export default function Dashboard() {
     queryKey: ["/api/dashboard/stats"],
     retry: false,
     refetchInterval: 10000,
+    refetchIntervalInBackground: true, // Continue polling even when tab is not active
   });
 
   const statsData: DashboardStats = stats ?? {
@@ -71,12 +72,14 @@ export default function Dashboard() {
     queryKey: ["/api/dashboard/recent-patients"],
     retry: false,
     refetchInterval: 10000,
+    refetchIntervalInBackground: true, // Continue polling even when tab is not active
   });
 
   const { data: todayAppointments, isLoading: appointmentsLoading } = useQuery({
     queryKey: ["/api/dashboard/today-appointments"],
     retry: false,
     refetchInterval: 10000,
+    refetchIntervalInBackground: true, // Continue polling even when tab is not active
   });
 
   const handleExportReport = async (format: string) => {

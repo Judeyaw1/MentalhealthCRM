@@ -151,6 +151,8 @@ export default function Appointments() {
       return res.json();
     },
     retry: false,
+    refetchInterval: 10000, // Refetch every 10 seconds for real-time updates
+    refetchIntervalInBackground: true, // Continue polling even when tab is not active
     onSuccess: (data) => {
       console.log("Appointments fetched:", data?.length || 0, "appointments");
       if (data && data.length > 0) {
@@ -170,6 +172,8 @@ export default function Appointments() {
   const { data: todayAppointments, isLoading: todayLoading } = useQuery({
     queryKey: ["/api/dashboard/today-appointments"],
     retry: false,
+    refetchInterval: 10000, // Refetch every 10 seconds for real-time updates
+    refetchIntervalInBackground: true, // Continue polling even when tab is not active
   });
 
   const getStatusBadge = (status: string) => {
