@@ -2925,7 +2925,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const wasUpdatedInTimeRange = patient.updatedAt >= startDate;
           console.log(`🔍 Patient changes debug - ${patient.firstName} ${patient.lastName}: createdAt=${patient.createdAt}, updatedAt=${patient.updatedAt}, startDate=${startDate}, wasUpdatedInTimeRange=${wasUpdatedInTimeRange}`);
           return wasUpdatedInTimeRange;
-        }).map(async patient => {
+        }).map(async (patient) => {
           // Find who made the most recent update for this patient from audit logs
           const patientAction = patientActions.find(log => 
             log.resourceId === patient._id.toString() && 
@@ -2966,11 +2966,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             updatedBy: updatedBy
           };
         })),
-         therapistAssignments: statusChanges.filter(patient => {
+         therapistAssignments: await Promise.all(statusChanges.filter(patient => {
            const hasTherapist = !!patient.assignedTherapistId;
            console.log(`🔍 Therapist assignment debug - ${patient.firstName} ${patient.lastName}: hasTherapist=${hasTherapist}, assignedTherapistId=${patient.assignedTherapistId}`);
            return hasTherapist;
-         }).map(patient => {
+         }).map(async (patient) => {
            // Find who assigned the therapist
            const assignmentAction = patientActions.find(log => 
              log.resourceId === patient._id.toString() && 
@@ -3008,7 +3008,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
              updatedAt: patient.updatedAt,
              assignedBy: assignedBy
            };
-         }),
+         })),
         importantUpdates: statusChanges.filter(patient => 
           patient.important && patient.createdAt < startDate
         ).map(patient => {
