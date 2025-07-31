@@ -121,19 +121,21 @@ export default function PatientChangesSummary() {
       console.log("Patient changes data:", data);
       return data;
     },
-    enabled: isOpen && !!user?.id && !shouldShowEmpty, // Don't fetch when showing empty state
+    enabled: isOpen && !!user?.id && !shouldShowEmpty && !isClearing, // Don't fetch when showing empty state or clearing
     staleTime: 0, // Always consider data stale
     gcTime: 0, // Don't cache this data
   });
 
   const handleOpen = () => {
     setIsOpen(true);
-    // Reset states when opening
-    setShouldShowEmpty(false);
-    setIsClearing(false);
-    // Force fresh data by incrementing the refresh counter
-    setForceRefresh(prev => prev + 1);
-    setLastRefreshed(new Date());
+    // Only reset states if we're not in a cleared state
+    if (!shouldShowEmpty) {
+      setShouldShowEmpty(false);
+      setIsClearing(false);
+      // Force fresh data by incrementing the refresh counter
+      setForceRefresh(prev => prev + 1);
+      setLastRefreshed(new Date());
+    }
   };
 
   const handleRefresh = () => {
