@@ -122,7 +122,7 @@ export default function Staff() {
       <div className="min-h-screen bg-gray-50">
         <Header />
         <div className="flex">
-          <Sidebar />
+          <Sidebar archivedCount={0} />
           <main className="flex-1 overflow-y-auto">
             <div className="p-6">
               <Card className="max-w-md mx-auto mt-20">
@@ -164,7 +164,7 @@ export default function Staff() {
       <Header />
 
       <div className="flex">
-        <Sidebar />
+        <Sidebar archivedCount={0} />
 
         <main className="flex-1 overflow-y-auto">
           <div className="p-6">

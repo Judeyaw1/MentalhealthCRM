@@ -124,6 +124,8 @@ export default function AuditLogs() {
       return response.json();
     },
     retry: false,
+    refetchInterval: 10000, // Refetch every 10 seconds for real-time updates
+    refetchIntervalInBackground: true, // Continue polling even when tab is not active
   });
 
   // Fetch users for filtering

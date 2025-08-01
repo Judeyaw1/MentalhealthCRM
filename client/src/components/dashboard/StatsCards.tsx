@@ -22,6 +22,7 @@ export interface DashboardStats {
   completedAppointments: number;
   upcomingAppointments: number;
   appointmentsNeedingReview: number;
+  archivedPatients?: number;
 }
 
 interface StatsCardsProps {

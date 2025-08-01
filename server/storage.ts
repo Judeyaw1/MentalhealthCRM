@@ -16,7 +16,7 @@ export class DatabaseStorage {
   }
   
   // Patient operations
-  async getPatients(limit = 50, offset = 0, search?: string, status?: string, createdBy?: string, therapist?: string, loc?: string) {
+  async getPatients(limit = 50, offset = 0, search?: string, status?: string, createdBy?: string, therapist?: string, loc?: string, includeArchived = false) {
     let query: any = {};
 
     if (search) {
@@ -42,6 +42,11 @@ export class DatabaseStorage {
 
     if (loc) {
       query.loc = loc;
+    }
+
+    // If not including archived, exclude only discharged patients (inactive should be visible)
+    if (!includeArchived) {
+      query.status = { $nin: ["discharged"] };
     }
 
     const total = await PatientModel.countDocuments(query);
@@ -280,6 +285,47 @@ export class DatabaseStorage {
       id: _id.toString(),
       assignedTherapist: undefined,
     };
+  }
+
+  async archivePatient(id: string, status: "inactive" | "discharged" = "inactive") {
+    try {
+      console.log("Storage: Attempting to archive patient with ID:", id, "with status:", status);
+
+      const patient = await PatientModel.findById(id);
+      if (!patient) {
+        throw new Error("Patient not found");
+      }
+
+      // Allow archiving any patient (active, inactive, or discharged)
+      // This provides flexibility for admin/supervisor to manage patient status
+
+      // Update patient status to archived
+      const updatedPatient = await PatientModel.findByIdAndUpdate(
+        id,
+        { 
+          status,
+          updatedAt: new Date()
+        },
+        { new: true }
+      );
+
+      if (!updatedPatient) {
+        throw new Error("Failed to archive patient");
+      }
+
+      console.log("Storage: Patient archived successfully with status:", status);
+      console.log("Storage: Updated patient data:", {
+        id: updatedPatient._id,
+        firstName: updatedPatient.firstName,
+        lastName: updatedPatient.lastName,
+        status: updatedPatient.status,
+        updatedAt: updatedPatient.updatedAt
+      });
+      return { success: true, message: `Patient archived successfully as ${status}` };
+    } catch (error) {
+      console.error("Storage: Error archiving patient:", error);
+      throw error;
+    }
   }
 
   async deletePatient(id: string) {
@@ -945,9 +991,14 @@ export class DatabaseStorage {
       };
     }
 
-    // Count active treatments (treatment records created this month)
-    const activeTreatments = await TreatmentRecord.countDocuments({
-      createdAt: { $gte: startOfMonth, $lt: endOfMonth },
+    // Count active treatments (patients with active status)
+    const activeTreatments = await PatientModel.countDocuments({
+      status: "active",
+    });
+
+    // Count discharged patients only (for archive page consistency)
+    const archivedPatients = await PatientModel.countDocuments({
+      status: "discharged"
     });
 
     const stats = {
@@ -960,6 +1011,7 @@ export class DatabaseStorage {
       completedAppointments,
       upcomingAppointments,
       appointmentsNeedingReview,
+      archivedPatients,
     };
 
     console.log("Dashboard stats response:", stats);

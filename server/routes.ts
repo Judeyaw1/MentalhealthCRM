@@ -223,6 +223,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
+  // Get archived patients (inactive and discharged)
+  app.get("/api/patients/archived", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.id);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Only admin and supervisor can access archive
+      if (user.role !== "admin" && user.role !== "supervisor") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const patients = await storage.getPatients(1000, 0, undefined, undefined, undefined, undefined, undefined, true);
+      
+      // Filter to only discharged patients (completed treatment)
+      const archivedPatients = patients.patients.filter((patient: any) => 
+        patient.status === "discharged"
+      );
+
+      res.json(archivedPatients);
+    } catch (error) {
+      console.error("Error fetching archived patients:", error);
+      res.status(500).json({ message: "Failed to fetch archived patients" });
+    }
+  });
+
+  // Restore patient from archive
+  app.post("/api/patients/:id/restore", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.id);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Only admin and supervisor can restore patients
+      if (user.role !== "admin" && user.role !== "supervisor") {
+        return res.status(403).json({ message: "Only administrators and supervisors can restore patients" });
+      }
+
+      const patientId = req.params.id;
+      const patient = await storage.getPatient(patientId);
+      
+      if (!patient) {
+        return res.status(404).json({ message: "Patient not found" });
+      }
+
+      // Only allow restoring inactive or discharged patients
+      if (patient.status !== "inactive" && patient.status !== "discharged") {
+        return res.status(400).json({ message: "Only inactive or discharged patients can be restored" });
+      }
+
+      // Restore patient by setting status to active
+      const updatedPatient = await storage.updatePatient(patientId, {
+        ...patient,
+        status: "active",
+        updatedAt: new Date(),
+      });
+
+      // Log the restore action
+      await logActivity(req.user.id, "update", "patient", patientId, {
+        action: "restore_from_archive",
+        previousStatus: patient.status,
+        newStatus: "active",
+        restoredBy: `${user.firstName} ${user.lastName}`,
+      });
+
+      res.json(updatedPatient);
+    } catch (error) {
+      console.error("Error restoring patient:", error);
+      res.status(500).json({ message: "Failed to restore patient" });
+    }
+  });
+
   // Patient routes
   app.get("/api/patients", isAuthenticated, async (req: any, res) => {
     try {
@@ -258,7 +334,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status as string,
         createdBy as string,
         therapist as string,
-        loc as string
+        loc as string,
+        false // Don't include archived patients in main list
       );
 
       await logActivity(userId, "view", "patients", "list");
@@ -384,48 +461,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/patients/:id", isAuthenticated, async (req: any, res) => {
+  // Archive patient endpoint (admin/supervisor only)
+  app.patch("/api/patients/:id/archive", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
       const patientId = req.params.id;
+      const { status = "inactive" } = req.body; // Default to inactive, can be "discharged"
+
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Only admin and supervisor can archive patients
+      if (user.role !== "admin" && user.role !== "supervisor") {
+        return res.status(403).json({ message: "Only administrators and supervisors can archive patients" });
+      }
 
       const patient = await storage.getPatient(patientId);
       if (!patient) {
         return res.status(404).json({ message: "Patient not found" });
       }
 
-      await storage.deletePatient(patientId);
-      await logActivity(userId, "delete", "patient", patientId.toString());
+      // Allow archiving any patient (active, inactive, or discharged)
+      // This provides flexibility for admin/supervisor to manage patient status
 
-      res.json({ message: "Patient deleted successfully" });
+      await storage.archivePatient(patientId, status);
+      await logActivity(userId, "archive", "patient", patientId.toString(), {
+        previousStatus: patient.status,
+        newStatus: status,
+        archivedBy: userId,
+        archivedByRole: user.role
+      });
+
+      res.json({ message: "Patient archived successfully" });
     } catch (error) {
-      console.error("Error deleting patient:", error);
-      if (
-        error instanceof Error &&
-        error.message.includes("Cannot delete patient")
-      ) {
-        return res.status(400).json({ message: error.message });
+      console.error("Error archiving patient:", error);
+      let errorMessage = "Failed to archive patient";
+      if (error instanceof Error) {
+        errorMessage = error.message;
       }
-      res.status(500).json({ message: "Failed to delete patient" });
+      res.status(500).json({ message: errorMessage });
     }
   });
 
-  // Bulk delete patients endpoint
-  app.post("/api/patients/bulk-delete", isAuthenticated, async (req: any, res) => {
+  // Bulk archive patients endpoint
+  app.post("/api/patients/bulk-archive", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const { patientIds } = req.body;
+      const { patientIds, status = "inactive" } = req.body;
+      
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
       if (!Array.isArray(patientIds) || patientIds.length === 0) {
         return res.status(400).json({ message: "No patient IDs provided" });
       }
+
+      // Only admin and supervisor can bulk archive patients
+      if (user.role !== "admin" && user.role !== "supervisor") {
+        return res.status(403).json({ message: "Only administrators and supervisors can archive patients" });
+      }
+
       const results = [];
       for (const id of patientIds) {
         try {
-          await storage.deletePatient(id);
-          await logActivity(userId, "delete", "patient", id.toString());
+          await storage.archivePatient(id, status);
+          await logActivity(userId, "archive", "patient", id.toString(), {
+            newStatus: status,
+            archivedBy: userId,
+            archivedByRole: user.role
+          });
           results.push({ id, success: true });
         } catch (error) {
-          let message = "Failed to delete patient";
+          let message = "Failed to archive patient";
           if (error instanceof Error) {
             message = error.message;
           }
@@ -435,14 +546,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const failed = results.filter(r => !r.success);
       if (failed.length > 0) {
         return res.status(207).json({
-          message: `Some patients could not be deleted`,
+          message: `Some patients could not be archived`,
           results,
         });
       }
-      res.json({ message: "All selected patients deleted successfully", results });
+      res.json({ message: "All selected patients archived successfully", results });
     } catch (error) {
-      console.error("Bulk delete error:", error);
-      res.status(500).json({ message: "Failed to delete patients" });
+      console.error("Bulk archive error:", error);
+      res.status(500).json({ message: "Failed to archive patients" });
     }
   });
 

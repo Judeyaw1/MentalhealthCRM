@@ -46,7 +46,7 @@ import {
   Search,
   Grid3X3,
   Table,
-  Trash2,
+
   ArrowLeft,
   CheckCircle,
   XCircle,
@@ -138,6 +138,8 @@ export default function Patients() {
       return res.json();
     },
     retry: false,
+    refetchInterval: 10000, // Refetch every 10 seconds for real-time updates
+    refetchIntervalInBackground: true, // Continue polling even when tab is not active
   });
 
   const { data: dashboardStats } = useQuery<{
@@ -146,6 +148,8 @@ export default function Patients() {
   }>({
     queryKey: ["/api/dashboard/stats"],
     retry: false,
+    refetchInterval: 10000, // Refetch every 10 seconds for real-time updates
+    refetchIntervalInBackground: true, // Continue polling even when tab is not active
   });
 
   const { data: therapists } = useQuery<
@@ -153,7 +157,11 @@ export default function Patients() {
   >({
     queryKey: ["/api/therapists"],
     retry: false,
+    refetchInterval: 10000, // Refetch every 10 seconds for real-time updates
+    refetchIntervalInBackground: true, // Continue polling even when tab is not active
   });
+
+
 
   // Export mutation
   const exportMutation = useMutation({
@@ -303,9 +311,9 @@ export default function Patients() {
           description: `Updating status for ${selectedPatients.length} patients...`,
         });
         break;
-      case "delete":
-        handleDeletePatients();
-        break;
+              case "archive":
+          handleArchivePatients();
+          break;
     }
   };
 
@@ -368,47 +376,47 @@ export default function Patients() {
     }
   };
 
-  const handleDeletePatients = async () => {
+  const handleArchivePatients = async () => {
     if (
       !confirm(
-        `Are you sure you want to delete ${selectedPatients.length} patient${selectedPatients.length !== 1 ? "s" : ""}? This action cannot be undone.`,
+        `Are you sure you want to archive ${selectedPatients.length} patient${selectedPatients.length !== 1 ? "s" : ""}? This will move them to the archive.`,
       )
     ) {
       return;
     }
 
     try {
-      const patientIdsToDelete = selectedPatients;
-      const response = await fetch(`/api/patients/bulk-delete`, {
+      const patientIdsToArchive = selectedPatients;
+      const response = await fetch(`/api/patients/bulk-archive`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         credentials: "include",
-        body: JSON.stringify({ patientIds: patientIdsToDelete }),
+        body: JSON.stringify({ patientIds: patientIdsToArchive, status: "inactive" }),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to delete patients");
+        throw new Error(errorData.message || "Failed to archive patients");
       }
 
       toast({
         title: "Success",
-        description: `Successfully deleted ${patientIdsToDelete.length} patient${patientIdsToDelete.length !== 1 ? "s" : ""}.`,
+        description: `Successfully archived ${patientIdsToArchive.length} patient${patientIdsToArchive.length !== 1 ? "s" : ""}.`,
       });
 
       // Refresh the patients list
       refetch();
-      setSelectedPatients([]); // Clear selection after successful deletion
+      setSelectedPatients([]); // Clear selection after successful archiving
     } catch (error) {
-      console.error("Error deleting patients:", error);
+      console.error("Error archiving patients:", error);
       toast({
         title: "Error",
         description:
           error instanceof Error
             ? error.message
-            : "Failed to delete patients. Please try again.",
+            : "Failed to archive patients. Please try again.",
         variant: "destructive",
       });
     }
@@ -422,67 +430,44 @@ export default function Patients() {
     });
   };
 
-  const handleDeletePatient = async (patientId: string) => {
+  const handleArchivePatient = async (patientId: string) => {
     if (
       !confirm(
-        "Are you sure you want to delete this patient? This action cannot be undone.",
+        "Are you sure you want to archive this patient? This will move them to the archive.",
       )
     ) {
       return;
     }
 
     try {
-      const response = await fetch(`/api/patients/${patientId}`, {
-        method: "DELETE",
+      const response = await fetch(`/api/patients/${patientId}/archive`, {
+        method: "PATCH",
         headers: {
           "Content-Type": "application/json",
         },
+        body: JSON.stringify({ status: "inactive" }),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-
-        // Check if the error contains details about what needs to be deleted
-        if (
-          (errorData.message && errorData.message.includes("appointment(s)")) ||
-          errorData.message.includes("treatment record(s)")
-        ) {
-          const message = errorData.message;
-
-          // Show a more detailed confirmation dialog
-          const shouldProceed = confirm(
-            `${message}\n\n` +
-              `To delete this patient, you need to:\n` +
-              `1. Delete all their appointments first\n` +
-              `2. Delete all their treatment records first\n\n` +
-              `Would you like to view the patient's details to manage their appointments and records?`,
-          );
-
-          if (shouldProceed) {
-            // Navigate to patient detail page
-            window.location.href = `/patients/${patientId}`;
-          }
-          return;
-        }
-
-        throw new Error(errorData.message || "Failed to delete patient");
+        throw new Error(errorData.message || "Failed to archive patient");
       }
 
       toast({
         title: "Success",
-        description: "Patient deleted successfully.",
+        description: "Patient archived successfully.",
       });
 
       // Refresh the patients list
       refetch();
     } catch (error) {
-      console.error("Error deleting patient:", error);
+      console.error("Error archiving patient:", error);
       toast({
         title: "Error",
         description:
           error instanceof Error
             ? error.message
-            : "Failed to delete patient. Please try again.",
+            : "Failed to archive patient. Please try again.",
         variant: "destructive",
       });
     }
@@ -700,23 +685,7 @@ export default function Patients() {
             </Tooltip>
           </TooltipProvider>
 
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                  onClick={() => handleDeletePatient(row.id as any)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Delete patient</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+
 
           <Button
             variant="outline"
@@ -738,7 +707,6 @@ export default function Patients() {
         { value: "all", label: "All Statuses" },
         { value: "active", label: "Active" },
         { value: "inactive", label: "Inactive" },
-        { value: "discharged", label: "Discharged" },
       ],
     },
     {
@@ -896,6 +864,59 @@ export default function Patients() {
 
             {/* Content */}
             <div className="space-y-6">
+              {/* Quick Stats - Now at the TOP */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-white rounded-lg shadow p-4">
+                  <div className="flex items-center">
+                    <div className="h-8 w-8 bg-green-100 rounded-lg flex items-center justify-center">
+                      <User className="h-4 w-4 text-green-600" />
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm font-medium text-gray-500">
+                        Total Patients
+                      </p>
+                      <p className="text-lg font-semibold text-gray-900">
+                        {patientsData?.total || 0}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-white rounded-lg shadow p-4">
+                  <div className="flex items-center">
+                    <div className="h-8 w-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                      <User className="h-4 w-4 text-blue-600" />
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm font-medium text-gray-500">
+                        Active
+                      </p>
+                      <p className="text-lg font-semibold text-gray-900">
+                        {patientsData?.patients?.filter(
+                          (p) => p.status === "active",
+                        ).length || 0}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-white rounded-lg shadow p-4">
+                  <div className="flex items-center">
+                    <div className="h-8 w-8 bg-gray-100 rounded-lg flex items-center justify-center">
+                      <User className="h-4 w-4 text-gray-600" />
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm font-medium text-gray-500">
+                        Inactive
+                      </p>
+                      <p className="text-lg font-semibold text-gray-900">
+                        {patientsData?.patients?.filter(
+                          (p) => p.status === "inactive",
+                        ).length || 0}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* Bulk Actions */}
               {selectedPatients.length > 0 && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -947,15 +968,7 @@ export default function Patients() {
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleBulkAction("delete")}
-                        className="flex items-center space-x-2 text-red-600 border-red-200 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                        <span>Delete Selected</span>
-                      </Button>
+
                       <Button
                         variant="outline"
                         size="sm"
@@ -987,7 +1000,8 @@ export default function Patients() {
                   </div>
                 </div>
               )}
-              {/* Data Display */}
+
+              {/* Patient Cards/List */}
               <div id="patients-list-section">
                 {viewMode === "list" ? (
                   <>
@@ -1041,75 +1055,8 @@ export default function Patients() {
                   </>
                 )}
               </div>
-              {/* Quick Stats */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="bg-white rounded-lg shadow p-4">
-                  <div className="flex items-center">
-                    <div className="h-8 w-8 bg-green-100 rounded-lg flex items-center justify-center">
-                      <User className="h-4 w-4 text-green-600" />
-                    </div>
-                    <div className="ml-3">
-                      <p className="text-sm font-medium text-gray-500">
-                        Total Patients
-                      </p>
-                      <p className="text-lg font-semibold text-gray-900">
-                        {patientsData?.total || 0}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <div className="bg-white rounded-lg shadow p-4">
-                  <div className="flex items-center">
-                    <div className="h-8 w-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                      <User className="h-4 w-4 text-blue-600" />
-                    </div>
-                    <div className="ml-3">
-                      <p className="text-sm font-medium text-gray-500">
-                        Active
-                      </p>
-                      <p className="text-lg font-semibold text-gray-900">
-                        {patientsData?.patients?.filter(
-                          (p) => p.status === "active",
-                        ).length || 0}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <div className="bg-white rounded-lg shadow p-4">
-                  <div className="flex items-center">
-                    <div className="h-8 w-8 bg-gray-100 rounded-lg flex items-center justify-center">
-                      <User className="h-4 w-4 text-gray-600" />
-                    </div>
-                    <div className="ml-3">
-                      <p className="text-sm font-medium text-gray-500">
-                        Inactive
-                      </p>
-                      <p className="text-lg font-semibold text-gray-900">
-                        {patientsData?.patients?.filter(
-                          (p) => p.status === "inactive",
-                        ).length || 0}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <div className="bg-white rounded-lg shadow p-4">
-                  <div className="flex items-center">
-                    <div className="h-8 w-8 bg-red-100 rounded-lg flex items-center justify-center">
-                      <User className="h-4 w-4 text-red-600" />
-                    </div>
-                    <div className="ml-3">
-                      <p className="text-sm font-medium text-gray-500">
-                        Discharged
-                      </p>
-                      <p className="text-lg font-semibold text-gray-900">
-                        {patientsData?.patients?.filter(
-                          (p) => p.status === "discharged",
-                        ).length || 0}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
+
+
             </div>
           </div>
         </main>
@@ -1298,6 +1245,8 @@ export default function Patients() {
           </div>
         </DialogContent>
       </Dialog>
+
+
     </div>
   );
 }

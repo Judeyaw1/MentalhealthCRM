@@ -14,6 +14,7 @@ import {
   AlertCircle,
   Bell,
   ClipboardList,
+  Archive,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -21,11 +22,13 @@ import { useAuth } from "@/hooks/useAuth";
 interface SidebarProps {
   patientCount?: number;
   todayAppointments?: number;
+  archivedCount?: number;
 }
 
 export function Sidebar({
   patientCount = 0,
   todayAppointments = 0,
+  archivedCount = 0,
 }: SidebarProps) {
   const [location] = useLocation();
   const { user } = useAuth();
@@ -52,6 +55,18 @@ export function Sidebar({
           current: location.startsWith("/patients"),
           badge: patientCount > 0 ? patientCount.toString() : undefined,
         },
+        // Show Archive Patients for admin and supervisor users only
+        ...((isAdmin || isSupervisor)
+          ? [
+              {
+                name: "Archive Patients",
+                href: "/archive",
+                icon: Archive,
+                current: location.startsWith("/archive"),
+                badge: archivedCount > 0 ? archivedCount.toString() : undefined,
+              },
+            ]
+          : []),
         {
           name: "Appointments",
           href: "/appointments",
@@ -139,6 +154,8 @@ export function Sidebar({
 
   return (
     <aside className="w-64 bg-white shadow-sm border-r border-gray-200 overflow-y-auto">
+
+      
       <nav className="p-4 space-y-6">
         {navigation.map((section) => (
           <div key={section.name}>

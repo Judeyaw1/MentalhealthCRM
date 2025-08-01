@@ -21,7 +21,7 @@ import {
   CreditCard,
   FileText,
   Clock,
-  User,
+    User,
   ArrowLeft,
   Trash2,
   Pencil,
@@ -418,61 +418,38 @@ export default function PatientDetail() {
                     </Button>
                   </Link>
 
-                  <Button
-                    variant={
-                      patient.status === "active" ? "outline" : "default"
-                    }
-                    onClick={() =>
-                      updateStatusMutation.mutate(
-                        patient.status === "active" ? "inactive" : "active",
-                      )
-                    }
-                    disabled={updateStatusMutation.isPending}
-                  >
-                    {patient.status === "active" ? "Deactivate" : "Activate"}
-                  </Button>
+                  {/* Only show deactivate button for admin/supervisor */}
+                  {(user?.role === "admin" || user?.role === "supervisor") ? (
+                    <Button
+                      variant={
+                        patient.status === "active" ? "outline" : "default"
+                      }
+                      onClick={() =>
+                        updateStatusMutation.mutate(
+                          patient.status === "active" ? "inactive" : "active",
+                        )
+                      }
+                      disabled={updateStatusMutation.isPending}
+                    >
+                      {patient.status === "active" ? "Deactivate" : "Activate"}
+                    </Button>
+                  ) : (
+                    /* All users can activate inactive patients */
+                    patient.status === "inactive" && (
+                      <Button
+                        variant="default"
+                        onClick={() =>
+                          updateStatusMutation.mutate("active")
+                        }
+                        disabled={updateStatusMutation.isPending}
+                      >
+                        Activate
+                      </Button>
+                    )
+                  )}
 
                   {/* Simple delete button */}
-                  <button
-                    type="button"
-                    className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 flex items-center space-x-2"
-                    onClick={async () => {
-                      if (!patient) {
-                        alert("Patient not found");
-                        return;
-                      }
-                      
-                      if (confirm(`Are you sure you want to delete ${patient.firstName} ${patient.lastName}?`)) {
-                        try {
-                          const response = await fetch(`/api/patients/${patientId}`, {
-                            method: "DELETE",
-                          });
-                          
-                          if (!response.ok) {
-                            throw new Error("Failed to delete patient");
-                          }
-                          
-                          toast({
-                            title: "Patient deleted",
-                            description: `${patient.firstName} ${patient.lastName} has been deleted successfully.`,
-                          });
-                          
-                          // Navigate back to patients list
-                          window.location.href = '/patients';
-                        } catch (error) {
-                          console.error("Error deleting patient:", error);
-                          toast({
-                            title: "Delete failed",
-                            description: "Failed to delete patient. Please try again.",
-                            variant: "destructive"
-                          });
-                        }
-                      }
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    <span>Delete Patient</span>
-                  </button>
+
                   
                   
                 </div>

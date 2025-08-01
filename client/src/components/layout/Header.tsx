@@ -356,7 +356,13 @@ export function Header({ onSearch }: HeaderProps) {
                     src="/logo.png"
                     alt="Logo"
                     className="h-8 w-8 object-contain"
+                    onError={(e) => {
+                      // Fallback to text if image fails to load
+                      e.currentTarget.style.display = 'none';
+                      e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                    }}
                   />
+                  <span className="text-white font-bold text-sm hidden">NL</span>
                 </div>
                 <div>
                   <h1 className="text-xl font-semibold text-gray-900">

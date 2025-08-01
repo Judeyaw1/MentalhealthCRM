@@ -66,6 +66,7 @@ export default function Dashboard() {
     completedAppointments: 0,
     upcomingAppointments: 0,
     appointmentsNeedingReview: 0,
+    archivedPatients: 0,
   };
 
   const { data: recentPatients, isLoading: patientsLoading } = useQuery({
@@ -176,6 +177,7 @@ export default function Dashboard() {
         <Sidebar
           patientCount={statsData.totalPatients}
           todayAppointments={statsData.todayAppointments}
+          archivedCount={statsData.archivedPatients || 0}
         />
 
         <main className="flex-1 overflow-y-auto">

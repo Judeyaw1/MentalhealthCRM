@@ -24,6 +24,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { z } from "zod";
 import { useQuery } from "@tanstack/react-query";
 import { useRef, useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
 
 interface PatientFormProps {
   initialData?: Partial<InsertPatient>;
@@ -79,6 +80,8 @@ export function PatientForm({
   isLoading = false,
   submitLabel = "Create Patient Record",
 }: PatientFormProps) {
+  const { user } = useAuth();
+  
   // Fetch therapists for dropdown
   const { data: therapists = [] } = useQuery<{ id: string; firstName: string; lastName: string }[]>({
     queryKey: ["/api/therapists"],
@@ -446,9 +449,20 @@ export function PatientForm({
                     <SelectContent>
                       <SelectItem value="active">Active</SelectItem>
                       <SelectItem value="inactive">Inactive</SelectItem>
-                      <SelectItem value="discharged">Discharged</SelectItem>
+                      <SelectItem 
+                        value="discharged" 
+                        disabled={!(user?.role === "admin" || user?.role === "supervisor")}
+                        className={!(user?.role === "admin" || user?.role === "supervisor") ? "opacity-50 cursor-not-allowed" : ""}
+                      >
+                        Discharged
+                      </SelectItem>
                     </SelectContent>
                   </Select>
+                  {!(user?.role === "admin" || user?.role === "supervisor") && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Only admin and supervisors can discharge patients
+                    </p>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}

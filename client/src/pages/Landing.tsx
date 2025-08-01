@@ -57,7 +57,16 @@ export default function Landing() {
           <div className="flex justify-between items-center py-6">
             <div className="flex items-center space-x-3">
               <div className="w-10 h-10 bg-primary-500 rounded-lg flex items-center justify-center">
-                <img src="/logo.png" alt="Logo" className="h-8 w-8 object-contain" />
+                <img 
+                  src="/logo.png" 
+                  alt="Logo" 
+                  className="h-8 w-8 object-contain"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                  }}
+                />
+                <span className="text-white font-bold text-sm hidden">NL</span>
               </div>
               <div>
                 <h1 className="text-xl font-semibold text-gray-900">
@@ -160,7 +169,16 @@ export default function Landing() {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
-                <img src="/logo.png" alt="Logo" className="h-5 w-5 object-contain" />
+                <img 
+                  src="/logo.png" 
+                  alt="Logo" 
+                  className="h-5 w-5 object-contain"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                  }}
+                />
+                <span className="text-white font-bold text-xs hidden">NL</span>
               </div>
               <span className="text-lg font-semibold">NewLife CRM</span>
             </div>
