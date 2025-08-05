@@ -303,29 +303,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/patients", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const { limit = 50, offset = 0, search, status, createdBy, therapist, loc } = req.query;
-
-      const query: any = {};
-      if (search) {
-        query.$or = [
-          { firstName: { $regex: search, $options: "i" } },
-          { lastName: { $regex: search, $options: "i" } },
-          { email: { $regex: search, $options: "i" } },
-          { phone: { $regex: search, $options: "i" } },
-        ];
-      }
-      if (status) {
-        query.status = status;
-      }
-      if (createdBy) {
-        query.createdBy = createdBy;
-      }
-      if (therapist) {
-        query.assignedTherapistId = therapist;
-      }
-      if (loc) {
-        query.loc = loc;
-      }
+      const { limit = 50, offset = 0, search, status, createdBy, therapist, loc, unassignedOnly } = req.query;
 
       const result = await storage.getPatients(
         parseInt(limit as string),
@@ -335,7 +313,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         createdBy as string,
         therapist as string,
         loc as string,
-        false // Don't include archived patients in main list
+        false, // Don't include archived patients in main list
+        unassignedOnly === "true"
       );
 
       await logActivity(userId, "view", "patients", "list");
@@ -402,6 +381,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         patient.id.toString(),
         parsed,
       );
+      
+      // Emit WebSocket event for real-time updates
+      const io = (global as any).io;
+      if (io) {
+        io.emit('patient_created', patient);
+      }
+      
       res.status(201).json(patient);
     } catch (error) {
       console.error("Error creating patient:", error);
@@ -449,6 +435,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         patientId.toString(),
         cleanedUpdates,
       );
+      
+      // Emit WebSocket event for real-time updates
+      const io = (global as any).io;
+      if (io) {
+        io.emit('patient_updated', patient);
+      }
+      
       res.json(patient);
     } catch (error) {
       console.error("Error updating patient:", error);
@@ -601,31 +594,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.id;
       const { patients } = req.body;
+      console.log("=== BULK IMPORT START ===");
+      console.log("Request body:", JSON.stringify(req.body, null, 2));
+      console.log("Patients array length:", patients?.length);
+      
       if (!Array.isArray(patients) || patients.length === 0) {
+        console.log("No patients provided or empty array");
         return res.status(400).json({ message: "No patients provided" });
       }
+      
       let successCount = 0;
       const errors: string[] = [];
-      for (const [i, data] of patients.entries()) {
+      
+      for (let i = 0; i < patients.length; i++) {
+        const data = patients[i];
         try {
-          // Basic validation: require firstName, lastName, dateOfBirth, email
-          if (!data.firstName || !data.lastName || !data.dateOfBirth || !data.email) {
-            errors.push(`Row ${i + 1}: Missing required fields.`);
+          console.log(`\n--- Processing row ${i + 1} ---`);
+          console.log("Raw data:", JSON.stringify(data, null, 2));
+          
+          // Basic validation: require firstName, lastName, dateOfBirth (email is optional)
+          if (!data.firstName || !data.lastName || !data.dateOfBirth) {
+            const missingFields = [];
+            if (!data.firstName) missingFields.push('firstName');
+            if (!data.lastName) missingFields.push('lastName');
+            if (!data.dateOfBirth) missingFields.push('dateOfBirth');
+            errors.push(`Row ${i + 1}: Missing required fields: ${missingFields.join(', ')}`);
             continue;
           }
           // Parse dateOfBirth if needed
           if (typeof data.dateOfBirth === "string") {
             data.dateOfBirth = new Date(data.dateOfBirth);
           }
-          // Create patient
-          const patient = new Patient({ ...data });
+          
+          // Clean and validate data
+          const cleanedData = {
+            ...data,
+            // Set default values for optional fields
+            status: data.status === "active" || data.status === "inactive" || data.status === "discharged" ? data.status : "active",
+            hipaaConsent: data.hipaaConsent === "true" || data.hipaaConsent === true || data.hipaaConsent === "1",
+            loc: data.loc || "3.3",
+            // Clean phone numbers (remove extensions and format)
+            phone: data.phone ? data.phone.replace(/x\d+$/, '').replace(/[^\d-]/g, '').substring(0, 15) : undefined,
+            // Clean email
+            email: data.email ? data.email.trim() : undefined,
+            // Clean address
+            address: data.address ? data.address.trim() : undefined,
+            // Clean insurance
+            insurance: data.insurance ? data.insurance.trim() : undefined,
+            // Clean reasonForVisit
+            reasonForVisit: data.reasonForVisit ? data.reasonForVisit.trim() : undefined,
+          };
+          
+          // Validate that status is a valid enum value
+          if (cleanedData.status && !["active", "inactive", "discharged"].includes(cleanedData.status)) {
+            errors.push(`Row ${i + 1}: Invalid status value "${cleanedData.status}". Must be "active", "inactive", or "discharged".`);
+            continue;
+          }
+          
+          // Create patient with createdBy field
+          const patient = new Patient({
+            ...cleanedData,
+            createdBy: userId
+          });
           await patient.save();
           await logActivity(userId, "create", "patient", patient._id.toString(), data);
           successCount++;
+          console.log(`Successfully created patient: ${cleanedData.firstName} ${cleanedData.lastName}`);
         } catch (err: any) {
+          console.error(`Error creating patient in row ${i + 1}:`, err);
           errors.push(`Row ${i + 1}: ${err.message || "Unknown error"}`);
         }
       }
+      
+      console.log("=== BULK IMPORT END ===");
+      console.log("Success count:", successCount);
+      console.log("Error count:", errors.length);
+      console.log("Errors:", errors);
+      
       res.json({ successCount, errors, message: `${successCount} patients imported. ${errors.length ? errors.length + ' errors.' : ''}` });
     } catch (error) {
       console.error("Bulk import error:", error);
@@ -676,7 +721,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }));
 
       // Helper function to calculate age
-      function getAge(dateOfBirth: string | number | Date) {
+      const getAge = (dateOfBirth: string | number | Date) => {
         const today = new Date();
         const birthDate = new Date(dateOfBirth);
         let age = today.getFullYear() - birthDate.getFullYear();
@@ -685,7 +730,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           age--;
         }
         return age;
-      }
+      };
 
       if (format === "csv") {
         // Export as CSV - generate directly in memory
@@ -1067,7 +1112,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUser(userId);
       const appointmentData = insertAppointmentSchema.parse(req.body);
 
-      const appointment = await storage.createAppointment(appointmentData);
+      const appointment = await storage.createAppointment({
+        ...appointmentData,
+        createdBy: userId
+      });
       await logActivity(
         userId,
         "create",
@@ -1094,6 +1142,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const appointmentId = req.params.id;
       const updates = insertAppointmentSchema.partial().parse(req.body);
 
+      // Get current appointment to check status
+      const currentAppointment = await storage.getAppointment(appointmentId);
+      if (!currentAppointment) {
+        return res.status(404).json({ message: "Appointment not found" });
+      }
+
+      // Validate status transitions
+      if (updates.status) {
+        const currentStatus = currentAppointment.status;
+        const newStatus = updates.status;
+
+        // Prevent cancelling completed appointments
+        if (newStatus === "cancelled" && currentStatus === "completed") {
+          return res.status(400).json({ 
+            message: "Cannot cancel a completed appointment" 
+          });
+        }
+
+        // Prevent marking cancelled appointments as completed
+        if (newStatus === "completed" && currentStatus === "cancelled") {
+          return res.status(400).json({ 
+            message: "Cannot mark a cancelled appointment as completed" 
+          });
+        }
+      }
+
       const appointment = await storage.updateAppointment(
         appointmentId,
         updates,
@@ -1105,6 +1179,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         appointmentId,
         updates,
       );
+
+      // Send notification for status changes
+      if (updates.status && currentAppointment.status !== updates.status && appointment) {
+        const user = await storage.getUser(userId);
+        const { notificationService } = await import("./notificationService");
+        
+        await notificationService.sendAppointmentStatusChangeNotification({
+          appointmentId,
+          patientName: appointment.patient?.firstName && appointment.patient?.lastName 
+            ? `${appointment.patient.firstName} ${appointment.patient.lastName}` 
+            : "Unknown Patient",
+          therapistName: appointment.therapist?.firstName && appointment.therapist?.lastName 
+            ? `${appointment.therapist.firstName} ${appointment.therapist.lastName}` 
+            : "Unknown Therapist",
+          appointmentDate: appointment.appointmentDate,
+          oldStatus: currentAppointment.status,
+          newStatus: updates.status,
+          changedBy: userId,
+          changedByName: user ? `${user.firstName} ${user.lastName}` : "Unknown User",
+        });
+      }
+
+      // Emit WebSocket event for real-time updates
+      const io = (global as any).io;
+      if (io && appointment) {
+        io.emit('appointment_updated', appointment);
+      }
 
       res.json(appointment);
     } catch (error) {
@@ -1440,8 +1541,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const adminId = req.user.id;
         const admin = await storage.getUser(adminId);
 
-        // Only admins can reset passwords
-        if (admin?.role !== "admin") {
+        // Only admins and supervisors can reset passwords
+        if (admin?.role !== "admin" && admin?.role !== "supervisor") {
           return res.status(403).json({ message: "Access denied" });
         }
 
@@ -1835,7 +1936,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Helper function to calculate age
-      function getAge(dateOfBirth: string | number | Date) {
+      const getAge = (dateOfBirth: string | number | Date) => {
         const today = new Date();
         const birthDate = new Date(dateOfBirth);
         let age = today.getFullYear() - birthDate.getFullYear();
@@ -1847,7 +1948,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           age--;
         }
         return age;
-      }
+      };
 
       console.log("Searching patients...");
       // Search patients
@@ -3249,6 +3350,151 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating staff member:", error);
       res.status(500).json({ message: "Failed to update staff member" });
+    }
+  });
+
+  // Assessment routes
+  app.post("/api/patients/:patientId/assessments", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const patientId = req.params.patientId;
+      
+      if (!mongoose.Types.ObjectId.isValid(patientId)) {
+        return res.status(400).json({ message: "Invalid patient ID format" });
+      }
+
+      const patient = await storage.getPatient(patientId);
+      if (!patient) {
+        return res.status(404).json({ message: "Patient not found" });
+      }
+
+      const {
+        presentingProblem,
+        medicalHistory,
+        psychiatricHistory,
+        familyHistory,
+        socialHistory,
+        mentalStatus,
+        riskAssessment,
+        diagnosis,
+        impressions,
+        followUpDate,
+        followUpNotes,
+      } = req.body;
+
+      // Validate required fields
+      if (!presentingProblem || !impressions) {
+        return res.status(400).json({
+          message: "Presenting problem and impressions are required",
+        });
+      }
+
+      const assessment = {
+        patientId,
+        presentingProblem,
+        medicalHistory,
+        psychiatricHistory,
+        familyHistory,
+        socialHistory,
+        mentalStatus,
+        riskAssessment,
+        diagnosis,
+        impressions,
+        followUpDate,
+        followUpNotes,
+        status: "in_progress",
+        createdBy: userId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const savedAssessment = await storage.createAssessment(assessment);
+      await logActivity(userId, "create", "assessment", savedAssessment.id);
+
+      res.status(201).json({
+        message: "Assessment created successfully",
+        assessment: savedAssessment,
+      });
+    } catch (error) {
+      console.error("Error creating assessment:", error);
+      res.status(500).json({ message: "Failed to create assessment" });
+    }
+  });
+
+  app.get("/api/patients/:patientId/assessments", isAuthenticated, async (req: any, res) => {
+    try {
+      const patientId = req.params.patientId;
+      
+      if (!mongoose.Types.ObjectId.isValid(patientId)) {
+        return res.status(400).json({ message: "Invalid patient ID format" });
+      }
+
+      const patient = await storage.getPatient(patientId);
+      if (!patient) {
+        return res.status(404).json({ message: "Patient not found" });
+      }
+
+      const assessments = await storage.getAssessments(patientId);
+      res.json(assessments);
+    } catch (error) {
+      console.error("Error fetching assessments:", error);
+      res.status(500).json({ message: "Failed to fetch assessments" });
+    }
+  });
+
+  app.patch("/api/assessments/:assessmentId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const assessmentId = req.params.assessmentId;
+      
+      if (!mongoose.Types.ObjectId.isValid(assessmentId)) {
+        return res.status(400).json({ message: "Invalid assessment ID format" });
+      }
+
+      const assessment = await storage.getAssessment(assessmentId);
+      if (!assessment) {
+        return res.status(404).json({ message: "Assessment not found" });
+      }
+
+      const updateData = {
+        ...req.body,
+        updatedAt: new Date(),
+      };
+
+      const updatedAssessment = await storage.updateAssessment(assessmentId, updateData);
+      await logActivity(userId, "update", "assessment", assessmentId);
+
+      res.json({
+        message: "Assessment updated successfully",
+        assessment: updatedAssessment,
+      });
+    } catch (error) {
+      console.error("Error updating assessment:", error);
+      res.status(500).json({ message: "Failed to update assessment" });
+    }
+  });
+
+  app.delete("/api/assessments/:assessmentId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const assessmentId = req.params.assessmentId;
+      
+      if (!mongoose.Types.ObjectId.isValid(assessmentId)) {
+        return res.status(400).json({ message: "Invalid assessment ID format" });
+      }
+
+      const assessment = await storage.getAssessment(assessmentId);
+      if (!assessment) {
+        return res.status(404).json({ message: "Assessment not found" });
+      }
+
+      await storage.deleteAssessment(assessmentId);
+      await logActivity(userId, "delete", "assessment", assessmentId);
+
+      res.json({ message: "Assessment deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting assessment:", error);
+      res.status(500).json({ message: "Failed to delete assessment" });
     }
   });
 

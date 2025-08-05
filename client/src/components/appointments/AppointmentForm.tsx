@@ -1,6 +1,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -43,6 +44,8 @@ interface AppointmentFormProps {
   submitLabel?: string;
   patients?: { id: number; firstName: string; lastName: string }[];
   therapists?: { id: string; firstName: string; lastName: string }[];
+  isNewAppointment?: boolean;
+  patientHistory?: { [patientId: number]: boolean }; // true = has previous appointments
 }
 
 export function AppointmentForm({
@@ -52,6 +55,8 @@ export function AppointmentForm({
   submitLabel = "Schedule Appointment",
   patients = [],
   therapists = [],
+  isNewAppointment = false,
+  patientHistory = {},
 }: AppointmentFormProps) {
   const form = useForm<InsertAppointment>({
     resolver: zodResolver(insertAppointmentSchema),
@@ -65,6 +70,19 @@ export function AppointmentForm({
       notes: initialData?.notes || "",
     },
   });
+
+  // Watch for patient selection to auto-update appointment type
+  const selectedPatientId = form.watch("patientId");
+  const selectedPatient = patients.find(p => p.id.toString() === selectedPatientId);
+  const isReturningPatient = selectedPatient ? patientHistory[selectedPatient.id] : false;
+
+  // Auto-update appointment type based on patient history
+  useEffect(() => {
+    if (selectedPatientId && isNewAppointment) {
+      const defaultType = isReturningPatient ? "therapy" : "consultation";
+      form.setValue("type", defaultType);
+    }
+  }, [selectedPatientId, isReturningPatient, isNewAppointment, form]);
 
   const handleSubmit = (data: InsertAppointment) => {
     onSubmit(data);
@@ -240,19 +258,29 @@ export function AppointmentForm({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Status</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    {isNewAppointment ? (
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
+                        <Input
+                          value="Scheduled"
+                          disabled
+                          className="bg-gray-50 text-gray-600"
+                        />
                       </FormControl>
-                      <SelectContent>
-                        <SelectItem value="scheduled">Scheduled</SelectItem>
-                        <SelectItem value="completed">Completed</SelectItem>
-                        <SelectItem value="cancelled">Cancelled</SelectItem>
-                        <SelectItem value="no-show">No Show</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    ) : (
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="scheduled">Scheduled</SelectItem>
+                          <SelectItem value="completed">Completed</SelectItem>
+                          <SelectItem value="cancelled">Cancelled</SelectItem>
+                          <SelectItem value="no-show">No Show</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}

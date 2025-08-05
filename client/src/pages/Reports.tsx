@@ -156,7 +156,7 @@ export default function Reports() {
   };
 
   const filteredAddPatients = allPatients.filter(
-    (p) => p.status === "active" && p.loc !== selectedLevel &&
+    (p) => p.status === "active" && (!p.loc || p.loc === "") &&
       (`${p.firstName} ${p.lastName}`.toLowerCase().includes(searchAdd.toLowerCase()) ||
        p.email?.toLowerCase().includes(searchAdd.toLowerCase()) ||
        p.phone?.toLowerCase().includes(searchAdd.toLowerCase()))

@@ -218,12 +218,13 @@ export default function Archive() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header onSearch={() => {}} />
+      <Header />
+
       <div className="flex">
         <Sidebar />
+
         <main className="flex-1 overflow-y-auto">
           <div className="p-6">
-            <div className="max-w-7xl mx-auto">
               {/* Header */}
               <div className="mb-6">
                 <div className="flex items-center justify-between">
@@ -426,7 +427,6 @@ export default function Archive() {
                   )}
                 </CardContent>
               </Card>
-            </div>
           </div>
         </main>
       </div>

@@ -137,6 +137,23 @@ export function TreatmentRecordForm({
   const watchedSessionType = form.watch("sessionType");
   const watchedValues = form.watch();
 
+  // Reset form when initialData changes (for editing)
+  useEffect(() => {
+    if (initialData) {
+      form.reset({
+        patientId: initialData.patientId || undefined,
+        therapistId: initialData.therapistId || undefined,
+        sessionDate: initialData.sessionDate || new Date(),
+        sessionType: initialData.sessionType || "therapy",
+        notes: initialData.notes || "",
+        goals: initialData.goals || "",
+        interventions: initialData.interventions || "",
+        progress: initialData.progress || "",
+        planForNextSession: initialData.planForNextSession || "",
+      });
+    }
+  }, [initialData, form]);
+
   // Auto-save functionality
   useEffect(() => {
     const timeoutId = setTimeout(() => {

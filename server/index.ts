@@ -12,6 +12,7 @@ import { connectToMongo } from "./mongo";
 import mongoose from "mongoose";
 import { storage } from "./storage";
 import { PatientNote } from "./models/PatientNote";
+import { setupSocketServer } from "./socket";
 
 const app = express();
 app.use(express.json());
@@ -53,6 +54,12 @@ app.use((req, res, next) => {
   storage.setDatabase(mongoose.connection.db);
 
   const server = await registerRoutes(app);
+  
+  // Setup WebSocket server
+  const io = setupSocketServer(server);
+  
+  // Make io available globally for routes
+  (global as any).io = io;
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;

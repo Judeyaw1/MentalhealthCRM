@@ -25,7 +25,7 @@ import {
   RefreshCw,
   Download,
   MoreHorizontal,
-  Settings,
+
   Grid3X3,
   List,
   Eye,
@@ -383,19 +383,7 @@ export function DataTable<T>({
                 </DropdownMenu>
               )}
 
-              {/* Settings */}
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="outline" size="sm" className="h-8 w-8 p-0">
-                      <Settings className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Table settings</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+
             </div>
           )}
         </div>

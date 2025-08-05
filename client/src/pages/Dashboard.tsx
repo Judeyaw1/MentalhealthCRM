@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useSocket } from "@/hooks/useSocket";
 import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { StatsCards } from "@/components/dashboard/StatsCards";
@@ -21,9 +22,33 @@ import * as XLSX from "xlsx";
 export default function Dashboard() {
   const { toast } = useToast();
   const { isAuthenticated, isLoading } = useAuth();
+  const queryClient = useQueryClient();
   const [dateRange, setDateRange] = useState<{ startDate: string; endDate: string }>({
     startDate: "",
     endDate: "",
+  });
+
+  // Setup WebSocket for real-time updates
+  const { isConnected, socket } = useSocket({
+    onPatientCreated: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/patients'] });
+    },
+    onPatientUpdated: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/patients'] });
+    },
+    onAppointmentCreated: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+    },
+    onAppointmentUpdated: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+    },
+    onDashboardStatsUpdated: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+    },
   });
 
   useEffect(() => {
@@ -53,6 +78,7 @@ export default function Dashboard() {
   const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
     queryKey: ["/api/dashboard/stats"],
     retry: false,
+    staleTime: 0, // Force fresh fetch
     refetchInterval: 10000,
     refetchIntervalInBackground: true, // Continue polling even when tab is not active
   });
@@ -63,6 +89,7 @@ export default function Dashboard() {
     activeTreatments: 0,
     treatmentCompletionRate: 0,
     monthlyAppointments: 0,
+    newPatientsThisMonth: 0,
     completedAppointments: 0,
     upcomingAppointments: 0,
     appointmentsNeedingReview: 0,
@@ -193,6 +220,14 @@ export default function Dashboard() {
                     Welcome back. Here's what's happening at your practice
                     today.
                   </p>
+                  
+                  {/* Real-time status indicator */}
+                  <div className="flex items-center gap-2 mt-2">
+                    <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                    <span className="text-xs text-gray-600">
+                      {isConnected ? 'Real-time connected' : 'Real-time disconnected'}
+                    </span>
+                  </div>
                 </div>
                 <div className="flex space-x-3">
                   <DropdownMenu>

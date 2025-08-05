@@ -19,6 +19,7 @@ export interface DashboardStats {
     eligibleForDischarge: number;
   };
   monthlyAppointments: number;
+  newPatientsThisMonth: number;
   completedAppointments: number;
   upcomingAppointments: number;
   appointmentsNeedingReview: number;
@@ -60,7 +61,7 @@ export function StatsCards({ stats, isLoading }: StatsCardsProps) {
     {
       title: "Total Patients",
       value: stats.totalPatients,
-      change: `+${stats.monthlyAppointments} this month`,
+      change: `+${stats.newPatientsThisMonth || 0} this month`,
       changeType: "positive" as const,
       icon: Users,
       iconBg: "bg-primary-50",

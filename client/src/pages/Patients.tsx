@@ -41,7 +41,7 @@ import {
   FileText,
   FileSpreadsheet,
   FileDown,
-  Settings,
+
   RefreshCw,
   Search,
   Grid3X3,
@@ -473,6 +473,97 @@ export default function Patients() {
     }
   };
 
+  const handleDownloadSample = () => {
+    // Sample data that matches the patient registration form
+    const sampleData = [
+      {
+        firstName: "John",
+        lastName: "Doe",
+        dateOfBirth: "1990-01-15",
+        gender: "male",
+        email: "john.doe@email.com",
+        phone: "555-123-4567",
+        emergencyContact: "555-999-8888",
+        address: "123 Main Street, Anytown, ST 12345",
+        insurance: "Blue Cross Blue Shield",
+        reasonForVisit: "Anxiety and stress management",
+        status: "active",
+        hipaaConsent: "true",
+        loc: "3.3",
+        authNumber: "12345"
+      },
+      {
+        firstName: "Jane",
+        lastName: "Smith",
+        dateOfBirth: "1985-03-22",
+        gender: "female",
+        email: "jane.smith@email.com",
+        phone: "555-567-8901",
+        emergencyContact: "555-888-7777",
+        address: "456 Oak Avenue, Somewhere, ST 12345",
+        insurance: "Aetna",
+        reasonForVisit: "Depression treatment",
+        status: "active",
+        hipaaConsent: "true",
+        loc: "3.3",
+        authNumber: "67890"
+      },
+      {
+        firstName: "Mike",
+        lastName: "Johnson",
+        dateOfBirth: "1995-07-10",
+        gender: "male",
+        email: "mike.j@email.com",
+        phone: "555-901-2345",
+        emergencyContact: "555-777-6666",
+        address: "789 Pine Road, Elsewhere, ST 12345",
+        insurance: "Medicare",
+        reasonForVisit: "Stress management and coping skills",
+        status: "active",
+        hipaaConsent: "true",
+        loc: "3.3",
+        authNumber: "11111"
+      }
+    ];
+
+    // Create CSV content
+    const headers = [
+      "firstName", "lastName", "dateOfBirth", "gender", "email", "phone", 
+      "emergencyContact", "address", "insurance", "reasonForVisit", 
+      "status", "hipaaConsent", "loc", "authNumber"
+    ];
+    
+    const csvContent = [
+      headers.join(","),
+      ...sampleData.map(row => 
+        headers.map(header => {
+          const value = row[header as keyof typeof row];
+          // Escape commas and quotes in CSV
+          if (typeof value === 'string' && (value.includes(',') || value.includes('"'))) {
+            return `"${value.replace(/"/g, '""')}"`;
+          }
+          return value;
+        }).join(",")
+      )
+    ].join("\n");
+
+    // Create and download the file
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "patient_import_template.csv";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+
+    toast({
+      title: "Sample Template Downloaded",
+      description: "Check your downloads folder for 'patient_import_template.csv'",
+    });
+  };
+
   const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -485,11 +576,30 @@ export default function Patients() {
         // Parse CSV
         const text = data as string;
         const lines = text.split(/\r?\n/).filter(Boolean);
-        const headers = lines[0].split(",");
+        const headers = lines[0].split(",").map(h => h.trim());
         rows = lines.slice(1).map(line => {
-          const values = line.split(",");
+          // Handle CSV with commas in quoted fields
+          const values: string[] = [];
+          let current = '';
+          let inQuotes = false;
+          
+          for (let i = 0; i < line.length; i++) {
+            const char = line[i];
+            if (char === '"') {
+              inQuotes = !inQuotes;
+            } else if (char === ',' && !inQuotes) {
+              values.push(current.trim());
+              current = '';
+            } else {
+              current += char;
+            }
+          }
+          values.push(current.trim()); // Add the last value
+          
           const obj: any = {};
-          headers.forEach((h, i) => { obj[h.trim()] = values[i]?.trim() || ""; });
+          headers.forEach((h, i) => { 
+            obj[h] = values[i]?.replace(/^"|"$/g, '') || ""; // Remove quotes
+          });
           return obj;
         });
       } else {
@@ -520,7 +630,17 @@ export default function Patients() {
       const result = await response.json();
       setImportResult(result);
       if (response.ok) {
-        toast({ title: "Import Successful", description: `${result.successCount || 0} patients imported.` });
+        const message = result.successCount > 0 
+          ? `Import Successful: ${result.successCount} patients imported.`
+          : "Import completed with errors.";
+        toast({ title: "Import Complete", description: message });
+        
+        // Show detailed errors if any
+        if (result.errors && result.errors.length > 0) {
+          console.log("Import errors:", result.errors);
+          // You could show these in a dialog or toast
+        }
+        
         setShowImportDialog(false);
         setImportFile(null);
         setImportData([]);
@@ -1187,38 +1307,70 @@ export default function Patients() {
         </DialogContent>
       </Dialog>
       <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Import Patients (CSV or Excel)</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <input
-              type="file"
-              accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
-              onChange={handleImportFile}
-              disabled={importLoading}
-            />
+            {/* Sample Template Download */}
+            <div className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center space-x-2">
+                <FileText className="h-5 w-5 text-blue-600" />
+                <div>
+                  <p className="text-sm font-medium text-blue-900">Need help with the format?</p>
+                  <p className="text-xs text-blue-700">Download a sample template to see the correct arrangement</p>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDownloadSample}
+                className="text-blue-600 border-blue-300 hover:bg-blue-100"
+              >
+                Download Sample
+              </Button>
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Select File (CSV or Excel)
+              </label>
+              <input
+                type="file"
+                accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
+                onChange={handleImportFile}
+                disabled={importLoading}
+                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+              />
+              <p className="text-xs text-gray-500">
+                Required fields: firstName, lastName, dateOfBirth. All other fields are optional.
+              </p>
+            </div>
             {importData.length > 0 && (
               <div className="max-h-64 overflow-auto border rounded p-2 bg-gray-50">
                 <div className="mb-2 font-semibold">Preview ({importData.length} rows):</div>
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr>
-                      {Object.keys(importData[0]).map((h) => (
-                        <th key={h} className="border-b px-2 py-1 text-left">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {importData.slice(0, 10).map((row, i) => (
-                      <tr key={i}>
-                        {Object.values(row).map((v, j) => (
-                          <td key={j} className="border-b px-2 py-1">{v as string}</td>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs min-w-full">
+                    <thead>
+                      <tr>
+                        {Object.keys(importData[0]).map((h) => (
+                          <th key={h} className="border-b px-2 py-1 text-left whitespace-nowrap">{h}</th>
                         ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {importData.slice(0, 10).map((row, i) => (
+                        <tr key={i}>
+                          {Object.values(row).map((v, j) => (
+                            <td key={j} className="border-b px-2 py-1 whitespace-nowrap max-w-xs truncate" title={v as string}>
+                              {v as string}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
                 {importData.length > 10 && <div className="text-gray-400 mt-1">...and {importData.length - 10} more rows</div>}
               </div>
             )}

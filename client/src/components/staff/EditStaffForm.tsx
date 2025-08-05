@@ -55,12 +55,12 @@ export function EditStaffForm({ staffMember, onSuccess }: EditStaffFormProps) {
   });
 
   const [formData, setFormData] = useState<EditData>({
-    firstName: "",
-    lastName: "",
-    role: "",
+    firstName: staffMember.firstName || "",
+    lastName: staffMember.lastName || "",
+    role: staffMember.role || "",
   });
 
-  // Initialize form data when current staff data is loaded
+  // Update form data when current staff data is loaded (in case there are updates)
   useEffect(() => {
     if (currentStaffData) {
       setFormData({

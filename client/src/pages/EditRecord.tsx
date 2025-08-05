@@ -193,6 +193,8 @@ export default function EditRecord() {
               </div>
             </div>
 
+
+
             {/* Form */}
             <div className="bg-white rounded-lg shadow">
               <TreatmentRecordForm
@@ -201,9 +203,9 @@ export default function EditRecord() {
                 patients={patients?.patients || []}
                 therapists={therapists || []}
                 initialData={{
-                  patientId: record.patientId,
-                  therapistId: record.therapistId,
-                  sessionDate: new Date(record.sessionDate).getTime(),
+                  patientId: record.patientId?._id || record.patientId?.toString() || record.patientId,
+                  therapistId: record.therapistId?._id || record.therapistId?.toString() || record.therapistId,
+                  sessionDate: new Date(record.sessionDate),
                   sessionType: record.sessionType,
                   notes: record.notes || "",
                   goals: record.goals || "",

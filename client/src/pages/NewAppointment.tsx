@@ -58,6 +58,12 @@ export default function NewAppointment() {
     retry: false,
   });
 
+  // Fetch all appointments to determine patient history
+  const { data: appointments } = useQuery({
+    queryKey: ["/api/appointments"],
+    retry: false,
+  });
+
   const createAppointmentMutation = useMutation({
     mutationFn: async (appointmentData: InsertAppointment) => {
       const response = await apiRequest(
@@ -129,6 +135,19 @@ export default function NewAppointment() {
 
   const defaultTherapistId = user?.role === "therapist" ? user.id : "";
 
+  // Create patient history object
+  const patientHistory: { [patientId: number]: boolean } = {};
+  if (appointments?.appointments && patients?.patients) {
+    appointments.appointments.forEach((appointment: any) => {
+      if (appointment.patientId && appointment.patientId._id) {
+        const patientId = Number(appointment.patientId._id);
+        if (!isNaN(patientId)) {
+          patientHistory[patientId] = true;
+        }
+      }
+    });
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
@@ -178,6 +197,8 @@ export default function NewAppointment() {
                 submitLabel="Schedule Appointment"
                 patients={patients?.patients || []}
                 therapists={therapists || []}
+                isNewAppointment={true}
+                patientHistory={patientHistory}
               />
             </div>
           </div>

@@ -215,7 +215,7 @@ export default function PatientNotes({ patientId }: PatientNotesProps) {
       queryClient.invalidateQueries({ queryKey: ["notes", patientId] });
       toast({
         title: "All Threads Closed",
-        description: `All threads closed successfully. ${data.updatedCount} notes archived. Notes will be cleared in 5 minutes.`,
+        description: `All threads closed successfully. ${(data as any).updatedCount} notes archived. Notes will be cleared in 5 minutes.`,
       });
       
       // Auto-clear archived notes after 5 minutes
@@ -241,7 +241,7 @@ export default function PatientNotes({ patientId }: PatientNotesProps) {
       queryClient.invalidateQueries({ queryKey: ["notes", patientId] });
       toast({
         title: "Notes Cleared",
-        description: `Archived notes cleared successfully. ${data.deletedCount} notes removed.`,
+        description: `Archived notes cleared successfully. ${(data as any).deletedCount} notes removed.`,
       });
     },
     onError: (error) => {
@@ -318,7 +318,7 @@ export default function PatientNotes({ patientId }: PatientNotesProps) {
   };
 
   const hasArchivedNotes = () => {
-    return threads.some(thread => isThreadArchived(thread));
+    return threads.some((thread: Thread) => isThreadArchived(thread));
   };
 
   const getRoleColor = (role: string) => {

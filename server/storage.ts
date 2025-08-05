@@ -16,7 +16,7 @@ export class DatabaseStorage {
   }
   
   // Patient operations
-  async getPatients(limit = 50, offset = 0, search?: string, status?: string, createdBy?: string, therapist?: string, loc?: string, includeArchived = false) {
+  async getPatients(limit = 50, offset = 0, search?: string, status?: string, createdBy?: string, therapist?: string, loc?: string, includeArchived = false, unassignedOnly = false) {
     let query: any = {};
 
     if (search) {
@@ -42,6 +42,15 @@ export class DatabaseStorage {
 
     if (loc) {
       query.loc = loc;
+    }
+
+    // Filter for unassigned patients only
+    if (unassignedOnly) {
+      query.$or = [
+        { assignedTherapistId: { $exists: false } },
+        { assignedTherapistId: null },
+        { assignedTherapistId: "" }
+      ];
     }
 
     // If not including archived, exclude only discharged patients (inactive should be visible)
@@ -192,7 +201,7 @@ export class DatabaseStorage {
             {
               patientName,
               patientId: populatedPatient._id.toString(),
-              reasonForVisit: populatedPatient.reasonForVisit,
+              reasonForVisit: populatedPatient.reasonForVisit ? populatedPatient.reasonForVisit : undefined,
               status: populatedPatient.status,
               assignedAt: new Date(),
             }
@@ -264,7 +273,7 @@ export class DatabaseStorage {
           {
             patientName,
             patientId: updatedPatient._id.toString(),
-            reasonForVisit: updatedPatient.reasonForVisit,
+            reasonForVisit: updatedPatient.reasonForVisit ? updatedPatient.reasonForVisit : undefined,
             status: updatedPatient.status,
             assignedAt: new Date(),
           }
@@ -421,12 +430,12 @@ export class DatabaseStorage {
   ) {
     const query: any = {};
 
-    if (therapistId) {
-      query.therapistId = therapistId;
+    if (therapistId && typeof therapistId === 'string') {
+      query.therapistId = new mongoose.Types.ObjectId(therapistId);
     }
 
-    if (patientId) {
-      query.patientId = patientId;
+    if (patientId && typeof patientId === 'string') {
+      query.patientId = new mongoose.Types.ObjectId(patientId);
     }
 
     if (startDate && endDate) {
@@ -932,7 +941,58 @@ export class DatabaseStorage {
   }
 
   async countTreatmentRecords(query: any = {}) {
-    return await TreatmentRecord.countDocuments(query);
+    // If searching by patientName, use aggregation for accurate count
+    let useAggregation = false;
+    let searchRegex = null;
+    if (query.$or) {
+      for (const cond of query.$or) {
+        if (cond.patientName && cond.patientName.$regex) {
+          useAggregation = true;
+          searchRegex = cond.patientName.$regex;
+          break;
+        }
+      }
+    }
+    
+    if (useAggregation && searchRegex) {
+      // Remove patientName from $or
+      const newOr = query.$or.filter((cond: any) => !cond.patientName);
+      // Build aggregation pipeline for counting
+      const pipeline: any[] = [
+        { $lookup: {
+            from: "patients",
+            localField: "patientId",
+            foreignField: "_id",
+            as: "patientObj"
+        }},
+        { $unwind: "$patientObj" },
+        { $lookup: {
+            from: "users",
+            localField: "therapistId",
+            foreignField: "_id",
+            as: "therapistObj"
+        }},
+        { $unwind: { path: "$therapistObj", preserveNullAndEmptyArrays: true } },
+        { $match: {
+            $or: [
+              ...newOr,
+              { "patientObj.firstName": { $regex: searchRegex, $options: "i" } },
+              { "patientObj.lastName": { $regex: searchRegex, $options: "i" } }
+            ],
+            ...(query.patientId ? { patientId: query.patientId } : {}),
+            ...(query.therapistId ? { therapistId: query.therapistId } : {}),
+            ...(query.sessionType ? { sessionType: query.sessionType } : {}),
+            ...(query.sessionDate ? { sessionDate: query.sessionDate } : {}),
+          }
+        },
+        { $count: "total" }
+      ];
+      const result = await TreatmentRecord.aggregate(pipeline);
+      return result.length > 0 ? result[0].total : 0;
+    } else {
+      // Fallback to normal count
+      return await TreatmentRecord.countDocuments(query);
+    }
   }
 
   async getDashboardStats() {
@@ -966,6 +1026,11 @@ export class DatabaseStorage {
       const aptDate = new Date(apt.appointmentDate);
       return aptDate >= startOfMonth && aptDate < endOfMonth;
     }).length;
+
+    // Calculate new patients added this month
+    const newPatientsThisMonth = await PatientModel.countDocuments({
+      createdAt: { $gte: startOfMonth, $lt: endOfMonth }
+    });
 
     // Calculate enhanced treatment completion rate
     let completionStats;
@@ -1008,6 +1073,7 @@ export class DatabaseStorage {
       treatmentCompletionRate: completionStats.rate,
       treatmentCompletionBreakdown: completionStats.breakdown,
       monthlyAppointments,
+      newPatientsThisMonth,
       completedAppointments,
       upcomingAppointments,
       appointmentsNeedingReview,
@@ -1479,6 +1545,140 @@ export class DatabaseStorage {
     });
 
     return result.deletedCount || 0;
+  }
+
+  // Assessment methods
+  async createAssessment(assessment: any) {
+    try {
+      const savedAssessment = await this.db.collection("assessments").insertOne(assessment);
+      const { _id, ...rest } = assessment;
+      return {
+        ...rest,
+        id: savedAssessment.insertedId.toString(),
+      };
+    } catch (error) {
+      console.error("Error creating assessment:", error);
+      throw error;
+    }
+  }
+
+  async getAssessments(patientId: string) {
+    try {
+      const assessments = await this.db
+        .collection("assessments")
+        .find({ patientId })
+        .sort({ createdAt: -1 })
+        .toArray();
+
+      // Populate user information for each assessment
+      const assessmentsWithUsers = await Promise.all(
+        assessments.map(async (assessment: any) => {
+          const { _id, createdBy, ...rest } = assessment;
+          
+          // Get user information if createdBy exists
+          let userInfo = null;
+          if (createdBy) {
+            try {
+              const user = await this.getUser(createdBy);
+              if (user) {
+                userInfo = {
+                  id: user.id,
+                  name: `${user.firstName} ${user.lastName}`,
+                  role: user.role,
+                };
+              }
+            } catch (error) {
+              console.error("Error fetching user for assessment:", error);
+            }
+          }
+
+          return {
+            ...rest,
+            id: _id.toString(),
+            createdBy: userInfo,
+          };
+        })
+      );
+
+      return assessmentsWithUsers;
+    } catch (error) {
+      console.error("Error fetching assessments:", error);
+      throw error;
+    }
+  }
+
+  async getAssessment(assessmentId: string) {
+    try {
+      const assessment = await this.db
+        .collection("assessments")
+        .findOne({ _id: new mongoose.Types.ObjectId(assessmentId) });
+
+      if (!assessment) return null;
+
+      const { _id, createdBy, ...rest } = assessment;
+      
+      // Get user information if createdBy exists
+      let userInfo = null;
+      if (createdBy) {
+        try {
+          const user = await this.getUser(createdBy);
+          if (user) {
+            userInfo = {
+              id: user.id,
+              name: `${user.firstName} ${user.lastName}`,
+              role: user.role,
+            };
+          }
+        } catch (error) {
+          console.error("Error fetching user for assessment:", error);
+        }
+      }
+
+      return {
+        ...rest,
+        id: _id.toString(),
+        createdBy: userInfo,
+      };
+    } catch (error) {
+      console.error("Error fetching assessment:", error);
+      throw error;
+    }
+  }
+
+  async updateAssessment(assessmentId: string, updateData: any) {
+    try {
+      const result = await this.db
+        .collection("assessments")
+        .findOneAndUpdate(
+          { _id: new mongoose.Types.ObjectId(assessmentId) },
+          { $set: updateData },
+          { returnDocument: "after" }
+        );
+
+      if (!result) return null;
+
+      const { _id, ...rest } = result;
+      return {
+        ...rest,
+        id: _id.toString(),
+      };
+    } catch (error) {
+      console.error("Error updating assessment:", error);
+      throw error;
+    }
+  }
+
+  async deleteAssessment(assessmentId: string) {
+    try {
+      const result = await this.db
+        .collection("assessments")
+        .deleteOne({ _id: new mongoose.Types.ObjectId(assessmentId) });
+
+      return result.deletedCount > 0;
+    } catch (error) {
+      console.error("Error deleting assessment:", error);
+      throw error;
+    }
   }
 }
 

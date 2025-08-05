@@ -113,7 +113,7 @@ export function ResetPasswordForm({
           Reset Password
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="w-[95vw] max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-blue-600">
             <Key className="h-5 w-5" />
@@ -122,7 +122,7 @@ export function ResetPasswordForm({
         </DialogHeader>
 
         {!isSuccess ? (
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             {/* Information Card */}
             <Card className="border-blue-200 bg-blue-50">
               <CardHeader className="pb-3">
@@ -131,7 +131,7 @@ export function ResetPasswordForm({
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-0">
-                <p className="text-blue-700">
+                <p className="text-blue-700 text-sm sm:text-base">
                   This will send a password reset email to{" "}
                   <strong>{staffMember.email}</strong>. The staff member will
                   receive instructions to set a new password.
@@ -147,17 +147,17 @@ export function ResetPasswordForm({
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-0 space-y-3">
-                <div className="flex justify-between">
+                <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
                   <span className="text-gray-600">Name:</span>
                   <span className="font-medium">
                     {staffMember.firstName} {staffMember.lastName}
                   </span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
                   <span className="text-gray-600">Email:</span>
-                  <span className="font-medium">{staffMember.email}</span>
+                  <span className="font-medium break-all">{staffMember.email}</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
                   <span className="text-gray-600">Role:</span>
                   <span className="font-medium capitalize">
                     {staffMember.role}
@@ -174,7 +174,7 @@ export function ResetPasswordForm({
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-0">
-                <ul className="text-amber-700 space-y-1 text-sm">
+                <ul className="text-amber-700 space-y-1 text-xs sm:text-sm">
                   <li>
                     • A password reset email will be sent to {staffMember.email}
                   </li>
@@ -192,12 +192,13 @@ export function ResetPasswordForm({
             </Card>
 
             {/* Action Buttons */}
-            <div className="flex justify-end space-x-3 pt-4">
+            <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">
               <Button
                 type="button"
                 variant="outline"
                 onClick={handleClose}
                 disabled={resetMutation.isPending}
+                className="w-full sm:w-auto"
               >
                 <X className="h-4 w-4 mr-2" />
                 Cancel
@@ -206,7 +207,7 @@ export function ResetPasswordForm({
                 type="button"
                 onClick={handleReset}
                 disabled={resetMutation.isPending}
-                className="min-w-[120px]"
+                className="w-full sm:w-auto min-w-[120px]"
               >
                 {resetMutation.isPending ? (
                   <>
@@ -223,7 +224,7 @@ export function ResetPasswordForm({
             </div>
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             {/* Success Card */}
             <Card className="border-green-200 bg-green-50">
               <CardHeader className="pb-3">
@@ -334,11 +335,11 @@ export function ResetPasswordForm({
             </Card>
 
             {/* Action Buttons */}
-            <div className="flex justify-end space-x-3 pt-4">
+            <div className="flex justify-end pt-4">
               <Button
                 type="button"
                 onClick={handleClose}
-                className="min-w-[120px]"
+                className="w-full sm:w-auto min-w-[120px]"
               >
                 Done
               </Button>

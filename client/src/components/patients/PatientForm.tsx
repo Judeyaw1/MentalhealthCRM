@@ -147,6 +147,7 @@ export function PatientForm({
     const processedData: InsertPatient = {
       ...data,
       dateOfBirth: new Date(data.dateOfBirth),
+      status: data.status as "active" | "inactive" | "discharged" | undefined,
     };
     // Handle file uploads (to be implemented in backend)
     if (insuranceCardFile || photoFile) {

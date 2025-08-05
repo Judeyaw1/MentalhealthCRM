@@ -580,6 +580,38 @@ export default function Appointments() {
   });
 
   const handleStatusChange = (appointmentId: string, newStatus: string) => {
+    // Find the appointment to check its current status
+    const appointment = appointments?.find(apt => apt.id === appointmentId);
+    
+    if (!appointment) {
+      toast({
+        title: "Error",
+        description: "Appointment not found",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Prevent cancelling completed appointments
+    if (newStatus === "cancelled" && appointment.status === "completed") {
+      toast({
+        title: "Cannot Cancel",
+        description: "Completed appointments cannot be cancelled",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Prevent marking cancelled appointments as completed
+    if (newStatus === "completed" && appointment.status === "cancelled") {
+      toast({
+        title: "Cannot Complete",
+        description: "Cancelled appointments cannot be marked as completed",
+        variant: "destructive",
+      });
+      return;
+    }
+
     updateStatusMutation.mutate({ appointmentId, newStatus });
   };
 

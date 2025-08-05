@@ -25,7 +25,8 @@ export type NotificationType =
   | 'password_reset'
   | 'directed_note'
   | 'general'
-  | 'patient_assigned';
+  | 'patient_assigned'
+  | 'appointment_status_change';
 
 export interface NotificationPreferences {
   emailNotifications: boolean;
@@ -356,6 +357,66 @@ export class NotificationService {
     );
   }
 
+  // Send appointment status change notification
+  async sendAppointmentStatusChangeNotification(
+    appointmentData: {
+      appointmentId: string;
+      patientName: string;
+      therapistName: string;
+      appointmentDate: Date;
+      oldStatus: string;
+      newStatus: string;
+      changedBy: string;
+      changedByName: string;
+    }
+  ): Promise<void> {
+    const title = 'Appointment Status Changed';
+    const message = `Appointment for ${appointmentData.patientName} has been ${appointmentData.newStatus} by ${appointmentData.changedByName}`;
+    
+    // Get the appointment to find the assigned therapist and creator
+    const appointment = await storage.getAppointment(appointmentData.appointmentId);
+    if (!appointment) return;
+
+    const notificationsToSend: Array<{ userId: string; role: string }> = [];
+
+    // Add assigned therapist if different from the person who made the change
+    if (appointment.therapistId && appointment.therapistId.toString() !== appointmentData.changedBy) {
+      notificationsToSend.push({ 
+        userId: appointment.therapistId.toString(), 
+        role: 'assigned_therapist' 
+      });
+    }
+
+    // Add appointment creator if different from the person who made the change
+    if (appointment.createdBy && appointment.createdBy.toString() !== appointmentData.changedBy) {
+      notificationsToSend.push({ 
+        userId: appointment.createdBy.toString(), 
+        role: 'appointment_creator' 
+      });
+    }
+
+    // Send notifications to all relevant users
+    for (const notification of notificationsToSend) {
+      await this.createNotification(
+        notification.userId,
+        'appointment_status_change',
+        title,
+        message,
+        {
+          appointmentId: appointmentData.appointmentId,
+          patientName: appointmentData.patientName,
+          therapistName: appointmentData.therapistName,
+          appointmentDate: appointmentData.appointmentDate,
+          oldStatus: appointmentData.oldStatus,
+          newStatus: appointmentData.newStatus,
+          changedBy: appointmentData.changedBy,
+          changedByName: appointmentData.changedByName,
+          role: notification.role,
+        }
+      );
+    }
+  }
+
   // Send staff invitation notification
   async sendStaffInvitation(
     userEmail: string,
@@ -432,6 +493,7 @@ export class NotificationService {
       directed_note: 0,
       general: 0,
       patient_assigned: 0,
+      appointment_status_change: 0,
     };
     
     notifications.forEach(notification => {

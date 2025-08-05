@@ -10,7 +10,7 @@
     "dev:full": "concurrently \"npm run dev\" \"ngrok http 3000\"",
     "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "start": "cross-env NODE_ENV=production node dist/index.js",
-        "check": "tsc"
+    "check": "tsc"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -55,7 +55,7 @@
     "connect-pg-simple": "^10.0.0",
     "csv-writer": "^1.6.0",
     "date-fns": "^3.6.0",
-
+    "dotenv": "^16.4.7",
     "embla-carousel-react": "^8.6.0",
     "express": "^4.21.2",
     "express-session": "^1.18.1",
@@ -81,6 +81,8 @@
     "react-icons": "^5.4.0",
     "react-resizable-panels": "^2.1.7",
     "recharts": "^2.15.2",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1",
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
     "tw-animate-css": "^1.2.5",
@@ -111,7 +113,6 @@
     "autoprefixer": "^10.4.20",
     "concurrently": "^9.2.0",
     "cross-env": "^7.0.3",
-
     "esbuild": "^0.25.0",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.17",
