@@ -26,7 +26,10 @@ export type NotificationType =
   | 'directed_note'
   | 'general'
   | 'patient_assigned'
-  | 'appointment_status_change';
+  | 'appointment_status_change'
+  | 'discharge_request_created'
+  | 'discharge_request_approved'
+  | 'discharge_request_denied';
 
 export interface NotificationPreferences {
   emailNotifications: boolean;
@@ -417,6 +420,127 @@ export class NotificationService {
     }
   }
 
+  // Send discharge request created notification to admins and supervisors
+  async sendDischargeRequestCreatedNotification(
+    requestData: {
+      patientName: string;
+      patientId: string;
+      requestedBy: {
+        firstName: string;
+        lastName: string;
+        role: string;
+      };
+      reason: string;
+      requestId: string;
+    }
+  ): Promise<void> {
+    const title = 'New Discharge Request';
+    const message = `${requestData.requestedBy.firstName} ${requestData.requestedBy.lastName} (${requestData.requestedBy.role}) has requested discharge for ${requestData.patientName}`;
+    
+    // Get all admin and supervisor users
+    const adminUsers = await storage.getUsersByRole(['admin', 'supervisor']);
+    
+    // Send notifications to all admin and supervisor users
+    for (const user of adminUsers) {
+      await this.createNotification(
+        user._id.toString(),
+        'discharge_request_created',
+        title,
+        message,
+        {
+          patientName: requestData.patientName,
+          patientId: requestData.patientId,
+          requestedBy: requestData.requestedBy,
+          reason: requestData.reason,
+          requestId: requestData.requestId,
+        }
+      );
+    }
+  }
+
+  // Send discharge request approved notification to the requester
+  async sendDischargeRequestApprovedNotification(
+    requestData: {
+      patientName: string;
+      patientId: string;
+      requestedBy: {
+        userId: string;
+        firstName: string;
+        lastName: string;
+      };
+      reviewedBy: {
+        firstName: string;
+        lastName: string;
+        role: string;
+      };
+      reviewNotes?: string;
+    }
+  ): Promise<void> {
+    const title = 'Discharge Request Approved';
+    const message = `Your discharge request for ${requestData.patientName} has been approved by ${requestData.reviewedBy.firstName} ${requestData.reviewedBy.lastName} (${requestData.reviewedBy.role})`;
+    
+    await this.createNotification(
+      requestData.requestedBy.userId,
+      'discharge_request_approved',
+      title,
+      message,
+      {
+        patientName: requestData.patientName,
+        patientId: requestData.patientId,
+        requestedBy: requestData.requestedBy,
+        reviewedBy: requestData.reviewedBy,
+        reviewNotes: requestData.reviewNotes,
+      }
+    );
+  }
+
+  // Send discharge request denied notification to the requester
+  async sendDischargeRequestDeniedNotification(
+    requestData: {
+      patientName: string;
+      patientId: string;
+      requestedBy: {
+        userId: string;
+        firstName: string;
+        lastName: string;
+      };
+      reviewedBy: {
+        firstName: string;
+        lastName: string;
+        role: string;
+      };
+      reviewNotes?: string;
+    }
+  ): Promise<void> {
+    console.log("📧 Creating discharge request denied notification...");
+    console.log("Notification data:", requestData);
+    
+    const title = 'Discharge Request Denied';
+    const message = `Your discharge request for ${requestData.patientName} has been denied by ${requestData.reviewedBy.firstName} ${requestData.reviewedBy.lastName} (${requestData.reviewedBy.role})`;
+    
+    console.log("Notification details:", { title, message, userId: requestData.requestedBy.userId });
+    
+    try {
+      await this.createNotification(
+        requestData.requestedBy.userId,
+        'discharge_request_denied',
+        title,
+        message,
+        {
+          patientName: requestData.patientName,
+          patientId: requestData.patientId,
+          requestedBy: requestData.requestedBy,
+          reviewedBy: requestData.reviewedBy,
+          reviewNotes: requestData.reviewNotes,
+        }
+      );
+      console.log("✅ Discharge request denied notification created successfully");
+    } catch (error) {
+      console.error("❌ Error creating discharge request denied notification:", error);
+      throw error;
+    }
+  }
+
   // Send staff invitation notification
   async sendStaffInvitation(
     userEmail: string,
@@ -494,6 +618,9 @@ export class NotificationService {
       general: 0,
       patient_assigned: 0,
       appointment_status_change: 0,
+      discharge_request_created: 0,
+      discharge_request_approved: 0,
+      discharge_request_denied: 0,
     };
     
     notifications.forEach(notification => {

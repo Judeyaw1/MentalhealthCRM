@@ -4442,6 +4442,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         reason: reason.trim()
       });
 
+      // Send notification to admins and supervisors
+      await notificationService.sendDischargeRequestCreatedNotification({
+        patientName: `${patient.firstName} ${patient.lastName}`,
+        patientId: patientId,
+        requestedBy: {
+          firstName: req.user.firstName,
+          lastName: req.user.lastName,
+          role: req.user.role
+        },
+        reason: reason.trim(),
+        requestId: dischargeRequest._id || new mongoose.Types.ObjectId().toString()
+      });
+
       // Emit WebSocket event
       const io = (global as any).io;
       if (io) {
@@ -4535,6 +4548,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
           reviewNotes
         });
 
+        // Send notification to the requester
+        console.log("🔔 Sending discharge request approved notification...");
+        console.log("Request data:", {
+          patientName: `${patient.firstName} ${patient.lastName}`,
+          patientId: patientId,
+          requestedBy: {
+            userId: request.requestedBy.toString(),
+            firstName: req.user.firstName,
+            lastName: req.user.lastName
+          },
+          reviewedBy: {
+            firstName: req.user.firstName,
+            lastName: req.user.lastName,
+            role: req.user.role
+          },
+          reviewNotes
+        });
+        
+        try {
+          await notificationService.sendDischargeRequestApprovedNotification({
+            patientName: `${patient.firstName} ${patient.lastName}`,
+            patientId: patientId,
+            requestedBy: {
+              userId: request.requestedBy.toString(),
+              firstName: req.user.firstName,
+              lastName: req.user.lastName
+            },
+            reviewedBy: {
+              firstName: req.user.firstName,
+              lastName: req.user.lastName,
+              role: req.user.role
+            },
+            reviewNotes
+          });
+          console.log("✅ Discharge request approved notification sent successfully");
+        } catch (error) {
+          console.error("❌ Error sending discharge request approved notification:", error);
+        }
+
         // Emit WebSocket event
         const io = (global as any).io;
         if (io) {
@@ -4547,6 +4599,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
           originalRequest: request,
           reviewNotes
         });
+
+        // Send notification to the requester
+        console.log("🔔 Sending discharge request denied notification...");
+        console.log("Request data:", {
+          patientName: `${patient.firstName} ${patient.lastName}`,
+          patientId: patientId,
+          requestedBy: {
+            userId: request.requestedBy.toString(),
+            firstName: req.user.firstName,
+            lastName: req.user.lastName
+          },
+          reviewedBy: {
+            firstName: req.user.firstName,
+            lastName: req.user.lastName,
+            role: req.user.role
+          },
+          reviewNotes
+        });
+        
+        try {
+          await notificationService.sendDischargeRequestDeniedNotification({
+            patientName: `${patient.firstName} ${patient.lastName}`,
+            patientId: patientId,
+            requestedBy: {
+              userId: request.requestedBy.toString(),
+              firstName: req.user.firstName,
+              lastName: req.user.lastName
+            },
+            reviewedBy: {
+              firstName: req.user.firstName,
+              lastName: req.user.lastName,
+              role: req.user.role
+            },
+            reviewNotes
+          });
+          console.log("✅ Discharge request denied notification sent successfully");
+        } catch (error) {
+          console.error("❌ Error sending discharge request denied notification:", error);
+        }
 
         // Emit WebSocket event
         const io = (global as any).io;

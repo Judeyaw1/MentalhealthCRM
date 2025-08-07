@@ -24,12 +24,14 @@ interface SidebarProps {
   patientCount?: number;
   todayAppointments?: number;
   archivedCount?: number;
+  dischargeRequestsCount?: number;
 }
 
 export function Sidebar({
   patientCount = 0,
   todayAppointments = 0,
   archivedCount = 0,
+  dischargeRequestsCount = 0,
 }: SidebarProps) {
   const [location] = useLocation();
   const { user } = useAuth();
@@ -38,6 +40,9 @@ export function Sidebar({
   const isFrontDesk = user?.role === "frontdesk";
   const isSupervisor = user?.role === "supervisor";
   const isAdmin = user?.role === "admin";
+
+  // Discharge requests badge logic
+  const dischargeRequestsBadge = dischargeRequestsCount > 0 ? dischargeRequestsCount.toString() : undefined;
 
   const navigation = [
     {
@@ -144,6 +149,8 @@ export function Sidebar({
                       href: "/discharge-requests",
                       icon: MessageSquare,
                       current: location.startsWith("/discharge-requests"),
+                      badge: dischargeRequestsBadge,
+                      badgeVariant: "destructive" as const,
                     },
                   ]
                 : []),
@@ -239,6 +246,7 @@ export function Sidebar({
                             {item.badge}
                           </Badge>
                         )}
+
 
                         {/* Hover effect overlay */}
                         {!item.current && (

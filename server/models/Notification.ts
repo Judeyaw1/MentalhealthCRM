@@ -18,7 +18,10 @@ const NotificationSchema = new mongoose.Schema({
       'directed_note',
       'general',
       'assessment_followup',
-      'patient_assigned'
+      'patient_assigned',
+      'discharge_request_created',
+      'discharge_request_approved',
+      'discharge_request_denied'
     ]
   },
   title: { type: String, required: true },

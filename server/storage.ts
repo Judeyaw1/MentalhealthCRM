@@ -1275,6 +1275,10 @@ export class DatabaseStorage {
     await User.findByIdAndDelete(id);
   }
 
+  async getUsersByRole(roles: string[]) {
+    return User.find({ role: { $in: roles } }).select('_id firstName lastName email role');
+  }
+
   // Inquiry management methods
   async addInquiry(patientId: string, inquiryData: any) {
     const patient = await PatientModel.findById(patientId);

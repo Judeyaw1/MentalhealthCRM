@@ -89,7 +89,9 @@ export default function DischargeRequests() {
       if (!response.ok) {
         throw new Error("Failed to fetch discharge requests");
       }
-      return response.json();
+      const data = await response.json();
+      console.log("🔍 Discharge requests API response:", data);
+      return data;
     },
   });
 
@@ -249,8 +251,10 @@ export default function DischargeRequests() {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {requests.map((request) => (
-                      <div key={request._id} className="border rounded-lg p-4 bg-orange-50">
+                    {requests.map((request) => {
+                      console.log("🔍 Discharge request reason:", request.reason);
+                      return (
+                        <div key={request._id} className="border rounded-lg p-4 bg-orange-50">
                         <div className="flex items-start justify-between mb-3">
                           <div>
                             <h4 className="font-medium text-gray-900">
@@ -283,13 +287,15 @@ export default function DischargeRequests() {
                           </div>
                         </div>
 
-                        <div className="mb-3">
-                          <h5 className="text-sm font-medium text-gray-700 mb-1">
+                        <div className="mb-4">
+                          <h5 className="text-sm font-medium text-gray-700 mb-2">
                             Reason for Discharge Request
                           </h5>
-                          <p className="text-sm text-gray-600 bg-white p-3 rounded border">
-                            {request.reason}
-                          </p>
+                          <div className="bg-white p-4 rounded border border-gray-200 shadow-sm">
+                            <p className="text-sm text-gray-700 whitespace-pre-wrap break-words leading-relaxed">
+                              {request.reason || "No reason provided"}
+                            </p>
+                          </div>
                         </div>
 
                         {request.assignedTherapist && (
@@ -298,7 +304,8 @@ export default function DischargeRequests() {
                           </div>
                         )}
                       </div>
-                    ))}
+                    );
+                    })}
                   </div>
                 )}
               </CardContent>

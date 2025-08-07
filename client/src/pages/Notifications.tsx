@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Bell, Check, X, Clock, AlertTriangle, User, Calendar, FileText, ChevronRight, Filter, Search, UserCheck, Mail, Users, Lock, ClipboardCheck } from "lucide-react";
 import { useSocket } from "@/hooks/useSocket";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,6 +31,7 @@ export default function Notifications() {
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
   const { openPatientDialog } = usePatientDialog();
+  const { user } = useAuth();
 
   // Fetch all notifications
   const { data: notifications = [], isLoading } = useQuery({
@@ -119,6 +121,29 @@ export default function Notifications() {
     // Mark as read first
     handleMarkAsRead(notification.id);
 
+    // Check notification type first, regardless of data
+    if (notification.type === "discharge_request_created" || 
+        notification.type === "discharge_request_approved" || 
+        notification.type === "discharge_request_denied") {
+      
+      // Only admin and supervisor can access discharge requests page
+      if (user?.role === "admin" || user?.role === "supervisor") {
+        toast({
+          title: "Opening discharge requests",
+          description: "Taking you to the discharge requests page...",
+        });
+        setLocation("/discharge-requests");
+        return;
+      } else {
+        toast({
+          title: "Access Denied",
+          description: "You don't have permission to access discharge requests.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     // Navigate based on notification type and data
     if (notification.data) {
       // Appointment notifications
@@ -185,6 +210,16 @@ export default function Notifications() {
 
     // Handle notifications without specific data
     switch (notification.type) {
+      case "discharge_request_created":
+      case "discharge_request_approved":
+      case "discharge_request_denied":
+        toast({
+          title: "Opening discharge requests",
+          description: "Taking you to the discharge requests page...",
+        });
+        setLocation("/discharge-requests");
+        return;
+        
       case "staff_invitation":
         toast({
           title: "Opening staff management",
@@ -244,6 +279,12 @@ export default function Notifications() {
         return <AlertTriangle className="h-4 w-4 text-red-500" />;
       case "treatment_completion":
         return <FileText className="h-4 w-4 text-purple-500" />;
+      case "discharge_request_created":
+        return <UserCheck className="h-4 w-4 text-blue-500" />;
+      case "discharge_request_approved":
+        return <UserCheck className="h-4 w-4 text-green-500" />;
+      case "discharge_request_denied":
+        return <UserCheck className="h-4 w-4 text-red-500" />;
       case "general":
         return <Bell className="h-4 w-4 text-gray-500" />;
       default:
@@ -314,6 +355,7 @@ export default function Notifications() {
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Dashboard
           </Button>
+
           <div>
             <h1 className="text-2xl font-bold">Notifications</h1>
             <p className="text-gray-600">

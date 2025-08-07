@@ -38,16 +38,6 @@ export function NotificationBell() {
       const response = await fetch("/api/notifications?limit=10");
       if (!response.ok) throw new Error("Failed to fetch notifications");
       const data = await response.json();
-      console.log("📋 Fetched notifications:", data);
-      console.log("📋 Notifications count:", data.length);
-      data.forEach((notification: any, index: number) => {
-        console.log(`📋 Notification ${index}:`, {
-          id: notification.id,
-          type: notification.type,
-          title: notification.title,
-          data: notification.data
-        });
-      });
       return data;
     },
     refetchInterval: 5000, // Refetch every 5 seconds for real-time updates
@@ -130,19 +120,27 @@ export function NotificationBell() {
 
   // Handle notification click and navigation
   const handleNotificationClick = (notification: Notification) => {
-    console.log("🔔 Notification clicked:", notification);
-    console.log("🔍 Notification type:", notification.type);
-    console.log("🔍 Notification data:", notification.data);
-    
     // Mark as read first
     handleMarkAsRead(notification.id);
     
     // Close the dropdown
     setIsOpen(false);
 
+    // Check notification type first, regardless of data
+    if (notification.type === "discharge_request_created" || 
+        notification.type === "discharge_request_approved" || 
+        notification.type === "discharge_request_denied") {
+      
+      toast({
+        title: "Opening discharge requests",
+        description: "Taking you to the discharge requests page...",
+      });
+      setLocation("/discharge-requests");
+      return;
+    }
+
     // Navigate based on notification type and data
     if (notification.data) {
-      console.log("📋 Notification data:", notification.data);
       
       // Appointment notifications
       if (notification.data.appointmentId) {
@@ -157,30 +155,15 @@ export function NotificationBell() {
       
       // Patient-related notifications
       if (notification.data.patientId) {
-        console.log("👤 Patient ID found:", notification.data.patientId);
-        console.log("📝 Notification type:", notification.type);
-        console.log("🔍 Type comparison result:", notification.type === "patient_assigned");
-        
         if (notification.type === "patient_assigned") {
-          console.log("🎯 Opening patient dialog for patient assignment");
-          console.log("🔍 Patient ID from notification:", notification.data.patientId);
-          console.log("🔍 Notification type check:", notification.type === "patient_assigned");
-          
           // Open patient dialog for patient assignment notifications
           toast({
             title: "Opening patient details",
             description: "Opening patient details dialog...",
           });
           
-          try {
-            openPatientDialog(notification.data.patientId);
-            console.log("✅ openPatientDialog called successfully");
-          } catch (error) {
-            console.error("❌ Error calling openPatientDialog:", error);
-          }
+          openPatientDialog(notification.data.patientId);
           return;
-        } else {
-          console.log("❌ Notification type is not 'patient_assigned', it is:", notification.type);
         }
         
         if (notification.type === "directed_note" && notification.data.noteId) {
