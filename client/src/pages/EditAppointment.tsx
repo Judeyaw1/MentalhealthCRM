@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useSocket } from "@/hooks/useSocket";
 import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Button } from "@/components/ui/button";
@@ -56,7 +57,7 @@ export default function EditAppointment() {
         variant: "destructive",
       });
       setTimeout(() => {
-        window.location.href = "/api/login";
+        window.location.href = "/login";
       }, 500);
       return;
     }
@@ -88,6 +89,15 @@ export default function EditAppointment() {
       return response.json();
     },
     retry: false,
+  });
+
+  // Real-time socket connection for instant updates
+  useSocket({
+    onAppointmentUpdated: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/today-appointments'] });
+    },
   });
 
   // Fetch therapists for dropdown

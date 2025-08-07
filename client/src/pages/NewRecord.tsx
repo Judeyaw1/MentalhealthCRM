@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useSocket } from "@/hooks/useSocket";
 import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TreatmentRecordForm } from "@/components/records/TreatmentRecordForm";
@@ -65,7 +66,7 @@ export default function NewRecord() {
         variant: "destructive",
       });
       setTimeout(() => {
-        window.location.href = "/api/login";
+        window.location.href = "/login";
       }, 500);
       return;
     }
@@ -84,6 +85,18 @@ export default function NewRecord() {
   >({
     queryKey: ["/api/therapists"],
     retry: false,
+  });
+
+  // Real-time socket connection for instant updates
+  useSocket({
+    onTreatmentRecordCreated: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/records'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+    },
+    onTreatmentRecordUpdated: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/records'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+    },
   });
 
   const createRecordMutation = useMutation({
@@ -114,7 +127,7 @@ export default function NewRecord() {
           variant: "destructive",
         });
         setTimeout(() => {
-          window.location.href = "/api/login";
+          window.location.href = "/login";
         }, 500);
         return;
       }

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useMemo } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from './useAuth';
 
@@ -18,11 +18,42 @@ interface UseSocketOptions {
   onStaffUpdated?: (data: any) => void;
   onStaffDeleted?: (data: any) => void;
   onDashboardStatsUpdated?: (data: any) => void;
+  onNoteCreated?: (data: any) => void;
+  onNoteUpdated?: (data: any) => void;
+  onNoteDeleted?: (data: any) => void;
+  onInquiryCreated?: (data: any) => void;
+  onInquiryUpdated?: (data: any) => void;
+  onAuditLogCreated?: (data: any) => void;
 }
 
 export function useSocket(options: UseSocketOptions = {}) {
   const socketRef = useRef<Socket | null>(null);
   const { user } = useAuth();
+
+  // Memoize options to prevent unnecessary re-renders
+  const memoizedOptions = useMemo(() => options, [
+    options.onPatientCreated,
+    options.onPatientUpdated,
+    options.onPatientDeleted,
+    options.onAppointmentCreated,
+    options.onAppointmentUpdated,
+    options.onAppointmentDeleted,
+    options.onTreatmentRecordCreated,
+    options.onTreatmentRecordUpdated,
+    options.onTreatmentRecordDeleted,
+    options.onNotificationCreated,
+    options.onNotificationRead,
+    options.onStaffCreated,
+    options.onStaffUpdated,
+    options.onStaffDeleted,
+    options.onDashboardStatsUpdated,
+    options.onNoteCreated,
+    options.onNoteUpdated,
+    options.onNoteDeleted,
+    options.onInquiryCreated,
+    options.onInquiryUpdated,
+    options.onAuditLogCreated,
+  ]);
 
   const connect = useCallback(() => {
     if (socketRef.current?.connected) return;
@@ -86,50 +117,68 @@ export function useSocket(options: UseSocketOptions = {}) {
     });
 
     // Set up event listeners
-    if (options.onPatientCreated) {
-      socket.on('patient_created', options.onPatientCreated);
+    if (memoizedOptions.onPatientCreated) {
+      socket.on('patient_created', memoizedOptions.onPatientCreated);
     }
-    if (options.onPatientUpdated) {
-      socket.on('patient_updated', options.onPatientUpdated);
+    if (memoizedOptions.onPatientUpdated) {
+      socket.on('patient_updated', memoizedOptions.onPatientUpdated);
     }
-    if (options.onPatientDeleted) {
-      socket.on('patient_deleted', options.onPatientDeleted);
+    if (memoizedOptions.onPatientDeleted) {
+      socket.on('patient_deleted', memoizedOptions.onPatientDeleted);
     }
-    if (options.onAppointmentCreated) {
-      socket.on('appointment_created', options.onAppointmentCreated);
+    if (memoizedOptions.onAppointmentCreated) {
+      socket.on('appointment_created', memoizedOptions.onAppointmentCreated);
     }
-    if (options.onAppointmentUpdated) {
-      socket.on('appointment_updated', options.onAppointmentUpdated);
+    if (memoizedOptions.onAppointmentUpdated) {
+      socket.on('appointment_updated', memoizedOptions.onAppointmentUpdated);
     }
-    if (options.onAppointmentDeleted) {
-      socket.on('appointment_deleted', options.onAppointmentDeleted);
+    if (memoizedOptions.onAppointmentDeleted) {
+      socket.on('appointment_deleted', memoizedOptions.onAppointmentDeleted);
     }
-    if (options.onTreatmentRecordCreated) {
-      socket.on('treatment_record_created', options.onTreatmentRecordCreated);
+    if (memoizedOptions.onTreatmentRecordCreated) {
+      socket.on('treatment_record_created', memoizedOptions.onTreatmentRecordCreated);
     }
-    if (options.onTreatmentRecordUpdated) {
-      socket.on('treatment_record_updated', options.onTreatmentRecordUpdated);
+    if (memoizedOptions.onTreatmentRecordUpdated) {
+      socket.on('treatment_record_updated', memoizedOptions.onTreatmentRecordUpdated);
     }
-    if (options.onTreatmentRecordDeleted) {
-      socket.on('treatment_record_deleted', options.onTreatmentRecordDeleted);
+    if (memoizedOptions.onTreatmentRecordDeleted) {
+      socket.on('treatment_record_deleted', memoizedOptions.onTreatmentRecordDeleted);
     }
-    if (options.onNotificationCreated) {
-      socket.on('notification_created', options.onNotificationCreated);
+    if (memoizedOptions.onNotificationCreated) {
+      socket.on('notification_created', memoizedOptions.onNotificationCreated);
     }
-    if (options.onNotificationRead) {
-      socket.on('notification_read', options.onNotificationRead);
+    if (memoizedOptions.onNotificationRead) {
+      socket.on('notification_read', memoizedOptions.onNotificationRead);
     }
-    if (options.onStaffCreated) {
-      socket.on('staff_created', options.onStaffCreated);
+    if (memoizedOptions.onStaffCreated) {
+      socket.on('staff_created', memoizedOptions.onStaffCreated);
     }
-    if (options.onStaffUpdated) {
-      socket.on('staff_updated', options.onStaffUpdated);
+    if (memoizedOptions.onStaffUpdated) {
+      socket.on('staff_updated', memoizedOptions.onStaffUpdated);
     }
-    if (options.onStaffDeleted) {
-      socket.on('staff_deleted', options.onStaffDeleted);
+    if (memoizedOptions.onStaffDeleted) {
+      socket.on('staff_deleted', memoizedOptions.onStaffDeleted);
     }
-    if (options.onDashboardStatsUpdated) {
-      socket.on('dashboard_stats_updated', options.onDashboardStatsUpdated);
+    if (memoizedOptions.onDashboardStatsUpdated) {
+      socket.on('dashboard_stats_updated', memoizedOptions.onDashboardStatsUpdated);
+    }
+    if (memoizedOptions.onNoteCreated) {
+      socket.on('note_created', memoizedOptions.onNoteCreated);
+    }
+    if (memoizedOptions.onNoteUpdated) {
+      socket.on('note_updated', memoizedOptions.onNoteUpdated);
+    }
+    if (memoizedOptions.onNoteDeleted) {
+      socket.on('note_deleted', memoizedOptions.onNoteDeleted);
+    }
+    if (memoizedOptions.onInquiryCreated) {
+      socket.on('inquiry_created', memoizedOptions.onInquiryCreated);
+    }
+    if (memoizedOptions.onInquiryUpdated) {
+      socket.on('inquiry_updated', memoizedOptions.onInquiryUpdated);
+    }
+    if (memoizedOptions.onAuditLogCreated) {
+      socket.on('audit_log_created', memoizedOptions.onAuditLogCreated);
     }
 
     socketRef.current = socket;
@@ -138,7 +187,7 @@ export function useSocket(options: UseSocketOptions = {}) {
     return () => {
       clearInterval(heartbeat);
     };
-  }, [user?.id, options]);
+  }, [user?.id, memoizedOptions]);
 
   const disconnect = useCallback(() => {
     if (socketRef.current) {

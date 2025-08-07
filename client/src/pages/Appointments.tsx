@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useSocket } from "@/hooks/useSocket";
 import { useLocation } from "wouter";
 import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
@@ -75,7 +76,7 @@ export default function Appointments() {
         variant: "destructive",
       });
       setTimeout(() => {
-        window.location.href = "/api/login";
+        window.location.href = "/login";
       }, 500);
       return;
     }
@@ -175,6 +176,25 @@ export default function Appointments() {
     retry: false,
     refetchInterval: 10000, // Refetch every 10 seconds for real-time updates
     refetchIntervalInBackground: true, // Continue polling even when tab is not active
+  });
+
+  // Real-time socket connection for instant updates
+  useSocket({
+    onAppointmentCreated: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/today-appointments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+    },
+    onAppointmentUpdated: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/today-appointments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+    },
+    onAppointmentDeleted: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/today-appointments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+    },
   });
 
   const getStatusBadge = (status: string) => {

@@ -96,7 +96,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         auditLogData.details = JSON.stringify(details);
       }
 
-      await storage.createAuditLog(auditLogData);
+      const auditLog = await storage.createAuditLog(auditLogData);
+      
+      // Emit WebSocket event for real-time updates
+      const io = (global as any).io;
+      if (io && auditLog) {
+        io.emit('audit_log_created', auditLog);
+      }
     } catch (error) {
       console.error("Failed to create audit log:", error);
     }
@@ -384,8 +390,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Emit WebSocket event for real-time updates
       const io = (global as any).io;
+      console.log('🔌 Emitting patient_created event:', { patientId: patient.id, io: !!io });
       if (io) {
         io.emit('patient_created', patient);
+        console.log('✅ Patient created event emitted successfully');
+      } else {
+        console.log('❌ No WebSocket io instance available');
       }
       
       res.status(201).json(patient);
@@ -419,6 +429,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         updates = req.body;
       }
+
+      // Check if status is being updated and validate permissions
+      if (updates.status) {
+        const user = await storage.getUser(userId);
+        if (!user) {
+          return res.status(404).json({ message: "User not found" });
+        }
+
+        // Only admin, supervisor, and front desk can change patient status
+        if (user.role !== "admin" && user.role !== "supervisor" && user.role !== "frontdesk") {
+          return res.status(403).json({ 
+            message: "Only administrators, supervisors, and front desk staff can change patient status" 
+          });
+        }
+      }
+
       // Clean up ObjectId fields - convert empty strings to null
       const cleanedUpdates = {
         ...updates,
@@ -438,8 +464,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Emit WebSocket event for real-time updates
       const io = (global as any).io;
-      if (io) {
+      console.log('🔌 Emitting patient_updated event:', { patientId: patient?.id, io: !!io });
+      if (io && patient) {
         io.emit('patient_updated', patient);
+        console.log('✅ Patient updated event emitted successfully');
+      } else {
+        console.log('❌ No WebSocket io instance available or patient is undefined');
       }
       
       res.json(patient);
@@ -935,6 +965,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sessionDate: new Date(req.body.sessionDate),
       };
       const recordData = insertTreatmentRecordSchema.parse(requestData);
+
+      // Check if patient is archived
+      const patient = await storage.getPatient(recordData.patientId);
+      if (!patient) {
+        return res.status(404).json({ message: "Patient not found" });
+      }
+
+      if (patient.status === 'inactive' || patient.status === 'discharged') {
+        return res.status(400).json({ 
+          message: `Cannot create treatment record for archived patient. Patient status: ${patient.status}. Please restore the patient first.` 
+        });
+      }
+
       const record = await storage.createTreatmentRecord(recordData);
 
       // Debug: Log the record object
@@ -951,6 +994,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         recordId,
         recordData,
       );
+
+      // Emit WebSocket event for real-time updates
+      const io = (global as any).io;
+      if (io && record) {
+        io.emit('treatment_record_created', record);
+      }
+
       res.status(201).json(record);
     } catch (error) {
       console.error("Error creating treatment record:", error);
@@ -977,6 +1027,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         : req.body;
       const updates = insertTreatmentRecordSchema.partial().parse(requestData);
+      
+      // Check if patient is archived
+      const currentRecord = await storage.getTreatmentRecord(recordId);
+      if (currentRecord) {
+        const patient = await storage.getPatient(currentRecord.patientId);
+        if (patient && (patient.status === 'inactive' || patient.status === 'discharged')) {
+          return res.status(400).json({ 
+            message: `Cannot update treatment record for archived patient. Patient status: ${patient.status}. Please restore the patient first.` 
+          });
+        }
+      }
+      
       const record = await storage.updateTreatmentRecord(recordId, updates);
       await logActivity(
         userId,
@@ -985,6 +1047,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         recordId.toString(),
         updates,
       );
+
+      // Emit WebSocket event for real-time updates
+      const io = (global as any).io;
+      if (io && record) {
+        io.emit('treatment_record_updated', record);
+      }
+
       res.json(record);
     } catch (error) {
       console.error("Error updating treatment record:", error);
@@ -1015,6 +1084,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "treatment_record",
         recordId.toString(),
       );
+
+      // Emit WebSocket event for real-time updates
+      const io = (global as any).io;
+      if (io && record) {
+        io.emit('treatment_record_deleted', record);
+      }
+
       res.json({ message: "Treatment record deleted successfully" });
     } catch (error) {
       console.error("Error deleting treatment record:", error);
@@ -1112,6 +1188,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUser(userId);
       const appointmentData = insertAppointmentSchema.parse(req.body);
 
+      // Check if patient is archived
+      const patient = await storage.getPatient(appointmentData.patientId);
+      if (!patient) {
+        return res.status(404).json({ message: "Patient not found" });
+      }
+
+      if (patient.status === 'inactive' || patient.status === 'discharged') {
+        return res.status(400).json({ 
+          message: `Cannot create appointment for archived patient. Patient status: ${patient.status}. Please restore the patient first.` 
+        });
+      }
+
       const appointment = await storage.createAppointment({
         ...appointmentData,
         createdBy: userId
@@ -1123,6 +1211,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         appointment._id.toString(),
         appointmentData,
       );
+
+      // Emit WebSocket event for real-time updates
+      const io = (global as any).io;
+      if (io && appointment) {
+        io.emit('appointment_created', appointment);
+      }
 
       res.status(201).json(appointment);
     } catch (error) {
@@ -1146,6 +1240,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const currentAppointment = await storage.getAppointment(appointmentId);
       if (!currentAppointment) {
         return res.status(404).json({ message: "Appointment not found" });
+      }
+
+      // Check if patient is archived
+      const patient = await storage.getPatient(currentAppointment.patientId);
+      if (patient && (patient.status === 'inactive' || patient.status === 'discharged')) {
+        return res.status(400).json({ 
+          message: `Cannot update appointment for archived patient. Patient status: ${patient.status}. Please restore the patient first.` 
+        });
       }
 
       // Validate status transitions
@@ -1239,6 +1341,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         await logActivity(userId, "delete", "appointment", appointmentId);
+        
+        // Emit WebSocket event for real-time updates
+        const io = (global as any).io;
+        if (io && deletedAppointment) {
+          io.emit('appointment_deleted', deletedAppointment);
+        }
+        
         console.log("Appointment deleted successfully");
         res.json({ message: "Appointment deleted successfully" });
       } catch (error) {
@@ -1418,6 +1527,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         emailSent,
       });
 
+      // Emit WebSocket event for real-time updates
+      const io = (global as any).io;
+      if (io && newUser) {
+        io.emit('staff_created', newUser);
+      }
+
       if (!emailSent) {
         // If email fails, still create the user but warn about it
         console.warn(
@@ -1510,6 +1625,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await storage.deleteUser(staffId);
       await logActivity(userId, "delete", "staff", staffId);
+
+      // Emit WebSocket event for real-time updates
+      const io = (global as any).io;
+      if (io && staff) {
+        io.emit('staff_deleted', staff);
+      }
 
       res.json({ message: "Staff member deleted successfully" });
     } catch (error) {
@@ -2360,6 +2481,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const success = await storage.markNotificationAsRead(id, userId);
         
         if (success) {
+          // Emit WebSocket event for real-time updates
+          const io = (global as any).io;
+          if (io) {
+            io.emit('notification_read', { notificationId: id, userId });
+          }
+          
           res.json({ message: "Notification marked as read" });
         } else {
           res.status(404).json({ message: "Notification not found" });
@@ -2557,6 +2684,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id } = req.params;
       const user = await storage.getUser(req.user.id);
       if (!user) { return res.status(404).json({ message: "User not found" }); }
+      
+      // Role-based access control for chat functionality
+      const allowedRoles = ['admin', 'supervisor', 'therapist'];
+      if (!allowedRoles.includes(user.role)) {
+        return res.status(403).json({ 
+          message: "Access denied. Only admin, supervisor, and therapist roles can access chat functionality." 
+        });
+      }
 
       // Get all notes for this patient
       const allNotes = await PatientNote.find({ patientId: id })
@@ -2576,17 +2711,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return false;
       });
 
-      // Group notes by threads (parent notes and their replies)
+      // Group notes by conversation threads
       const groupedNotes = filteredNotes.reduce((acc: any, note) => {
         let threadKey;
         
-        if (note.parentNoteId) {
-          // This is a reply - group it with its parent
-          threadKey = `thread_${note.parentNoteId}`;
+        if (note.directedTo) {
+          // Directed note - create chat with specific person
+          const authorId = note.authorId;
+          const directedToId = note.directedTo;
+          
+          // Always create a consistent thread key for the conversation between these two people
+          // This ensures all messages between the same two people go to the same thread
+          const sortedIds = [authorId, directedToId].sort();
+          threadKey = `chat_${sortedIds[0]}_${sortedIds[1]}`;
         } else {
-          // This is a parent note - create a new thread
-          threadKey = note.directedTo ? `directed_${note.directedTo}` : 'general';
+          // General note - create general chat thread
+          threadKey = 'general_chat';
         }
+        
+        console.log(`🔍 Note grouping debug:`, {
+          noteId: note._id,
+          content: note.content.substring(0, 30) + '...',
+          directedTo: note.directedTo,
+          directedToName: note.directedToName,
+          threadKey: threadKey,
+          authorName: note.authorName
+        });
         
         if (!acc[threadKey]) {
           acc[threadKey] = {
@@ -2594,6 +2744,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             directedTo: note.directedTo,
             directedToName: note.directedToName,
             isGeneral: !note.directedTo,
+            isChat: true,
+            chatWith: note.directedTo ? note.directedToName : 'General Chat',
             notes: []
           };
         }
@@ -2601,6 +2753,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         acc[threadKey].notes.push(note);
         return acc;
       }, {});
+
+      console.log(`📊 Final threads:`, Object.keys(groupedNotes).map(key => ({
+        threadKey: key,
+        noteCount: groupedNotes[key].notes.length,
+        directedTo: groupedNotes[key].directedTo,
+        directedToName: groupedNotes[key].directedToName
+      })));
 
       // Convert to array and sort threads by most recent activity
       const threads = Object.values(groupedNotes).map((thread: any) => {
@@ -2629,8 +2788,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { content, isPrivate = false, directedTo = null, directedToName = null, parentNoteId = null } = req.body;
       const user = await storage.getUser(req.user.id);
       if (!user) { return res.status(404).json({ message: "User not found" }); }
-      if (user.role === "frontdesk") { return res.status(403).json({ message: "Front desk cannot add notes" }); }
+      
+      // Role-based access control for chat functionality
+      const allowedRoles = ['admin', 'supervisor', 'therapist'];
+      if (!allowedRoles.includes(user.role)) {
+        return res.status(403).json({ 
+          message: "Access denied. Only admin, supervisor, and therapist roles can use chat functionality." 
+        });
+      }
       if (!content || content.trim().length === 0) { return res.status(400).json({ message: "Note content is required" }); }
+
+      console.log(`📝 Received note creation request:`, {
+        patientId: id,
+        content: content.substring(0, 30) + '...',
+        directedTo,
+        directedToName,
+        parentNoteId,
+        authorId: user.id,
+        authorName: `${user.firstName} ${user.lastName}`,
+        isSelfChat: user.id === directedTo
+      });
 
       let finalDirectedTo = directedTo;
       let finalDirectedToName = directedToName;
@@ -2645,14 +2822,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ message: "Parent note not found" });
         }
         
-        // For replies, direct the response back to the original author
-        finalDirectedTo = parentNote.authorId;
-        finalDirectedToName = parentNote.authorName;
+        // For replies, keep the same chat thread (don't change directedTo)
+        finalDirectedTo = parentNote.directedTo;
+        finalDirectedToName = parentNote.directedToName;
         
         console.log(`🔍 Reply inheritance debug:`, {
           parentNoteId: parentNoteId,
-          parentAuthorId: parentNote.authorId,
-          parentAuthorName: parentNote.authorName,
+          parentDirectedTo: parentNote.directedTo,
+          parentDirectedToName: parentNote.directedToName,
           finalDirectedTo: finalDirectedTo,
           finalDirectedToName: finalDirectedToName,
           currentUserId: user.id
@@ -2704,18 +2881,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
             parentNoteId: parentNoteId
           });
           
-          await notificationService.createNotification(
+          const notification = await notificationService.createNotification(
             finalDirectedTo,
             "directed_note",
-            `New Note from ${user.firstName} ${user.lastName}`,
-            `You have a new directed note for patient ${id}`,
+            `New message from ${user.firstName} ${user.lastName}`,
+            `${content.trim().substring(0, 100)}${content.trim().length > 100 ? '...' : ''}`,
             {
               patientId: id,
               noteId: note._id.toString(),
               authorName: `${user.firstName} ${user.lastName}`,
+              messageContent: content.trim(),
             },
             new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
           );
+
+          // Emit WebSocket event for real-time notification updates
+          const io = (global as any).io;
+          if (io && notification) {
+            io.emit('notification_created', notification);
+          }
         } catch (notificationError) {
           console.error("Failed to create notification for directed note:", notificationError);
           // Don't fail the note creation if notification fails
@@ -2723,6 +2907,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       await logActivity(user.id, "create_note", "note", note._id.toString(), { content: content.trim(), isPrivate, directedTo: finalDirectedTo, directedToName: finalDirectedToName, parentNoteId });
+      
+      // Emit WebSocket event for real-time updates
+      const io = (global as any).io;
+      if (io) {
+        console.log(`🔌 Emitting note_created to room: patient_${id}`);
+        console.log(`🔌 Room members:`, io.sockets.adapter.rooms.get(`patient_${id}`)?.size || 0);
+        
+        io.to(`patient_${id}`).emit('note_created', {
+          note,
+          patientId: id,
+          authorId: user.id,
+          authorName: `${user.firstName} ${user.lastName}`,
+          directedTo: finalDirectedTo,
+          directedToName: finalDirectedToName,
+          parentNoteId
+        });
+        
+        console.log(`✅ Note created event emitted to patient_${id}`);
+      } else {
+        console.log(`❌ No WebSocket io instance available`);
+      }
+      
       res.status(201).json(note);
     } catch (error) {
       console.error("Error creating note:", error);
@@ -2738,6 +2944,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!user) {
         return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Role-based access control for chat functionality
+      const allowedRoles = ['admin', 'supervisor', 'therapist'];
+      if (!allowedRoles.includes(user.role)) {
+        return res.status(403).json({ 
+          message: "Access denied. Only admin, supervisor, and therapist roles can use chat functionality." 
+        });
       }
 
       const note = await PatientNote.findById(noteId);
@@ -2762,6 +2976,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         content: content.trim(),
       });
 
+      // Emit WebSocket event for real-time updates
+      const io = (global as any).io;
+      if (io) {
+        io.to(`patient_${note.patientId}`).emit('note_updated', {
+          note,
+          patientId: note.patientId,
+          authorId: user.id,
+          authorName: `${user.firstName} ${user.lastName}`,
+          content: content.trim()
+        });
+      }
+
       res.json(note);
     } catch (error) {
       console.error("Error updating patient note:", error);
@@ -2776,6 +3002,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!user) {
         return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Role-based access control for chat functionality
+      const allowedRoles = ['admin', 'supervisor', 'therapist'];
+      if (!allowedRoles.includes(user.role)) {
+        return res.status(403).json({ 
+          message: "Access denied. Only admin, supervisor, and therapist roles can use chat functionality." 
+        });
       }
 
       const note = await PatientNote.findById(noteId);
@@ -2792,6 +3026,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Log activity
       await logActivity(user.id, "delete_note", "note", note._id.toString());
+
+      // Emit WebSocket event for real-time updates
+      const io = (global as any).io;
+      if (io) {
+        io.to(`patient_${note.patientId}`).emit('note_deleted', {
+          noteId,
+          patientId: note.patientId,
+          authorId: user.id,
+          authorName: `${user.firstName} ${user.lastName}`
+        });
+      }
 
       res.json({ message: "Note deleted successfully" });
     } catch (error) {
@@ -2943,8 +3188,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
 
-      // Only admins and therapists can close all threads
-      if (user.role !== "admin" && user.role !== "therapist") {
+      // Only admins, supervisors, and therapists can close all threads
+      if (user.role !== "admin" && user.role !== "supervisor" && user.role !== "therapist") {
         return res.status(403).json({ message: "Access denied" });
       }
 
@@ -2998,8 +3243,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
 
-      // Only admins and therapists can clear archived notes
-      if (user.role !== "admin" && user.role !== "therapist") {
+      // Only admins, supervisors, and therapists can clear archived notes
+      if (user.role !== "admin" && user.role !== "supervisor" && user.role !== "therapist") {
         return res.status(403).json({ message: "Access denied" });
       }
 
@@ -3353,8 +3598,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Assessment role check middleware
+  const canPerformAssessment = (req: any, res: any, next: any) => {
+    const userRole = req.user?.role;
+    const allowedRoles = ['admin', 'supervisor', 'therapist'];
+    
+    if (!allowedRoles.includes(userRole)) {
+      return res.status(403).json({ 
+        message: "Access denied. Only admin, supervisor, and therapist roles can perform assessments." 
+      });
+    }
+    
+    next();
+  };
+
   // Assessment routes
-  app.post("/api/patients/:patientId/assessments", isAuthenticated, async (req: any, res) => {
+  app.post("/api/patients/:patientId/assessments", isAuthenticated, canPerformAssessment, async (req: any, res) => {
     try {
       const userId = req.user.id;
       const patientId = req.params.patientId;
@@ -3421,7 +3680,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/patients/:patientId/assessments", isAuthenticated, async (req: any, res) => {
+  app.get("/api/patients/:patientId/assessments", isAuthenticated, canPerformAssessment, async (req: any, res) => {
     try {
       const patientId = req.params.patientId;
       
@@ -3442,7 +3701,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/assessments/:assessmentId", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/assessments/:assessmentId", isAuthenticated, canPerformAssessment, async (req: any, res) => {
     try {
       const userId = req.user.id;
       const assessmentId = req.params.assessmentId;
@@ -3474,7 +3733,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/assessments/:assessmentId", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/assessments/:assessmentId", isAuthenticated, canPerformAssessment, async (req: any, res) => {
     try {
       const userId = req.user.id;
       const assessmentId = req.params.assessmentId;
@@ -3510,6 +3769,632 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.sendFile(path.join(process.cwd(), 'dist/public/index.html'));
     });
   }
+
+  // Get patient demographics for reports
+  app.get("/api/reports/demographics", isAuthenticated, async (req: any, res) => {
+    try {
+      const patients = await storage.getPatients(1000, 0, undefined, undefined, undefined, undefined, undefined, true);
+      
+      // Calculate age groups
+      const ageGroups = {
+        "18-25": 0,
+        "26-35": 0,
+        "36-45": 0,
+        "46-55": 0,
+        "55+": 0
+      };
+
+      // Calculate gender distribution
+      const genderDistribution = {
+        "male": 0,
+        "female": 0,
+        "non-binary": 0,
+        "other": 0
+      };
+
+      // Calculate level of care distribution
+      const locDistribution = {
+        "2.1": 0,
+        "3.1": 0,
+        "3.3": 0,
+        "0.0": 0,
+        "unassigned": 0
+      };
+
+      // Calculate insurance distribution
+      const insuranceDistribution: { [key: string]: number } = {};
+
+      // Calculate status distribution
+      const statusDistribution = {
+        "active": 0,
+        "inactive": 0,
+        "discharged": 0
+      };
+
+      // Calculate geographic distribution (by first letter of address for privacy)
+      const geographicDistribution: { [key: string]: number } = {};
+
+      // Calculate treatment duration (for discharged patients)
+      const treatmentDurations: number[] = [];
+
+      let totalPatients = 0;
+      let totalAge = 0;
+      let validAgeCount = 0;
+
+      patients.patients.forEach((patient: any) => {
+        totalPatients++;
+        
+        // Calculate age accurately (same as frontend)
+        if (patient.dateOfBirth) {
+          try {
+            const today = new Date();
+            const birthDate = new Date(patient.dateOfBirth);
+            
+            // Validate birth date is not in the future
+            if (birthDate > today) {
+              console.warn(`Future birth date for patient ${patient.id}: ${patient.dateOfBirth}`);
+            } else {
+              // Calculate accurate age
+              let age = today.getFullYear() - birthDate.getFullYear();
+              const monthDiff = today.getMonth() - birthDate.getMonth();
+              
+              // Adjust age if birthday hasn't occurred yet this year
+              if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+                age--;
+              }
+              
+              // Validate reasonable age range (0-120 years)
+              if (age >= 0 && age <= 120) {
+                console.log(`✅ Valid age for patient ${patient.id}: ${age} years (birth: ${patient.dateOfBirth})`);
+                totalAge += age;
+                validAgeCount++;
+                
+                // Age group categorization
+                if (age >= 18 && age <= 25) ageGroups["18-25"]++;
+                else if (age >= 26 && age <= 35) ageGroups["26-35"]++;
+                else if (age >= 36 && age <= 45) ageGroups["36-45"]++;
+                else if (age >= 46 && age <= 55) ageGroups["46-55"]++;
+                else if (age > 55) ageGroups["55+"]++;
+              } else {
+                console.warn(`❌ Unreasonable age calculated for patient ${patient.id}: ${age} years (birth date: ${patient.dateOfBirth})`);
+              }
+            }
+          } catch (error) {
+            console.warn(`❌ Error calculating age for patient ${patient.id}: ${patient.dateOfBirth}`, error);
+          }
+        }
+
+        // Gender distribution
+        if (patient.gender) {
+          const gender = patient.gender.toLowerCase();
+          if (gender === "male" || gender === "female" || gender === "non-binary") {
+            genderDistribution[gender]++;
+          } else {
+            genderDistribution["other"]++;
+          }
+        }
+
+        // Level of care distribution
+        if (patient.loc) {
+          if (locDistribution.hasOwnProperty(patient.loc)) {
+            locDistribution[patient.loc]++;
+          } else {
+            locDistribution["unassigned"]++;
+          }
+        } else {
+          locDistribution["unassigned"]++;
+        }
+
+        // Insurance distribution
+        if (patient.insurance) {
+          const insurance = patient.insurance.trim();
+          insuranceDistribution[insurance] = (insuranceDistribution[insurance] || 0) + 1;
+        }
+
+        // Status distribution
+        if (patient.status) {
+          statusDistribution[patient.status]++;
+        }
+
+        // Geographic distribution (first letter of address for privacy)
+        if (patient.address) {
+          const firstLetter = patient.address.charAt(0).toUpperCase();
+          geographicDistribution[firstLetter] = (geographicDistribution[firstLetter] || 0) + 1;
+        }
+
+        // Treatment duration for discharged patients
+        if (patient.status === "discharged" && patient.createdAt && patient.updatedAt) {
+          const createdDate = new Date(patient.createdAt);
+          const dischargedDate = new Date(patient.updatedAt);
+          const durationInDays = Math.round((dischargedDate.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24));
+          if (durationInDays > 0) {
+            treatmentDurations.push(durationInDays);
+          }
+        }
+      });
+
+      // Calculate averages
+      const averageAge = validAgeCount > 0 ? Math.round(totalAge / validAgeCount) : 0;
+      console.log(`📊 Age calculation summary: totalAge=${totalAge}, validAgeCount=${validAgeCount}, averageAge=${averageAge}`);
+      const averageTreatmentDuration = treatmentDurations.length > 0 
+        ? Math.round(treatmentDurations.reduce((a, b) => a + b, 0) / treatmentDurations.length)
+        : 0;
+
+      // Get top insurance providers
+      const topInsuranceProviders = Object.entries(insuranceDistribution)
+        .sort(([,a], [,b]) => b - a)
+        .slice(0, 5)
+        .map(([provider, count]) => ({ provider, count }));
+
+      // Get top geographic areas
+      const topGeographicAreas = Object.entries(geographicDistribution)
+        .sort(([,a], [,b]) => b - a)
+        .slice(0, 5)
+        .map(([area, count]) => ({ area, count }));
+
+      const demographics = {
+        totalPatients,
+        averageAge,
+        averageAgeDetails: {
+          average: averageAge,
+          totalAge,
+          validAgeCount,
+          patientsWithValidAge: validAgeCount,
+          patientsWithoutAge: totalPatients - validAgeCount
+        },
+        averageTreatmentDuration,
+        ageGroups,
+        genderDistribution,
+        locDistribution,
+        statusDistribution,
+        topInsuranceProviders,
+        topGeographicAreas,
+        treatmentDurations: {
+          average: averageTreatmentDuration,
+          min: treatmentDurations.length > 0 ? Math.min(...treatmentDurations) : 0,
+          max: treatmentDurations.length > 0 ? Math.max(...treatmentDurations) : 0,
+          distribution: {
+            "0-30 days": treatmentDurations.filter(d => d <= 30).length,
+            "31-60 days": treatmentDurations.filter(d => d > 30 && d <= 60).length,
+            "61-90 days": treatmentDurations.filter(d => d > 60 && d <= 90).length,
+            "90+ days": treatmentDurations.filter(d => d > 90).length
+          }
+        }
+      };
+
+      res.json(demographics);
+    } catch (error) {
+      console.error("Error fetching demographics:", error);
+      res.status(500).json({ message: "Failed to fetch demographics data" });
+    }
+  });
+
+  // Get appointment analytics for reports
+  app.get("/api/reports/appointment-analytics", isAuthenticated, async (req: any, res) => {
+    try {
+      const appointments = await storage.getAppointments();
+      
+      // Calculate basic metrics
+      const totalAppointments = appointments.length;
+      const today = new Date();
+      const todayAppointments = appointments.filter(apt => {
+        const aptDate = new Date(apt.appointmentDate);
+        return aptDate.toDateString() === today.toDateString();
+      }).length;
+
+      // Calculate status distribution
+      const statusDistribution = {
+        "scheduled": 0,
+        "completed": 0,
+        "cancelled": 0,
+        "no-show": 0
+      };
+
+      // Calculate monthly trends (last 12 months)
+      const monthlyTrends: { [key: string]: number } = {};
+      const currentMonth = new Date();
+      for (let i = 0; i < 12; i++) {
+        const month = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - i, 1);
+        const monthKey = month.toISOString().slice(0, 7); // YYYY-MM format
+        monthlyTrends[monthKey] = 0;
+      }
+
+      // Calculate day of week distribution
+      const dayOfWeekDistribution = {
+        "Sunday": 0,
+        "Monday": 0,
+        "Tuesday": 0,
+        "Wednesday": 0,
+        "Thursday": 0,
+        "Friday": 0,
+        "Saturday": 0
+      };
+
+      // Calculate time slot preferences
+      const timeSlotDistribution: { [key: string]: number } = {};
+
+      // Calculate therapist utilization
+      const therapistUtilization: { [key: string]: number } = {};
+
+      // Calculate session duration analysis
+      const sessionDurations: number[] = [];
+      let totalDuration = 0;
+
+      // Calculate no-show rate
+      let noShowCount = 0;
+      let completedCount = 0;
+
+      appointments.forEach((appointment: any) => {
+        // Status distribution
+        if (statusDistribution.hasOwnProperty(appointment.status)) {
+          statusDistribution[appointment.status]++;
+        }
+
+        // Monthly trends
+        const aptDate = new Date(appointment.appointmentDate);
+        const monthKey = aptDate.toISOString().slice(0, 7);
+        if (monthlyTrends.hasOwnProperty(monthKey)) {
+          monthlyTrends[monthKey]++;
+        }
+
+        // Day of week
+        const dayName = aptDate.toLocaleDateString('en-US', { weekday: 'long' });
+        if (dayOfWeekDistribution.hasOwnProperty(dayName)) {
+          dayOfWeekDistribution[dayName]++;
+        }
+
+        // Time slot (hour)
+        const hour = aptDate.getHours();
+        const timeSlot = `${hour}:00`;
+        timeSlotDistribution[timeSlot] = (timeSlotDistribution[timeSlot] || 0) + 1;
+
+        // Therapist utilization
+        if (appointment.therapistId) {
+          const therapistId = appointment.therapistId.toString();
+          therapistUtilization[therapistId] = (therapistUtilization[therapistId] || 0) + 1;
+        }
+
+        // Session duration
+        if (appointment.duration) {
+          sessionDurations.push(appointment.duration);
+          totalDuration += appointment.duration;
+        }
+
+        // No-show and completion rates
+        if (appointment.status === "no-show") {
+          noShowCount++;
+        } else if (appointment.status === "completed") {
+          completedCount++;
+        }
+      });
+
+      // Calculate averages and rates
+      const averageSessionDuration = sessionDurations.length > 0 
+        ? Math.round(totalDuration / sessionDurations.length)
+        : 0;
+
+      const noShowRate = totalAppointments > 0 
+        ? ((noShowCount / totalAppointments) * 100).toFixed(1)
+        : "0.0";
+
+      const completionRate = totalAppointments > 0 
+        ? ((completedCount / totalAppointments) * 100).toFixed(1)
+        : "0.0";
+
+      // Get upcoming appointments (next 30 days)
+      const thirtyDaysFromNow = new Date();
+      thirtyDaysFromNow.setDate(today.getDate() + 30);
+      const upcomingAppointments = appointments.filter(apt => {
+        const aptDate = new Date(apt.appointmentDate);
+        return aptDate >= today && aptDate <= thirtyDaysFromNow && apt.status === "scheduled";
+      }).length;
+
+      // Get top time slots
+      const topTimeSlots = Object.entries(timeSlotDistribution)
+        .sort(([,a], [,b]) => b - a)
+        .slice(0, 5)
+        .map(([time, count]) => ({ time, count }));
+
+      // Get top therapists
+      const topTherapists = Object.entries(therapistUtilization)
+        .sort(([,a], [,b]) => b - a)
+        .slice(0, 5)
+        .map(([therapistId, count]) => ({ therapistId, count }));
+
+      // Calculate session type distribution
+      const sessionTypeDistribution: { [key: string]: number } = {};
+      appointments.forEach((apt: any) => {
+        const type = apt.type || "Unknown";
+        sessionTypeDistribution[type] = (sessionTypeDistribution[type] || 0) + 1;
+      });
+
+      const analytics = {
+        totalAppointments,
+        todayAppointments,
+        upcomingAppointments,
+        averageSessionDuration,
+        noShowRate: parseFloat(noShowRate),
+        completionRate: parseFloat(completionRate),
+        statusDistribution,
+        monthlyTrends,
+        dayOfWeekDistribution,
+        topTimeSlots,
+        topTherapists,
+        sessionTypeDistribution,
+        sessionDurations: {
+          average: averageSessionDuration,
+          min: sessionDurations.length > 0 ? Math.min(...sessionDurations) : 0,
+          max: sessionDurations.length > 0 ? Math.max(...sessionDurations) : 0,
+          distribution: {
+            "30 min": sessionDurations.filter(d => d === 30).length,
+            "45 min": sessionDurations.filter(d => d === 45).length,
+            "60 min": sessionDurations.filter(d => d === 60).length,
+            "90 min": sessionDurations.filter(d => d === 90).length,
+            "120+ min": sessionDurations.filter(d => d > 120).length
+          }
+        }
+      };
+
+      res.json(analytics);
+    } catch (error) {
+      console.error("Error fetching appointment analytics:", error);
+      res.status(500).json({ message: "Failed to fetch appointment analytics data" });
+    }
+  });
+
+  // Get treatment completion rate analytics for reports
+  app.get("/api/reports/treatment-completion", isAuthenticated, async (req: any, res) => {
+    try {
+      const patientsResult = await storage.getPatients(1000, 0, undefined, undefined, undefined, undefined, undefined, true);
+      const patients = (patientsResult.patients || []) as any[];
+      const treatmentRecords = await storage.getAllTreatmentRecords();
+      
+      // Calculate completion metrics
+      const totalPatients = patients.length;
+      const dischargedPatients = patients.filter(p => p.status === 'discharged').length;
+      const activePatients = patients.filter(p => p.status === 'active').length;
+      const inactivePatients = patients.filter(p => p.status === 'inactive').length;
+      
+      // Calculate treatment completion rate
+      const completionRate = totalPatients > 0 ? ((dischargedPatients / totalPatients) * 100).toFixed(1) : "0.0";
+      
+      // Calculate average length of stay for discharged patients
+      const dischargedWithDates = patients.filter(p => p.status === 'discharged' && p.createdAt && p.updatedAt);
+      const totalLOS = dischargedWithDates.reduce((sum, patient) => {
+        const created = new Date(patient.createdAt);
+        const discharged = new Date(patient.updatedAt);
+        const los = Math.ceil((discharged.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
+        return sum + los;
+      }, 0);
+      const averageLOS = dischargedWithDates.length > 0 ? Math.round(totalLOS / dischargedWithDates.length) : 0;
+      
+      // Calculate treatment record completion
+      const totalRecords = treatmentRecords.length;
+      const completedRecords = treatmentRecords.filter(r => r.status === 'completed').length;
+      const inProgressRecords = treatmentRecords.filter(r => r.status === 'in-progress').length;
+      const pendingRecords = treatmentRecords.filter(r => r.status === 'pending').length;
+      
+      const recordCompletionRate = totalRecords > 0 ? ((completedRecords / totalRecords) * 100).toFixed(1) : "0.0";
+      
+      // Calculate treatment goals completion
+      const patientsWithGoals = (patients as any[]).filter(p => p.treatmentGoals && p.treatmentGoals.length > 0);
+      const totalGoals = patientsWithGoals.reduce((sum, patient) => {
+        return sum + (patient.treatmentGoals?.length || 0);
+      }, 0);
+      
+      const completedGoals = patientsWithGoals.reduce((sum, patient) => {
+        return sum + (patient.treatmentGoals?.filter(goal => goal.status === 'completed').length || 0);
+      }, 0);
+      
+      const goalCompletionRate = totalGoals > 0 ? ((completedGoals / totalGoals) * 100).toFixed(1) : "0.0";
+      
+      // Calculate monthly discharge trends
+      const monthlyDischarges: { [key: string]: number } = {};
+      const currentMonth = new Date();
+      for (let i = 0; i < 12; i++) {
+        const month = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - i, 1);
+        const monthKey = month.toISOString().slice(0, 7);
+        monthlyDischarges[monthKey] = 0;
+      }
+      
+      dischargedWithDates.forEach(patient => {
+        const dischargeDate = new Date(patient.updatedAt);
+        const monthKey = dischargeDate.toISOString().slice(0, 7);
+        if (monthlyDischarges.hasOwnProperty(monthKey)) {
+          monthlyDischarges[monthKey]++;
+        }
+      });
+      
+      // Calculate treatment duration distribution
+      const treatmentDurations = dischargedWithDates.map(patient => {
+        const created = new Date(patient.createdAt);
+        const discharged = new Date(patient.updatedAt);
+        return Math.ceil((discharged.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
+      });
+      
+      const durationDistribution = {
+        "0-30 days": treatmentDurations.filter(d => d <= 30).length,
+        "31-60 days": treatmentDurations.filter(d => d > 30 && d <= 60).length,
+        "61-90 days": treatmentDurations.filter(d => d > 60 && d <= 90).length,
+        "91-180 days": treatmentDurations.filter(d => d > 90 && d <= 180).length,
+        "180+ days": treatmentDurations.filter(d => d > 180).length
+      };
+      
+      const analytics = {
+        totalPatients,
+        dischargedPatients,
+        activePatients,
+        inactivePatients,
+        completionRate: parseFloat(completionRate),
+        averageLOS,
+        totalRecords,
+        completedRecords,
+        inProgressRecords,
+        pendingRecords,
+        recordCompletionRate: parseFloat(recordCompletionRate),
+        totalGoals,
+        completedGoals,
+        goalCompletionRate: parseFloat(goalCompletionRate),
+        monthlyDischarges,
+        durationDistribution,
+        treatmentDurations: {
+          average: averageLOS,
+          min: treatmentDurations.length > 0 ? Math.min(...treatmentDurations) : 0,
+          max: treatmentDurations.length > 0 ? Math.max(...treatmentDurations) : 0,
+          total: treatmentDurations.length
+        }
+      };
+      
+      res.json(analytics);
+    } catch (error) {
+      console.error("Error fetching treatment completion analytics:", error);
+      res.status(500).json({ message: "Failed to fetch treatment completion data" });
+    }
+  });
+
+  // Get staff performance analytics for reports
+  app.get("/api/reports/staff-performance", isAuthenticated, async (req: any, res) => {
+    try {
+      const users = await storage.getStaff();
+      const appointments = await storage.getAppointments();
+      const treatmentRecords = await storage.getAllTreatmentRecords();
+      const patientsResult = await storage.getPatients(1000, 0, undefined, undefined, undefined, undefined, undefined, true);
+      const patients = (patientsResult.patients || []) as any[];
+      
+      console.log('Staff Performance Debug:');
+      console.log(`Total users: ${users.length}`);
+      console.log(`Total appointments: ${appointments.length}`);
+      console.log(`Total treatment records: ${treatmentRecords.length}`);
+      console.log(`Total patients: ${patients.length}`);
+      
+      // Filter only staff members (non-admin users)
+      const staffMembers = users.filter(user => user.role !== 'admin');
+      console.log(`Staff members (non-admin): ${staffMembers.length}`);
+      
+      // Calculate staff performance metrics
+      const staffPerformance = staffMembers.map(staff => {
+        // Get appointments for this staff member
+        const staffAppointments = appointments.filter(apt => apt.therapistId?.toString() === (staff as any)._id?.toString());
+        const completedAppointments = staffAppointments.filter(apt => apt.status === 'completed');
+        const cancelledAppointments = staffAppointments.filter(apt => apt.status === 'cancelled');
+        const noShowAppointments = staffAppointments.filter(apt => apt.status === 'no-show');
+        
+        // Get treatment records for this staff member
+        const staffRecords = treatmentRecords.filter(record => record.therapistId?.toString() === (staff as any)._id?.toString());
+        const completedRecords = staffRecords.filter(record => record.status === 'completed');
+        
+        // Get patients assigned to this staff member
+        const assignedPatients = (patients as any[]).filter(patient => patient.assignedTherapistId?.toString() === (staff as any)._id?.toString());
+        const dischargedPatients = assignedPatients.filter(patient => patient.status === 'discharged');
+        
+        console.log(`Staff ${staff.firstName} ${staff.lastName}:`);
+        console.log(`  Appointments: ${staffAppointments.length} (${completedAppointments.length} completed)`);
+        console.log(`  Records: ${staffRecords.length} (${completedRecords.length} completed)`);
+        console.log(`  Patients: ${assignedPatients.length} (${dischargedPatients.length} discharged)`);
+        
+        // Calculate metrics
+        const appointmentCompletionRate = staffAppointments.length > 0 
+          ? ((completedAppointments.length / staffAppointments.length) * 100).toFixed(1)
+          : "0.0";
+          
+        const recordCompletionRate = staffRecords.length > 0
+          ? ((completedRecords.length / staffRecords.length) * 100).toFixed(1)
+          : "0.0";
+          
+        const patientDischargeRate = assignedPatients.length > 0
+          ? ((dischargedPatients.length / assignedPatients.length) * 100).toFixed(1)
+          : "0.0";
+        
+        // Calculate average session duration
+        const sessionDurations = completedAppointments
+          .filter(apt => apt.duration)
+          .map(apt => apt.duration);
+        const averageSessionDuration = sessionDurations.length > 0
+          ? Math.round(sessionDurations.reduce((sum, duration) => sum + duration, 0) / sessionDurations.length)
+          : 0;
+        
+        // Calculate monthly performance
+        const currentMonth = new Date();
+        const monthKey = currentMonth.toISOString().slice(0, 7);
+        const monthlyAppointments = staffAppointments.filter(apt => {
+          const aptDate = new Date(apt.dateTime);
+          return aptDate.toISOString().slice(0, 7) === monthKey;
+        }).length;
+        
+        return {
+          staffId: (staff as any)._id,
+          firstName: staff.firstName,
+          lastName: staff.lastName,
+          email: staff.email,
+          role: staff.role,
+          totalAppointments: staffAppointments.length,
+          completedAppointments: completedAppointments.length,
+          cancelledAppointments: cancelledAppointments.length,
+          noShowAppointments: noShowAppointments.length,
+          appointmentCompletionRate: parseFloat(appointmentCompletionRate),
+          totalRecords: staffRecords.length,
+          completedRecords: completedRecords.length,
+          recordCompletionRate: parseFloat(recordCompletionRate),
+          assignedPatients: assignedPatients.length,
+          dischargedPatients: dischargedPatients.length,
+          patientDischargeRate: parseFloat(patientDischargeRate),
+          averageSessionDuration,
+          monthlyAppointments
+        };
+      });
+      
+      // Calculate overall staff statistics
+      const totalStaff = staffMembers.length;
+      const totalStaffAppointments = staffPerformance.reduce((sum, staff) => sum + staff.totalAppointments, 0);
+      const totalStaffRecords = staffPerformance.reduce((sum, staff) => sum + staff.totalRecords, 0);
+      const totalStaffPatients = staffPerformance.reduce((sum, staff) => sum + staff.assignedPatients, 0);
+      
+      const averageAppointmentCompletionRate = totalStaff > 0
+        ? (staffPerformance.reduce((sum, staff) => sum + staff.appointmentCompletionRate, 0) / totalStaff).toFixed(1)
+        : "0.0";
+        
+      const averageRecordCompletionRate = totalStaff > 0
+        ? (staffPerformance.reduce((sum, staff) => sum + staff.recordCompletionRate, 0) / totalStaff).toFixed(1)
+        : "0.0";
+        
+      const averagePatientDischargeRate = totalStaff > 0
+        ? (staffPerformance.reduce((sum, staff) => sum + staff.patientDischargeRate, 0) / totalStaff).toFixed(1)
+        : "0.0";
+      
+      // Get top performers
+      const topAppointmentPerformers = staffPerformance
+        .sort((a, b) => b.appointmentCompletionRate - a.appointmentCompletionRate)
+        .slice(0, 5);
+        
+      const topRecordPerformers = staffPerformance
+        .sort((a, b) => b.recordCompletionRate - a.recordCompletionRate)
+        .slice(0, 5);
+        
+      const topPatientDischargers = staffPerformance
+        .sort((a, b) => b.patientDischargeRate - a.patientDischargeRate)
+        .slice(0, 5);
+      
+      const analytics = {
+        totalStaff,
+        totalStaffAppointments,
+        totalStaffRecords,
+        totalStaffPatients,
+        averageAppointmentCompletionRate: parseFloat(averageAppointmentCompletionRate),
+        averageRecordCompletionRate: parseFloat(averageRecordCompletionRate),
+        averagePatientDischargeRate: parseFloat(averagePatientDischargeRate),
+        staffPerformance,
+        topAppointmentPerformers,
+        topRecordPerformers,
+        topPatientDischargers
+      };
+      
+      res.json(analytics);
+    } catch (error) {
+      console.error("Error fetching staff performance analytics:", error);
+      console.error("Stack trace:", error.stack);
+      res.status(500).json({ message: "Failed to fetch staff performance data", error: error.message });
+    }
+  });
 
   const httpServer = createServer(app);
   return httpServer;

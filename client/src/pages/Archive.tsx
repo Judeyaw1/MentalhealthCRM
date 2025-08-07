@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useSocket } from "@/hooks/useSocket";
 import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Button } from "@/components/ui/button";
@@ -90,7 +91,7 @@ export default function Archive() {
         variant: "destructive",
       });
       setTimeout(() => {
-        window.location.href = "/api/login";
+        window.location.href = "/login";
       }, 500);
       return;
     }
@@ -120,6 +121,19 @@ export default function Archive() {
     retry: false,
     refetchInterval: 10000, // Refetch every 10 seconds for real-time updates
     refetchIntervalInBackground: true,
+  });
+
+  // Real-time socket connection for instant updates
+  useSocket({
+    onPatientCreated: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/patients/archived'] });
+    },
+    onPatientUpdated: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/patients/archived'] });
+    },
+    onPatientDeleted: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/patients/archived'] });
+    },
   });
 
   // Fetch total patients count

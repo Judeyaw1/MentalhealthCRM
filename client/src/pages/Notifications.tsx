@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Bell, Check, X, Clock, AlertTriangle, User, Calendar, FileText, ChevronRight, Filter, Search, UserCheck, Mail, Users, Lock, ClipboardCheck } from "lucide-react";
+import { useSocket } from "@/hooks/useSocket";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,6 +38,18 @@ export default function Notifications() {
       const response = await fetch("/api/notifications?limit=100");
       if (!response.ok) throw new Error("Failed to fetch notifications");
       return response.json();
+    },
+  });
+
+  // Real-time socket connection for instant updates
+  useSocket({
+    onNotificationCreated: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-count'] });
+    },
+    onNotificationRead: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-count'] });
     },
   });
 

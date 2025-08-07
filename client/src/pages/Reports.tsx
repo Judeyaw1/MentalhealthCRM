@@ -1,8 +1,9 @@
 // @ts-nocheck
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useSocket } from "@/hooks/useSocket";
 import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,10 +25,17 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Link } from "wouter";
+import { Trash2 } from "lucide-react";
+
+import { PatientDemographics } from "@/components/reports/PatientDemographics";
+import { AppointmentAnalytics } from "@/components/reports/AppointmentAnalytics";
+import { TreatmentCompletion } from "@/components/reports/TreatmentCompletion";
+import { StaffPerformance } from "@/components/reports/StaffPerformance";
 
 export default function Reports() {
   const { toast } = useToast();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const queryClient = useQueryClient();
   const [selectedLevel, setSelectedLevel] = useState<string | null>(null);
   const [patients, setPatients] = useState<any[]>([]);
   const [loadingPatients, setLoadingPatients] = useState(false);
@@ -37,6 +45,12 @@ export default function Reports() {
   const [selectedPatientId, setSelectedPatientId] = useState("");
   const [searchAdd, setSearchAdd] = useState("");
   const [selectedPatientIds, setSelectedPatientIds] = useState<string[]>([]);
+  const [showRemoveDialog, setShowRemoveDialog] = useState(false);
+  const [patientToRemove, setPatientToRemove] = useState<any>(null);
+  const [showDemographicsDialog, setShowDemographicsDialog] = useState(false);
+  const [showAppointmentAnalyticsDialog, setShowAppointmentAnalyticsDialog] = useState(false);
+  const [showTreatmentCompletionDialog, setShowTreatmentCompletionDialog] = useState(false);
+  const [showStaffPerformanceDialog, setShowStaffPerformanceDialog] = useState(false);
 
   // Redirect to home if not authenticated
   useEffect(() => {
@@ -47,7 +61,7 @@ export default function Reports() {
         variant: "destructive",
       });
       setTimeout(() => {
-        window.location.href = "/api/login";
+        window.location.href = "/login";
       }, 500);
       return;
     }
@@ -56,6 +70,41 @@ export default function Reports() {
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ["/api/dashboard/stats"],
     retry: false,
+    staleTime: 0, // Force fresh data
+  });
+
+  // Get staff count for the Staff Performance card
+  const { data: staffData, isLoading: staffLoading } = useQuery({
+    queryKey: ["/api/staff/list"],
+    retry: false,
+    staleTime: 0,
+  });
+
+  // Real-time socket connection
+  const { isConnected } = useSocket({
+    onPatientCreated: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+      // Refresh level counts when new patients are added
+      refreshLevelCounts();
+    },
+    onPatientUpdated: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+      // Refresh current patient list if a level is selected
+      if (selectedLevel) {
+        handleLevelClick(selectedLevel);
+      }
+      // Refresh level counts when patients are updated
+      refreshLevelCounts();
+    },
+    onPatientDeleted: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+      // Refresh current patient list if a level is selected
+      if (selectedLevel) {
+        handleLevelClick(selectedLevel);
+      }
+      // Refresh level counts when patients are deleted
+      refreshLevelCounts();
+    },
   });
 
   const levelsOfCare = [
@@ -73,21 +122,24 @@ export default function Reports() {
     },
   ];
 
+  // Function to refresh level counts
+  const refreshLevelCounts = async () => {
+    const counts: { [key: string]: number } = {};
+    for (const level of levelsOfCare) {
+      try {
+        const res = await fetch(`/api/patients?loc=${level.value}`);
+        const data = await res.json();
+        counts[level.value] = data.patients?.length || 0;
+      } catch {
+        counts[level.value] = 0;
+      }
+    }
+    setLevelCounts(counts);
+  };
+
   // Fetch counts for each level on mount
   useEffect(() => {
-    (async () => {
-      const counts: { [key: string]: number } = {};
-      for (const level of levelsOfCare) {
-        try {
-          const res = await fetch(`/api/patients?loc=${level.value}`);
-          const data = await res.json();
-          counts[level.value] = data.patients?.length || 0;
-        } catch {
-          counts[level.value] = 0;
-        }
-      }
-      setLevelCounts(counts);
-    })();
+    refreshLevelCounts();
   }, []);
 
   // Fetch all patients (for add dialog)
@@ -142,6 +194,12 @@ export default function Reports() {
     URL.revokeObjectURL(url);
   };
 
+
+
+
+
+
+
   const handleAddPatient = async (e: any) => {
     e.preventDefault();
     if (!selectedPatientId || !selectedLevel) return;
@@ -175,6 +233,37 @@ export default function Reports() {
     setSelectedPatientIds([]);
     setSearchAdd("");
     handleLevelClick(selectedLevel); // refresh list
+  };
+
+  const handleRemoveFromProgram = async (patientId: string) => {
+    try {
+      await fetch(`/api/patients/${patientId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ loc: "" }), // Remove LOC by setting to empty string
+      });
+      
+      toast({
+        title: "Patient Removed",
+        description: "Patient has been removed from the program successfully.",
+      });
+      
+      // Refresh the patient list
+      handleLevelClick(selectedLevel!);
+      setShowRemoveDialog(false);
+      setPatientToRemove(null);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to remove patient from program. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const confirmRemovePatient = (patient: any) => {
+    setPatientToRemove(patient);
+    setShowRemoveDialog(true);
   };
 
   if (authLoading) {
@@ -225,7 +314,7 @@ export default function Reports() {
         "Therapist productivity, caseload distribution, and efficiency metrics",
       icon: Activity,
       color: "bg-indigo-50 text-indigo-700 hover:bg-indigo-100",
-      metric: "Coming soon",
+      metric: `${staffData?.length || 0} staff`,
     },
     {
       title: "Compliance Reports",
@@ -385,6 +474,7 @@ export default function Reports() {
                             <th className="px-4 py-2 text-left">Name</th>
                             <th className="px-4 py-2 text-left">Therapist</th>
                             <th className="px-4 py-2 text-left">Status</th>
+                            <th className="px-4 py-2 text-left">Actions</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -397,6 +487,17 @@ export default function Reports() {
                               </td>
                               <td className="px-4 py-2">{p.assignedTherapist ? `${p.assignedTherapist.firstName} ${p.assignedTherapist.lastName}` : "-"}</td>
                               <td className="px-4 py-2 capitalize">{p.status}</td>
+                              <td className="px-4 py-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => confirmRemovePatient(p)}
+                                  className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-1" />
+                                  Remove
+                                </Button>
+                              </td>
                             </tr>
                           ))}
                         </tbody>
@@ -407,6 +508,8 @@ export default function Reports() {
               )}
             </div>
 
+
+
             {/* Report Categories */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {reportCards.map((report, index) => {
@@ -416,6 +519,17 @@ export default function Reports() {
                   <Card
                     key={index}
                     className="hover:shadow-lg transition-shadow cursor-pointer"
+                    onClick={() => {
+                      if (report.title === "Patient Demographics") {
+                        setShowDemographicsDialog(true);
+                      } else if (report.title === "Appointment Analytics") {
+                        setShowAppointmentAnalyticsDialog(true);
+                      } else if (report.title === "Treatment Completion Rate") {
+                        setShowTreatmentCompletionDialog(true);
+                      } else if (report.title === "Staff Performance") {
+                        setShowStaffPerformanceDialog(true);
+                      }
+                    }}
                   >
                     <CardContent className="p-6">
                       <div className="flex items-start space-x-4">
@@ -438,7 +552,7 @@ export default function Reports() {
                               {report.metric}
                             </span>
                             <Button variant="outline" size="sm">
-                              Generate
+                              {report.title === "Patient Demographics" || report.title === "Appointment Analytics" || report.title === "Treatment Completion Rate" || report.title === "Staff Performance" ? "View Report" : "Generate"}
                             </Button>
                           </div>
                         </div>
@@ -540,6 +654,84 @@ export default function Reports() {
               <Button type="submit" disabled={!selectedPatientIds.length}>Add Selected Patients</Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Remove Patient Confirmation Dialog */}
+      <Dialog open={showRemoveDialog} onOpenChange={setShowRemoveDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Remove Patient from Program</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-gray-600">
+              Are you sure you want to remove{" "}
+              <span className="font-semibold">
+                {patientToRemove?.firstName} {patientToRemove?.lastName}
+              </span>{" "}
+              from the {levelsOfCare.find(l => l.value === selectedLevel)?.label} program?
+            </p>
+            <p className="text-sm text-gray-500">
+              This will remove their Level of Care assignment. They can be reassigned to a different program later.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowRemoveDialog(false);
+                  setPatientToRemove(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => handleRemoveFromProgram(patientToRemove?.id)}
+              >
+                Remove from Program
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Patient Demographics Dialog */}
+      <Dialog open={showDemographicsDialog} onOpenChange={setShowDemographicsDialog}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Patient Demographics Report</DialogTitle>
+          </DialogHeader>
+          <PatientDemographics />
+        </DialogContent>
+      </Dialog>
+
+      {/* Appointment Analytics Dialog */}
+      <Dialog open={showAppointmentAnalyticsDialog} onOpenChange={setShowAppointmentAnalyticsDialog}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Appointment Analytics Report</DialogTitle>
+          </DialogHeader>
+          <AppointmentAnalytics />
+        </DialogContent>
+      </Dialog>
+
+      {/* Treatment Completion Dialog */}
+      <Dialog open={showTreatmentCompletionDialog} onOpenChange={setShowTreatmentCompletionDialog}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Treatment Completion Rate Report</DialogTitle>
+          </DialogHeader>
+          <TreatmentCompletion />
+        </DialogContent>
+      </Dialog>
+
+      {/* Staff Performance Dialog */}
+      <Dialog open={showStaffPerformanceDialog} onOpenChange={setShowStaffPerformanceDialog}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Staff Performance Report</DialogTitle>
+          </DialogHeader>
+          <StaffPerformance />
         </DialogContent>
       </Dialog>
     </div>

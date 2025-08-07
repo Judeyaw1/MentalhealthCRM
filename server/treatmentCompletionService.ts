@@ -16,6 +16,15 @@ export class TreatmentCompletionService {
       throw new Error('Patient not found');
     }
 
+    // Skip LOS calculations for archived patients
+    if (patient.status === 'inactive' || patient.status === 'discharged') {
+      return {
+        shouldDischarge: false,
+        reason: 'Patient is archived - activities on hold',
+        criteria: []
+      };
+    }
+
     const criteria = [];
     let shouldDischarge = false;
     let reason = '';

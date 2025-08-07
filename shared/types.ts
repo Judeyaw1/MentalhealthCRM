@@ -23,9 +23,14 @@ export interface Patient {
   gender?: string;
   email?: string;
   phone?: string;
-  emergencyContact?: string;
+  emergencyContact?: {
+    name?: string;
+    relationship?: string;
+    phone?: string;
+  };
   address?: string;
   insurance?: string;
+  ssn?: string;
   insuranceCardUrl?: string;
   photoUrl?: string;
   reasonForVisit?: string;
@@ -94,9 +99,14 @@ export interface InsertPatient {
   gender?: string;
   email?: string;
   phone?: string;
-  emergencyContact?: string;
+  emergencyContact?: {
+    name?: string;
+    relationship?: string;
+    phone?: string;
+  };
   address?: string;
   insurance?: string;
+  ssn?: string;
   insuranceCardUrl?: string;
   photoUrl?: string;
   reasonForVisit?: string;

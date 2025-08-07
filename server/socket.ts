@@ -105,6 +105,61 @@ export function setupSocketServer(httpServer: HTTPServer) {
       socket.broadcast.emit('dashboard_stats_updated', data);
     });
 
+    // Handle inquiry updates
+    socket.on('inquiry_created', (data) => {
+      console.log('📝 Inquiry created, broadcasting to all users');
+      socket.broadcast.emit('inquiry_created', data);
+    });
+
+    socket.on('inquiry_updated', (data) => {
+      console.log('📝 Inquiry updated, broadcasting to all users');
+      socket.broadcast.emit('inquiry_updated', data);
+    });
+
+    // Handle audit log updates
+    socket.on('audit_log_created', (data) => {
+      console.log('📋 Audit log created, broadcasting to all users');
+      socket.broadcast.emit('audit_log_created', data);
+    });
+
+    // Handle patient note updates - scope to specific patient
+    socket.on('note_created', (data) => {
+      console.log('📝 Note created, broadcasting to patient room:', data.patientId);
+      socket.broadcast.to(`patient_${data.patientId}`).emit('note_created', data);
+    });
+
+    socket.on('note_updated', (data) => {
+      console.log('📝 Note updated, broadcasting to patient room:', data.patientId);
+      socket.broadcast.to(`patient_${data.patientId}`).emit('note_updated', data);
+    });
+
+    socket.on('note_deleted', (data) => {
+      console.log('📝 Note deleted, broadcasting to patient room:', data.patientId);
+      socket.broadcast.to(`patient_${data.patientId}`).emit('note_deleted', data);
+    });
+
+    // Handle room joining for patient-specific events
+    socket.on('join_patient_room', (data) => {
+      console.log('🔌 User joining patient room:', data.patientId);
+      socket.join(`patient_${data.patientId}`);
+    });
+
+    socket.on('leave_patient_room', (data) => {
+      console.log('🔌 User leaving patient room:', data.patientId);
+      socket.leave(`patient_${data.patientId}`);
+    });
+
+    // Handle typing indicators
+    socket.on('typing_start', (data) => {
+      console.log('⌨️ User started typing:', data);
+      socket.broadcast.to(`patient_${data.patientId}`).emit('user_typing_start', data);
+    });
+
+    socket.on('typing_stop', (data) => {
+      console.log('⌨️ User stopped typing:', data);
+      socket.broadcast.to(`patient_${data.patientId}`).emit('user_typing_stop', data);
+    });
+
     // Handle heartbeat
     socket.on('ping', () => {
       socket.emit('pong');

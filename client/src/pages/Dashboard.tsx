@@ -18,6 +18,9 @@ import type { DashboardStats } from "@/components/dashboard/StatsCards";
 import { Card } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import * as XLSX from "xlsx";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 
 export default function Dashboard() {
   const { toast } = useToast();
@@ -27,6 +30,8 @@ export default function Dashboard() {
     startDate: "",
     endDate: "",
   });
+  const [exportType, setExportType] = useState<string>("full"); // full, stats-only, patients-only, appointments-only
+  const [showExportDialog, setShowExportDialog] = useState(false);
 
   // Setup WebSocket for real-time updates
   const { isConnected, socket } = useSocket({
@@ -69,7 +74,7 @@ export default function Dashboard() {
         variant: "destructive",
       });
       setTimeout(() => {
-        window.location.href = "/api/login";
+        window.location.href = "/login";
       }, 500);
       return;
     }
@@ -111,78 +116,241 @@ export default function Dashboard() {
   });
 
   const handleExportReport = async (format: string) => {
-    // Gather data
-    const statsSection = [
-      ["Metric", "Value"],
-      ["Total Patients", statsData.totalPatients],
-      ["Today's Appointments", statsData.todayAppointments],
-      ["Active Treatments", statsData.activeTreatments],
-      ["Treatment Completion Rate", statsData.treatmentCompletionRate],
-      ["Monthly Appointments", statsData.monthlyAppointments],
-      ["Completed Appointments", statsData.completedAppointments],
-      ["Upcoming Appointments", statsData.upcomingAppointments],
-      ["Appointments Needing Review", statsData.appointmentsNeedingReview],
+    // Gather comprehensive data with enhanced information
+    const statsSection: string[][] = [
+      ["Dashboard Metrics", "", ""],
+      ["Metric", "Value", "Description", "Trend"],
+      ["Total Patients", String(statsData.totalPatients), "All registered patients", "↗️ Growing"],
+      ["Today's Appointments", String(statsData.todayAppointments), "Scheduled for today", "📅 Daily"],
+      ["Active Treatments", String(statsData.activeTreatments), "Ongoing treatment plans", "🔄 Active"],
+      ["Treatment Completion Rate", `${statsData.treatmentCompletionRate}%`, "Success rate", "📈 Performance"],
+      ["Monthly Appointments", String(statsData.monthlyAppointments), "This month's total", "📊 Monthly"],
+      ["New Patients This Month", String(statsData.newPatientsThisMonth), "Recent registrations", "🆕 Growth"],
+      ["Completed Appointments", String(statsData.completedAppointments), "Finished sessions", "✅ Completed"],
+      ["Upcoming Appointments", String(statsData.upcomingAppointments), "Future scheduled", "⏰ Scheduled"],
+      ["Appointments Needing Review", String(statsData.appointmentsNeedingReview), "Require attention", "⚠️ Attention"],
+      ["Archived Patients", String(statsData.archivedPatients || 0), "Discharged patients", "📁 Archived"],
+      ["", "", "", ""],
+      ["Report Generated", new Date().toLocaleString(), "Timestamp", ""],
+      ["Real-time Status", isConnected ? "Connected" : "Disconnected", "WebSocket status", ""],
+      ["Data Freshness", "Live", "Real-time data", ""],
     ];
+
     const patientsSection = [
-      ["ID", "Name", "Email", "Status", "Joined"],
+      ["Recent Patients", "", "", "", "", "", ""],
+      ["ID", "Name", "Email", "Status", "Join Date", "Age", "Therapist", "Last Activity"],
       ...(Array.isArray(recentPatients)
         ? recentPatients.map((p: any) => [
             p.id,
             `${p.firstName} ${p.lastName}`,
-            p.email,
+            p.email || "N/A",
             p.status,
-            p.createdAt ? new Date(p.createdAt).toLocaleDateString() : ""
-          ])
-        : []),
-    ];
-    const appointmentsSection = [
-      ["ID", "Patient", "Therapist", "Date", "Type", "Status"],
-      ...(Array.isArray(todayAppointments)
-        ? todayAppointments.map((a: any) => [
-            a.id,
-            a.patientName || "",
-            a.therapistName || "",
-            a.appointmentDate ? new Date(a.appointmentDate).toLocaleString() : "",
-            a.type,
-            a.status
+            p.createdAt ? new Date(p.createdAt).toLocaleDateString() : "N/A",
+            p.dateOfBirth ? calculateAge(p.dateOfBirth) : "N/A",
+            p.assignedTherapist ? `${p.assignedTherapist.firstName} ${p.assignedTherapist.lastName}` : "Unassigned",
+            p.updatedAt ? new Date(p.updatedAt).toLocaleDateString() : "N/A"
           ])
         : []),
     ];
 
+    const appointmentsSection = [
+      ["Today's Appointments", "", "", "", "", "", ""],
+      ["ID", "Patient", "Therapist", "Date & Time", "Type", "Status", "Duration", "Notes"],
+      ...(Array.isArray(todayAppointments)
+        ? todayAppointments.map((a: any) => [
+            a.id,
+            a.patientName || "N/A",
+            a.therapistName || "N/A",
+            a.appointmentDate ? new Date(a.appointmentDate).toLocaleString() : "N/A",
+            a.type || "Session",
+            a.status,
+            a.duration || "60 min",
+            a.notes || "N/A"
+          ])
+        : []),
+    ];
+
+    // Add practice information with enhanced details
+    const practiceInfo = [
+      ["Practice Information", "", ""],
+      ["Report Type", "Dashboard Overview", ""],
+      ["Generated By", "Mental Health Tracker System", ""],
+      ["Data Source", "Real-time Database", ""],
+      ["Export Format", format.toUpperCase(), ""],
+      ["Report Scope", exportType === "full" ? "Complete Dashboard" : exportType.replace("-", " "), ""],
+      ["Date Range", dateRange.startDate && dateRange.endDate ? `${dateRange.startDate} to ${dateRange.endDate}` : "Current Data", ""],
+      ["", "", ""],
+    ];
+
+    // Add performance insights
+    const insightsSection = [
+      ["Performance Insights", "", ""],
+      ["Metric", "Value", "Analysis"],
+      ["Patient Growth", `${statsData.newPatientsThisMonth} this month`, statsData.newPatientsThisMonth > 0 ? "Positive growth" : "No new patients"],
+      ["Treatment Success", `${statsData.treatmentCompletionRate}%`, statsData.treatmentCompletionRate > 80 ? "Excellent" : "Needs improvement"],
+      ["Appointment Efficiency", `${statsData.todayAppointments} today`, statsData.todayAppointments > 0 ? "Active schedule" : "No appointments"],
+      ["Practice Capacity", `${statsData.totalPatients} total`, "Current patient load"],
+      ["", "", ""],
+    ];
+
     if (format === "csv") {
-      // CSV: concatenate all sections with headers
-      const csv = [
-        "Dashboard Stats",
-        statsSection.map(row => row.join(",")).join("\n"),
-        "",
-        "Recent Patients",
-        patientsSection.map(row => row.join(",")).join("\n"),
-        "",
-        "Today's Appointments",
-        appointmentsSection.map(row => row.join(",")).join("\n"),
-      ].join("\n");
+      // Enhanced CSV with better formatting and conditional sections
+      const sections = [practiceInfo];
+      
+      if (exportType === "full" || exportType === "stats-only") {
+        sections.push(statsSection, insightsSection);
+      }
+      if (exportType === "full" || exportType === "patients-only") {
+        sections.push(patientsSection);
+      }
+      if (exportType === "full" || exportType === "appointments-only") {
+        sections.push(appointmentsSection);
+      }
+      
+      const csv = sections.map(section => section.map(row => row.map(cell => String(cell)).join(",")).join("\n")).join("\n\n");
+      
       const blob = new Blob([csv], { type: "text/csv" });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `dashboard-report-${new Date().toISOString().split("T")[0]}.csv`;
+      a.download = `dashboard-report-${exportType}-${new Date().toISOString().split("T")[0]}.csv`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      toast({ title: "Export Successful", description: "Dashboard report exported as CSV." });
+      toast({ title: "Export Successful", description: `Enhanced ${exportType} report exported as CSV.` });
     } else if (format === "excel") {
-      // Excel: each section as a sheet
+      // Enhanced Excel with multiple sheets and conditional content
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(statsSection), "Stats");
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(patientsSection), "Recent Patients");
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(appointmentsSection), "Today's Appointments");
-      XLSX.writeFile(wb, `dashboard-report-${new Date().toISOString().split("T")[0]}.xlsx`);
-      toast({ title: "Export Successful", description: "Dashboard report exported as Excel." });
+      
+      // Practice Info Sheet
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(practiceInfo), "Practice Info");
+      
+      if (exportType === "full" || exportType === "stats-only") {
+        // Stats Sheet with better formatting
+        const statsSheet = XLSX.utils.aoa_to_sheet(statsSection);
+        XLSX.utils.book_append_sheet(wb, statsSheet, "Dashboard Stats");
+        
+        // Insights Sheet
+        const insightsSheet = XLSX.utils.aoa_to_sheet(insightsSection);
+        XLSX.utils.book_append_sheet(wb, insightsSheet, "Performance Insights");
+      }
+      
+      if (exportType === "full" || exportType === "patients-only") {
+        // Patients Sheet
+        const patientsSheet = XLSX.utils.aoa_to_sheet(patientsSection);
+        XLSX.utils.book_append_sheet(wb, patientsSheet, "Recent Patients");
+      }
+      
+      if (exportType === "full" || exportType === "appointments-only") {
+        // Appointments Sheet
+        const appointmentsSheet = XLSX.utils.aoa_to_sheet(appointmentsSection);
+        XLSX.utils.book_append_sheet(wb, appointmentsSheet, "Today's Appointments");
+      }
+      
+      XLSX.writeFile(wb, `dashboard-report-${exportType}-${new Date().toISOString().split("T")[0]}.xlsx`);
+      toast({ title: "Export Successful", description: `Enhanced ${exportType} report exported as Excel.` });
     } else if (format === "pdf") {
-      // Placeholder: PDF export can be implemented with jsPDF or similar
-      toast({ title: "PDF Export Not Implemented", description: "PDF export will be available soon." });
+      // Enhanced PDF export with conditional content
+      try {
+        const { jsPDF } = await import("jspdf");
+        const doc = new jsPDF();
+        
+        // Add title
+        doc.setFontSize(20);
+        doc.text("Dashboard Report", 20, 20);
+        
+        // Add practice info
+        doc.setFontSize(12);
+        doc.text(`Generated: ${new Date().toLocaleString()}`, 20, 35);
+        doc.text(`Status: ${isConnected ? 'Real-time Connected' : 'Disconnected'}`, 20, 45);
+        doc.text(`Report Type: ${exportType}`, 20, 55);
+        
+        let pageNumber = 1;
+        
+        if (exportType === "full" || exportType === "stats-only") {
+          // Add stats
+          doc.setFontSize(16);
+          doc.text("Dashboard Metrics", 20, 75);
+          doc.setFontSize(10);
+          let yPos = 85;
+          doc.text(`Total Patients: ${statsData.totalPatients}`, 20, yPos); yPos += 7;
+          doc.text(`Today's Appointments: ${statsData.todayAppointments}`, 20, yPos); yPos += 7;
+          doc.text(`Active Treatments: ${statsData.activeTreatments}`, 20, yPos); yPos += 7;
+          doc.text(`Treatment Completion Rate: ${statsData.treatmentCompletionRate}%`, 20, yPos); yPos += 7;
+          doc.text(`New Patients This Month: ${statsData.newPatientsThisMonth}`, 20, yPos); yPos += 7;
+          
+          // Add insights
+          doc.setFontSize(14);
+          doc.text("Performance Insights", 20, yPos + 10);
+          doc.setFontSize(10);
+          yPos += 20;
+          doc.text(`Patient Growth: ${statsData.newPatientsThisMonth > 0 ? 'Positive' : 'No growth'}`, 20, yPos); yPos += 7;
+          doc.text(`Treatment Success: ${statsData.treatmentCompletionRate > 80 ? 'Excellent' : 'Needs improvement'}`, 20, yPos); yPos += 7;
+        }
+        
+        if (exportType === "full" || exportType === "patients-only") {
+          // Add new page for patients
+          doc.addPage();
+          pageNumber++;
+          doc.setFontSize(16);
+          doc.text("Recent Patients", 20, 20);
+          doc.setFontSize(10);
+          let yPos = 30;
+          if (Array.isArray(recentPatients)) {
+            recentPatients.slice(0, 20).forEach((p: any) => {
+              doc.text(`${p.firstName} ${p.lastName} - ${p.status}`, 20, yPos);
+              yPos += 6;
+            });
+          }
+        }
+        
+        if (exportType === "full" || exportType === "appointments-only") {
+          // Add new page for appointments
+          doc.addPage();
+          pageNumber++;
+          doc.setFontSize(16);
+          doc.text("Today's Appointments", 20, 20);
+          doc.setFontSize(10);
+          let yPos = 30;
+          if (Array.isArray(todayAppointments)) {
+            todayAppointments.slice(0, 20).forEach((a: any) => {
+              const time = a.appointmentDate ? new Date(a.appointmentDate).toLocaleTimeString() : "N/A";
+              doc.text(`${a.patientName || 'N/A'} - ${time} - ${a.status}`, 20, yPos);
+              yPos += 6;
+            });
+          }
+        }
+        
+        // Add page numbers
+        for (let i = 1; i <= pageNumber; i++) {
+          doc.setPage(i);
+          doc.setFontSize(8);
+          doc.text(`Page ${i} of ${pageNumber}`, 180, 280);
+        }
+        
+        doc.save(`dashboard-report-${exportType}-${new Date().toISOString().split("T")[0]}.pdf`);
+        toast({ title: "Export Successful", description: `Enhanced ${exportType} report exported as PDF.` });
+      } catch (error) {
+        toast({ 
+          title: "PDF Export Error", 
+          description: "PDF export requires jsPDF library. Please install it first.",
+          variant: "destructive"
+        });
+      }
     }
+  };
+
+  // Helper function to calculate age
+  const calculateAge = (dateOfBirth: string | Date) => {
+    const today = new Date();
+    const birthDate = new Date(dateOfBirth);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return age;
   };
 
   if (isLoading) {
@@ -238,9 +406,10 @@ export default function Dashboard() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => handleExportReport("csv")}>Export as CSV</DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleExportReport("excel")}>Export as Excel</DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleExportReport("pdf")}>Export as PDF</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setShowExportDialog(true)}>Advanced Export</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleExportReport("csv")}>Quick CSV Export</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleExportReport("excel")}>Quick Excel Export</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleExportReport("pdf")}>Quick PDF Export</DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                   <Link href="/patients/new">
@@ -288,6 +457,94 @@ export default function Dashboard() {
           <QuickActions />
         </main>
       </div>
+
+      {/* Advanced Export Dialog */}
+      <Dialog open={showExportDialog} onOpenChange={setShowExportDialog}>
+        <DialogContent className="max-w-lg w-[95vw] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Advanced Export Options</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-3">Report Type</label>
+              <Select value={exportType} onValueChange={setExportType}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="full">Full Dashboard Report</SelectItem>
+                  <SelectItem value="stats-only">Statistics Only</SelectItem>
+                  <SelectItem value="patients-only">Patients Only</SelectItem>
+                  <SelectItem value="appointments-only">Appointments Only</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-3">Date Range (Optional)</label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Start Date</label>
+                  <Input
+                    type="date"
+                    placeholder="Start Date"
+                    value={dateRange.startDate}
+                    onChange={(e) => setDateRange(prev => ({ ...prev, startDate: e.target.value }))}
+                    className="w-full"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">End Date</label>
+                  <Input
+                    type="date"
+                    placeholder="End Date"
+                    value={dateRange.endDate}
+                    onChange={(e) => setDateRange(prev => ({ ...prev, endDate: e.target.value }))}
+                    className="w-full"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">
+              <Button 
+                variant="outline" 
+                onClick={() => setShowExportDialog(false)}
+                className="w-full sm:w-auto"
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={() => {
+                  handleExportReport("csv");
+                  setShowExportDialog(false);
+                }}
+                className="w-full sm:w-auto"
+              >
+                Export CSV
+              </Button>
+              <Button 
+                onClick={() => {
+                  handleExportReport("excel");
+                  setShowExportDialog(false);
+                }}
+                className="w-full sm:w-auto"
+              >
+                Export Excel
+              </Button>
+              <Button 
+                onClick={() => {
+                  handleExportReport("pdf");
+                  setShowExportDialog(false);
+                }}
+                className="w-full sm:w-auto"
+              >
+                Export PDF
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

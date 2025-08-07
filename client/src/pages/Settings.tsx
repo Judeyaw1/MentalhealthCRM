@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useSocket } from "@/hooks/useSocket";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
@@ -90,6 +91,18 @@ export default function Settings() {
   const [testNotificationType, setTestNotificationType] = useState("general");
   const [testNotificationTitle, setTestNotificationTitle] = useState("Test Notification");
   const [testNotificationMessage, setTestNotificationMessage] = useState("This is a test notification");
+
+  // Real-time socket connection for instant updates
+  useSocket({
+    onNotificationCreated: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-count'] });
+    },
+    onNotificationRead: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-count'] });
+    },
+  });
 
   // Update profile mutation
   const updateProfileMutation = useMutation({

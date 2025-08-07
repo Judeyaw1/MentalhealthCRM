@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useSocket } from "@/hooks/useSocket";
 import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -74,10 +75,22 @@ export default function Inquiries() {
       variant: "destructive",
     });
     setTimeout(() => {
-      window.location.href = "/api/login";
+      window.location.href = "/login";
     }, 500);
     return null;
   }
+
+  // Real-time socket connection for instant updates
+  useSocket({
+    onInquiryCreated: () => {
+      // Refresh inquiries when new ones are created
+      window.location.reload();
+    },
+    onInquiryUpdated: () => {
+      // Refresh inquiries when they are updated
+      window.location.reload();
+    },
+  });
 
   const { data: inquiries, isLoading } = useQuery<Inquiry[]>({
     queryKey: [

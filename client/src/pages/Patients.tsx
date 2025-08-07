@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useSocket } from "@/hooks/useSocket";
 import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { PatientDashboard } from "@/components/patients/PatientDashboard";
@@ -69,6 +70,7 @@ export default function Patients() {
   const queryClient = useQueryClient();
   const { isAuthenticated, isLoading: authLoading, user } = useAuth();
   const isFrontDesk = user?.role === "frontdesk";
+  const canPerformAssessments = ['admin', 'supervisor', 'therapist'].includes(user?.role || '');
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -111,6 +113,7 @@ export default function Patients() {
     }
   }, [isAuthenticated, authLoading, toast]);
 
+  // Query for list view (paginated)
   const {
     data: patientsData,
     isLoading,
@@ -140,6 +143,39 @@ export default function Patients() {
     retry: false,
     refetchInterval: 10000, // Refetch every 10 seconds for real-time updates
     refetchIntervalInBackground: true, // Continue polling even when tab is not active
+    enabled: viewMode === "list", // Only fetch when in list view
+  });
+
+  // Query for grid view (all patients)
+  const {
+    data: gridPatientsData,
+    isLoading: gridIsLoading,
+    refetch: gridRefetch,
+  } = useQuery<{ patients: PatientWithTherapist[]; total: number }>({
+    queryKey: [
+      "/api/patients",
+      {
+        search: debouncedSearch || undefined,
+        status: statusFilter || undefined,
+        therapist: therapistFilter || undefined,
+        // No pagination for grid view - fetch all patients
+      },
+    ],
+    queryFn: async ({ queryKey }) => {
+      const [_url, params] = queryKey as [string, Record<string, any>];
+      const url = new URL(_url, window.location.origin);
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== "")
+          url.searchParams.append(key, value);
+      });
+      const res = await fetch(url.toString());
+      if (!res.ok) throw new Error("Failed to fetch patients");
+      return res.json();
+    },
+    retry: false,
+    refetchInterval: 10000, // Refetch every 10 seconds for real-time updates
+    refetchIntervalInBackground: true, // Continue polling even when tab is not active
+    enabled: viewMode === "grid", // Only fetch when in grid view
   });
 
   const { data: dashboardStats } = useQuery<{
@@ -161,7 +197,41 @@ export default function Patients() {
     refetchIntervalInBackground: true, // Continue polling even when tab is not active
   });
 
+  // Real-time socket connection for instant updates
+  const { isConnected, socket } = useSocket({
+    onPatientCreated: (data) => {
+      console.log('🔌 Patient created event received:', data);
+      console.log('🔌 Invalidating queries...');
+      queryClient.invalidateQueries({ queryKey: ['/api/patients'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+      console.log('✅ Queries invalidated for patient created');
+    },
+    onPatientUpdated: (data) => {
+      console.log('🔌 Patient updated event received:', data);
+      console.log('🔌 Invalidating queries...');
+      queryClient.invalidateQueries({ queryKey: ['/api/patients'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+      console.log('✅ Queries invalidated for patient updated');
+    },
+    onPatientDeleted: (data) => {
+      console.log('🔌 Patient deleted event received:', data);
+      console.log('🔌 Invalidating queries...');
+      queryClient.invalidateQueries({ queryKey: ['/api/patients'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+      console.log('✅ Queries invalidated for patient deleted');
+    },
+  });
 
+  // Test WebSocket connection
+  useEffect(() => {
+    if (socket && isConnected) {
+      console.log('🔌 WebSocket connected, testing...');
+      socket.emit('ping');
+      socket.on('pong', () => {
+        console.log('✅ WebSocket connection test successful');
+      });
+    }
+  }, [socket, isConnected]);
 
   // Export mutation
   const exportMutation = useMutation({
@@ -483,7 +553,9 @@ export default function Patients() {
         gender: "male",
         email: "john.doe@email.com",
         phone: "555-123-4567",
-        emergencyContact: "555-999-8888",
+        emergencyContactName: "Sarah Doe",
+        emergencyContactRelationship: "Spouse",
+        emergencyContactPhone: "555-999-8888",
         address: "123 Main Street, Anytown, ST 12345",
         insurance: "Blue Cross Blue Shield",
         reasonForVisit: "Anxiety and stress management",
@@ -499,7 +571,9 @@ export default function Patients() {
         gender: "female",
         email: "jane.smith@email.com",
         phone: "555-567-8901",
-        emergencyContact: "555-888-7777",
+        emergencyContactName: "Robert Smith",
+        emergencyContactRelationship: "Father",
+        emergencyContactPhone: "555-888-7777",
         address: "456 Oak Avenue, Somewhere, ST 12345",
         insurance: "Aetna",
         reasonForVisit: "Depression treatment",
@@ -515,7 +589,9 @@ export default function Patients() {
         gender: "male",
         email: "mike.j@email.com",
         phone: "555-901-2345",
-        emergencyContact: "555-777-6666",
+        emergencyContactName: "Lisa Johnson",
+        emergencyContactRelationship: "Sister",
+        emergencyContactPhone: "555-777-6666",
         address: "789 Pine Road, Elsewhere, ST 12345",
         insurance: "Medicare",
         reasonForVisit: "Stress management and coping skills",
@@ -529,7 +605,7 @@ export default function Patients() {
     // Create CSV content
     const headers = [
       "firstName", "lastName", "dateOfBirth", "gender", "email", "phone", 
-      "emergencyContact", "address", "insurance", "reasonForVisit", 
+      "emergencyContactName", "emergencyContactRelationship", "emergencyContactPhone", "address", "insurance", "reasonForVisit", 
       "status", "hipaaConsent", "loc", "authNumber"
     ];
     
@@ -807,13 +883,15 @@ export default function Patients() {
 
 
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => { setAssessmentPatient(row); setShowAssessment(true); }}
-          >
-            Assess
-          </Button>
+          {canPerformAssessments && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => { setAssessmentPatient(row); setShowAssessment(true); }}
+            >
+              Assess
+            </Button>
+          )}
         </div>
       ),
     },
@@ -865,7 +943,7 @@ export default function Patients() {
   // Grid view component
   const PatientGrid = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-      {patientsData?.patients.map((patient) => (
+      {gridPatientsData?.patients.map((patient) => (
         <div
           key={patient.id}
           className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow"
@@ -928,16 +1006,21 @@ export default function Patients() {
     </div>
   );
 
-  console.log("User:", user, "Role:", user?.role, "isFrontDesk:", isFrontDesk);
+  console.log("User:", user, "Role:", user?.role, "isFrontDesk:", user?.role === "frontdesk");
   console.log("ViewMode:", viewMode);
   console.log(
-    "Patients data:",
+    "List patients data:",
     patientsData?.patients?.length || 0,
     "patients",
   );
   console.log(
+    "Grid patients data:",
+    gridPatientsData?.patients?.length || 0,
+    "patients",
+  );
+  console.log(
     "RecentPatients should show:",
-    isFrontDesk && viewMode === "dashboard",
+    user?.role === "frontdesk" && viewMode === "dashboard",
   );
 
   if (authLoading) {
@@ -1164,15 +1247,57 @@ export default function Patients() {
                       </div>
                     )}
                   </>
-                ) : (
+                ) : viewMode === "grid" ? (
                   <>
+                    {/* Grid View Header with View Mode Toggle */}
+                    <div className="mb-6 flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <h2 className="text-lg font-semibold text-gray-900">Patients</h2>
+                        <Badge variant="secondary">{gridPatientsData?.total || 0} total</Badge>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setViewMode("list")}
+                          className="flex items-center space-x-2"
+                        >
+                          <List className="h-4 w-4" />
+                          <span>List</span>
+                        </Button>
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={() => setViewMode("grid")}
+                          className="flex items-center space-x-2"
+                        >
+                          <Grid3X3 className="h-4 w-4" />
+                          <span>Grid</span>
+                        </Button>
+                        {user?.role === "frontdesk" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setViewMode("dashboard")}
+                            className="flex items-center space-x-2"
+                          >
+                            <LayoutDashboard className="h-4 w-4" />
+                            <span>Dashboard</span>
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    
                     <PatientGrid />
-                    {!isLoading && patientsData?.patients?.length === 0 && (
+                    {!gridIsLoading && gridPatientsData?.patients?.length === 0 && (
                       <div className="text-center text-gray-500 py-8 text-lg">
                         No patients found.
                       </div>
                     )}
                   </>
+                ) : (
+                  // Dashboard view (for front desk)
+                  <PatientDashboard />
                 )}
               </div>
 

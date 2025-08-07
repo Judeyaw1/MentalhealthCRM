@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useSocket } from "@/hooks/useSocket";
 import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { RecordHistoryDialog } from "@/components/records/RecordHistoryDialog";
@@ -92,7 +93,7 @@ export default function Records() {
         variant: "destructive",
       });
       setTimeout(() => {
-        window.location.href = "/api/login";
+        window.location.href = "/login";
       }, 500);
       return;
     }
@@ -113,6 +114,22 @@ export default function Records() {
     },
     enabled: !!appointmentIdFromUrl,
     retry: false,
+  });
+
+  // Real-time socket connection for instant updates
+  useSocket({
+    onTreatmentRecordCreated: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/records'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+    },
+    onTreatmentRecordUpdated: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/records'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+    },
+    onTreatmentRecordDeleted: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/records'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+    },
   });
 
   // Fetch records with filters
@@ -242,7 +259,7 @@ export default function Records() {
           variant: "destructive",
         });
         setTimeout(() => {
-          window.location.href = "/api/login";
+          window.location.href = "/login";
         }, 500);
         return;
       }

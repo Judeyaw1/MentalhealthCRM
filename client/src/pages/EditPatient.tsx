@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useSocket } from "@/hooks/useSocket";
 import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { PatientForm } from "@/components/patients/PatientForm";
@@ -31,11 +32,20 @@ export default function EditPatient() {
         variant: "destructive",
       });
       setTimeout(() => {
-        window.location.href = "/api/login";
+        window.location.href = "/login";
       }, 500);
       return;
     }
   }, [isAuthenticated, authLoading, toast]);
+
+  // Real-time socket connection for instant updates
+  useSocket({
+    onPatientUpdated: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/patients/${patientId}`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/patients'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+    },
+  });
 
   const { data: patient, isLoading: patientLoading } = useQuery({
     queryKey: [`/api/patients/${patientId}`],
@@ -86,7 +96,7 @@ export default function EditPatient() {
           variant: "destructive",
         });
         setTimeout(() => {
-          window.location.href = "/api/login";
+          window.location.href = "/login";
         }, 500);
         return;
       }

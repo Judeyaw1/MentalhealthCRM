@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useSocket } from "@/hooks/useSocket";
 import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,6 +29,7 @@ import {
   CheckCircle,
   XCircle,
   Search,
+  LogOut,
 } from "lucide-react";
 import { Link } from "wouter";
 import { isUnauthorizedError, canSeeCreatedBy } from "@/lib/authUtils";
@@ -49,6 +51,8 @@ export default function PatientDetail() {
   const { toast } = useToast();
   const { isAuthenticated, isLoading: authLoading, user } = useAuth();
   const queryClient = useQueryClient();
+  const canPerformAssessments = ['admin', 'supervisor', 'therapist'].includes(user?.role || '');
+  const canUseChat = ['admin', 'supervisor', 'therapist'].includes(user?.role || '');
 
   // Get tab from URL query parameter
   const urlParams = new URLSearchParams(location.split('?')[1]);
@@ -63,6 +67,31 @@ export default function PatientDetail() {
   // Delete confirmation state
   const [isDeleting, setIsDeleting] = useState(false);
   
+  // Real-time socket connection for instant updates
+  useSocket({
+    onPatientUpdated: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/patients/${patientId}`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/patients'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+    },
+    onAppointmentCreated: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/patients/${patientId}/appointments`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+    },
+    onAppointmentUpdated: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/patients/${patientId}/appointments`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+    },
+    onTreatmentRecordCreated: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/patients/${patientId}/records`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/records'] });
+    },
+    onTreatmentRecordUpdated: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/patients/${patientId}/records`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/records'] });
+    },
+  });
+
   // Track where user came from
   useEffect(() => {
     const referrer = document.referrer;
@@ -195,14 +224,26 @@ export default function PatientDetail() {
     mutationFn: async (status: string) => {
       await apiRequest("PATCH", `/api/patients/${patientId}`, { status });
     },
-    onSuccess: () => {
+    onSuccess: (_, status) => {
       queryClient.invalidateQueries({
         queryKey: [`/api/patients/${patientId}`],
       });
-      toast({
-        title: "Success",
-        description: "Patient status updated successfully.",
-      });
+      
+      if (status === "discharged") {
+        toast({
+          title: "Patient Discharged",
+          description: "Patient has been discharged and moved to archive.",
+        });
+        // Redirect to archive page after a short delay
+        setTimeout(() => {
+          window.location.href = "/archive";
+        }, 1500);
+      } else {
+        toast({
+          title: "Success",
+          description: "Patient status updated successfully.",
+        });
+      }
     },
     onError: (error) => {
       if (isUnauthorizedError(error)) {
@@ -419,7 +460,8 @@ export default function PatientDetail() {
                   </Link>
 
                   {/* Only show deactivate button for admin/supervisor */}
-                  {(user?.role === "admin" || user?.role === "supervisor") ? (
+                  {/* Only admin, supervisor, and front desk can activate/inactivate patients */}
+                  {(user?.role === "admin" || user?.role === "supervisor" || user?.role === "frontdesk") && (
                     <Button
                       variant={
                         patient.status === "active" ? "outline" : "default"
@@ -433,19 +475,22 @@ export default function PatientDetail() {
                     >
                       {patient.status === "active" ? "Deactivate" : "Activate"}
                     </Button>
-                  ) : (
-                    /* All users can activate inactive patients */
-                    patient.status === "inactive" && (
-                      <Button
-                        variant="default"
-                        onClick={() =>
-                          updateStatusMutation.mutate("active")
+                  )}
+
+                  {/* Discharge button - only for admin and supervisor */}
+                  {(user?.role === "admin" || user?.role === "supervisor") && patient.status !== "discharged" && (
+                    <Button
+                      variant="destructive"
+                      onClick={() => {
+                        if (window.confirm(`Are you sure you want to discharge ${patient.firstName} ${patient.lastName}? This will move them to the archive.`)) {
+                          updateStatusMutation.mutate("discharged");
                         }
-                        disabled={updateStatusMutation.isPending}
-                      >
-                        Activate
-                      </Button>
-                    )
+                      }}
+                      disabled={updateStatusMutation.isPending}
+                    >
+                      <LogOut className="h-4 w-4 mr-2" />
+                      Discharge Patient
+                    </Button>
                   )}
 
                   {/* Simple delete button */}
@@ -461,8 +506,12 @@ export default function PatientDetail() {
                 <TabsTrigger value="overview">Overview</TabsTrigger>
                 <TabsTrigger value="appointments">Appointments</TabsTrigger>
                 <TabsTrigger value="records">Treatment Records</TabsTrigger>
-                <TabsTrigger value="notes">Notes</TabsTrigger>
-                <TabsTrigger value="assessment">Assessment</TabsTrigger>
+                {canUseChat && (
+                  <TabsTrigger value="notes">Notes</TabsTrigger>
+                )}
+                {canPerformAssessments && (
+                  <TabsTrigger value="assessment">Assessment</TabsTrigger>
+                )}
               </TabsList>
 
               <TabsContent value="overview" className="space-y-6">
@@ -595,7 +644,7 @@ export default function PatientDetail() {
                             Emergency Contact
                           </label>
                           <p className="text-sm text-gray-900">
-                            {patient.emergencyContact || "Not provided"}
+                            {patient.emergencyContact ? `${patient.emergencyContact.name} (${patient.emergencyContact.relationship}) - ${patient.emergencyContact.phone}` : "Not provided"}
                           </p>
                         </div>
                       </div>
@@ -886,21 +935,25 @@ export default function PatientDetail() {
                 </Card>
               </TabsContent>
 
-              <TabsContent value="notes">
-                <PatientNotes patientId={patientId} />
-              </TabsContent>
+              {canUseChat && (
+                <TabsContent value="notes">
+                  <PatientNotes patientId={patientId} />
+                </TabsContent>
+              )}
 
-              <TabsContent value="assessment">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Patient Assessment</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {/* List of previous assessments */}
-                    <AssessmentsSection patientId={patient.id} patient={patient} />
-                  </CardContent>
-                </Card>
-              </TabsContent>
+              {canPerformAssessments && (
+                <TabsContent value="assessment">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Patient Assessment</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {/* List of previous assessments */}
+                      <AssessmentsSection patientId={patient.id} patient={patient} />
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              )}
             </Tabs>
           </div>
         </main>
@@ -911,8 +964,16 @@ export default function PatientDetail() {
 
 function AssessmentsSection({ patientId, patient }: { patientId: string, patient: any }) {
   const { user } = useAuth();
-  const isFrontDesk = user?.role === "frontdesk";
-  const isAdmin = user?.role === "admin";
+  const canPerformAssessments = ['admin', 'supervisor', 'therapist'].includes(user?.role || '');
+  
+  // If user cannot perform assessments, show access denied message
+  if (!canPerformAssessments) {
+    return (
+      <div className="text-center py-8 text-gray-500">
+        <p>Access denied. Only admin, supervisor, and therapist roles can perform assessments.</p>
+      </div>
+    );
+  }
   const [form, setForm] = useState({
     presentingProblem: "",
     medicalHistory: "",
@@ -1057,7 +1118,7 @@ function AssessmentsSection({ patientId, patient }: { patientId: string, patient
   return (
     <div>
       {/* New assessment form */}
-      {!isFrontDesk && (
+      {user?.role !== "frontdesk" && (
         <form className="space-y-4 mb-10 bg-white p-6 rounded-lg shadow border" onSubmit={handleSubmit}>
           <h2 className="text-xl font-bold mb-2 text-gray-800">New Assessment</h2>
           <div>
@@ -1127,7 +1188,7 @@ function AssessmentsSection({ patientId, patient }: { patientId: string, patient
                   <div className="font-medium text-blue-900 text-base">Assessment #{assessments.length - idx}</div>
                   <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${a.status === 'complete' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{a.status === 'complete' ? 'Complete' : 'In Progress'}</span>
                 </div>
-                {(!isFrontDesk && (a.status !== 'complete' || isAdmin)) && (
+                {(user?.role !== "frontdesk" && (a.status !== 'complete' || isAdmin)) && (
                   <>
                     {a.status !== 'complete' && (
                       <button className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded bg-green-100 text-green-700 hover:bg-green-200 transition" onClick={async () => {
@@ -1191,52 +1252,52 @@ function AssessmentsSection({ patientId, patient }: { patientId: string, patient
             </div>
             <div className="space-y-2">
               <label className="block font-semibold">Presenting Problem</label>
-              <textarea className="w-full border rounded p-2" name="presentingProblem" value={editForm.presentingProblem} onChange={handleEditChange} disabled={isFrontDesk || (editForm.status === 'complete' && !isAdmin)} />
+              <textarea className="w-full border rounded p-2" name="presentingProblem" value={editForm.presentingProblem} onChange={handleEditChange} disabled={user?.role === "frontdesk" || (editForm.status === 'complete' && !isAdmin)} />
             </div>
             <div className="space-y-2">
               <label className="block font-semibold">Medical History</label>
-              <textarea className="w-full border rounded p-2" name="medicalHistory" value={editForm.medicalHistory} onChange={handleEditChange} disabled={isFrontDesk || (editForm.status === 'complete' && !isAdmin)} />
+              <textarea className="w-full border rounded p-2" name="medicalHistory" value={editForm.medicalHistory} onChange={handleEditChange} disabled={user?.role === "frontdesk" || (editForm.status === 'complete' && !isAdmin)} />
             </div>
             <div className="space-y-2">
               <label className="block font-semibold">Psychiatric History</label>
-              <textarea className="w-full border rounded p-2" name="psychiatricHistory" value={editForm.psychiatricHistory} onChange={handleEditChange} disabled={isFrontDesk || (editForm.status === 'complete' && !isAdmin)} />
+              <textarea className="w-full border rounded p-2" name="psychiatricHistory" value={editForm.psychiatricHistory} onChange={handleEditChange} disabled={user?.role === "frontdesk" || (editForm.status === 'complete' && !isAdmin)} />
             </div>
             <div className="space-y-2">
               <label className="block font-semibold">Family History</label>
-              <textarea className="w-full border rounded p-2" name="familyHistory" value={editForm.familyHistory} onChange={handleEditChange} disabled={isFrontDesk || (editForm.status === 'complete' && !isAdmin)} />
+              <textarea className="w-full border rounded p-2" name="familyHistory" value={editForm.familyHistory} onChange={handleEditChange} disabled={user?.role === "frontdesk" || (editForm.status === 'complete' && !isAdmin)} />
             </div>
             <div className="space-y-2">
               <label className="block font-semibold">Social History</label>
-              <textarea className="w-full border rounded p-2" name="socialHistory" value={editForm.socialHistory} onChange={handleEditChange} disabled={isFrontDesk || (editForm.status === 'complete' && !isAdmin)} />
+              <textarea className="w-full border rounded p-2" name="socialHistory" value={editForm.socialHistory} onChange={handleEditChange} disabled={user?.role === "frontdesk" || (editForm.status === 'complete' && !isAdmin)} />
             </div>
             <div className="space-y-2">
               <label className="block font-semibold">Mental Status Exam</label>
-              <textarea className="w-full border rounded p-2" name="mentalStatus" value={editForm.mentalStatus} onChange={handleEditChange} disabled={isFrontDesk || (editForm.status === 'complete' && !isAdmin)} />
+              <textarea className="w-full border rounded p-2" name="mentalStatus" value={editForm.mentalStatus} onChange={handleEditChange} disabled={user?.role === "frontdesk" || (editForm.status === 'complete' && !isAdmin)} />
             </div>
             <div className="space-y-2">
               <label className="block font-semibold">Risk Assessment</label>
-              <textarea className="w-full border rounded p-2" name="riskAssessment" value={editForm.riskAssessment} onChange={handleEditChange} disabled={isFrontDesk || (editForm.status === 'complete' && !isAdmin)} />
+              <textarea className="w-full border rounded p-2" name="riskAssessment" value={editForm.riskAssessment} onChange={handleEditChange} disabled={user?.role === "frontdesk" || (editForm.status === 'complete' && !isAdmin)} />
             </div>
             <div className="space-y-2">
               <label className="block font-semibold">Diagnosis</label>
-              <input className="w-full border rounded p-2" name="diagnosis" value={editForm.diagnosis} onChange={handleEditChange} disabled={isFrontDesk || (editForm.status === 'complete' && !isAdmin)} />
+              <input className="w-full border rounded p-2" name="diagnosis" value={editForm.diagnosis} onChange={handleEditChange} disabled={user?.role === "frontdesk" || (editForm.status === 'complete' && !isAdmin)} />
             </div>
             <div className="space-y-2">
               <label className="block font-semibold">Initial Impressions & Recommendations</label>
-              <textarea className="w-full border rounded p-2" name="impressions" value={editForm.impressions} onChange={handleEditChange} disabled={isFrontDesk || (editForm.status === 'complete' && !isAdmin)} />
+              <textarea className="w-full border rounded p-2" name="impressions" value={editForm.impressions} onChange={handleEditChange} disabled={user?.role === "frontdesk" || (editForm.status === 'complete' && !isAdmin)} />
             </div>
             <div className="space-y-2">
               <label className="block font-semibold">Follow-Up Date</label>
-              <input type="date" className="w-full border rounded p-2" name="followUpDate" value={editForm.followUpDate} onChange={handleEditChange} disabled={isFrontDesk || (editForm.status === 'complete' && !isAdmin)} />
+              <input type="date" className="w-full border rounded p-2" name="followUpDate" value={editForm.followUpDate} onChange={handleEditChange} disabled={user?.role === "frontdesk" || (editForm.status === 'complete' && !isAdmin)} />
             </div>
             <div className="space-y-2">
               <label className="block font-semibold">Follow-Up Notes</label>
-              <textarea className="w-full border rounded p-2" name="followUpNotes" value={editForm.followUpNotes} onChange={handleEditChange} disabled={isFrontDesk || (editForm.status === 'complete' && !isAdmin)} />
+              <textarea className="w-full border rounded p-2" name="followUpNotes" value={editForm.followUpNotes} onChange={handleEditChange} disabled={user?.role === "frontdesk" || (editForm.status === 'complete' && !isAdmin)} />
             </div>
           </form>
           <div className="sticky bottom-0 z-10 bg-white border-t px-6 py-4 flex justify-end space-x-2 rounded-b-lg shadow-sm">
             <button type="button" className="inline-flex items-center gap-2 px-4 py-2 rounded bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium transition" onClick={() => { setEditDialogOpen(false); setEditingId(null); }}>Close</button>
-            {(!isFrontDesk && (editForm.status !== 'complete' || isAdmin)) && (
+            {(user?.role !== "frontdesk" && (editForm.status !== 'complete' || isAdmin)) && (
               <button type="submit" form="edit-assessment-form" className="inline-flex items-center gap-2 px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700 font-semibold shadow transition" disabled={submitting}>
                 <CheckCircle className="w-5 h-5" /> {submitting ? "Updating..." : "Update Assessment"}
               </button>

@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useSocket } from "@/hooks/useSocket";
 import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { PatientForm } from "@/components/patients/PatientForm";
@@ -57,11 +58,23 @@ export default function NewPatient() {
         variant: "destructive",
       });
       setTimeout(() => {
-        window.location.href = "/api/login";
+        window.location.href = "/login";
       }, 500);
       return;
     }
   }, [isAuthenticated, authLoading, toast]);
+
+  // Real-time socket connection for instant updates
+  useSocket({
+    onPatientCreated: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/patients'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+    },
+    onPatientUpdated: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/patients'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+    },
+  });
 
   const createPatientMutation = useMutation({
     mutationFn: async (patientData: InsertPatient) => {
@@ -90,7 +103,7 @@ export default function NewPatient() {
           variant: "destructive",
         });
         setTimeout(() => {
-          window.location.href = "/api/login";
+          window.location.href = "/login";
         }, 500);
         return;
       }
@@ -155,7 +168,7 @@ export default function NewPatient() {
       email: quickAddData.email || "",
       dateOfBirth: new Date(), // Default to today
       gender: "",
-      emergencyContact: "",
+      emergencyContact: undefined,
       address: "",
       insurance: "",
       reasonForVisit: "Quick add - details to be completed",

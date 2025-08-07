@@ -1,7 +1,8 @@
 import { useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useSocket } from "@/hooks/useSocket";
 import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -46,7 +47,7 @@ export default function Staff() {
         variant: "destructive",
       });
       setTimeout(() => {
-        window.location.href = "/api/login";
+        window.location.href = "/login";
       }, 500);
       return;
     }
@@ -55,6 +56,19 @@ export default function Staff() {
   const { data: staff, isLoading: staffLoading } = useQuery<User[]>({
     queryKey: ["/api/staff"],
     retry: false,
+  });
+
+  // Real-time socket connection for instant updates
+  useSocket({
+    onStaffCreated: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/staff'] });
+    },
+    onStaffUpdated: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/staff'] });
+    },
+    onStaffDeleted: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/staff'] });
+    },
   });
 
   const getInitials = (firstName?: string | null, lastName?: string | null) => {

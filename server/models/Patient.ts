@@ -74,12 +74,23 @@ const patientSchema = new mongoose.Schema({
     type: String,
   },
   emergencyContact: {
-    type: String,
+    name: {
+      type: String,
+    },
+    relationship: {
+      type: String,
+    },
+    phone: {
+      type: String,
+    },
   },
   address: {
     type: String,
   },
   insurance: {
+    type: String,
+  },
+  ssn: {
     type: String,
   },
   insuranceCardUrl: {

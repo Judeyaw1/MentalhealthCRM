@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,6 +19,7 @@ interface LoginData {
 
 export function LoginForm({ onSuccess }: LoginFormProps) {
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState<LoginData>({
     email: "",
@@ -42,6 +44,8 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
       return response.json();
     },
     onSuccess: (data) => {
+      console.log("🔐 Login successful:", data);
+      
       // Store authentication state in localStorage
       localStorage.setItem("isLoggedIn", "true");
       localStorage.setItem("user", JSON.stringify(data.user));
@@ -49,6 +53,12 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
         "forcePasswordChange",
         data.forcePasswordChange ? "true" : "false",
       );
+
+      console.log("🔐 localStorage updated:", {
+        isLoggedIn: localStorage.getItem("isLoggedIn"),
+        user: localStorage.getItem("user"),
+        forcePasswordChange: localStorage.getItem("forcePasswordChange")
+      });
 
       // Don't clear patient changes refresh state on login - let it persist
       // This allows users to see the same fresh data they requested before logout
@@ -58,7 +68,8 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
         description: `Welcome back, ${data.user.firstName}!`,
       });
 
-      // Redirect to dashboard instead of reloading
+      console.log("🔐 Redirecting to dashboard...");
+      // Reload the page to ensure authentication state is properly initialized
       window.location.href = "/dashboard";
 
       // Call success callback

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useSocket } from "@/hooks/useSocket";
 import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -92,6 +93,14 @@ export default function AuditLogs() {
   const [showResetDialog, setShowResetDialog] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
 
+  // Real-time socket connection for instant updates
+  useSocket({
+    onAuditLogCreated: () => {
+      // Refresh audit logs when new ones are created
+      window.location.reload();
+    },
+  });
+
   // Redirect to home if not authenticated
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -101,7 +110,7 @@ export default function AuditLogs() {
         variant: "destructive",
       });
       setTimeout(() => {
-        window.location.href = "/api/login";
+        window.location.href = "/login";
       }, 500);
       return;
     }

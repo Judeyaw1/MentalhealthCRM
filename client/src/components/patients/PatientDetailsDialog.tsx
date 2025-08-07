@@ -122,7 +122,7 @@ export function PatientDetailsDialog({ patientId, isOpen, onClose }: PatientDeta
                   <div><strong>Email:</strong> {patient.email}</div>
                   <div><strong>Phone:</strong> {patient.phone}</div>
                   <div><strong>Address:</strong> {patient.address}</div>
-                  <div><strong>Emergency Contact:</strong> {patient.emergencyContact}</div>
+                  <div><strong>Emergency Contact:</strong> {patient.emergencyContact ? `${patient.emergencyContact.name} (${patient.emergencyContact.relationship}) - ${patient.emergencyContact.phone}` : "Not provided"}</div>
                   <div><strong>Insurance:</strong> {patient.insurance}</div>
                 </div>
               </CardContent>
