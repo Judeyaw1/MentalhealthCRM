@@ -99,6 +99,17 @@ export function setupSocketServer(httpServer: HTTPServer) {
       socket.broadcast.emit('staff_deleted', data);
     });
 
+    // Handle discharge request updates
+    socket.on('discharge_request_created', (data) => {
+      console.log('📋 Discharge request created, broadcasting to all users');
+      socket.broadcast.emit('discharge_request_created', data);
+    });
+
+    socket.on('discharge_request_updated', (data) => {
+      console.log('📋 Discharge request updated, broadcasting to all users');
+      socket.broadcast.emit('discharge_request_updated', data);
+    });
+
     // Handle dashboard stats updates
     socket.on('dashboard_stats_updated', (data) => {
       console.log('📊 Dashboard stats updated, broadcasting to all users');

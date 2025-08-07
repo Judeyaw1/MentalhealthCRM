@@ -4396,6 +4396,215 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Discharge request endpoints
+  app.post("/api/patients/:id/discharge-request", isAuthenticated, async (req: any, res) => {
+    try {
+      const patientId = req.params.id;
+      const userId = req.user.id;
+      const { reason } = req.body;
+
+      if (!reason || reason.trim().length === 0) {
+        return res.status(400).json({ message: "Discharge reason is required" });
+      }
+
+      const patient = await storage.getPatient(patientId);
+      if (!patient) {
+        return res.status(404).json({ message: "Patient not found" });
+      }
+
+      if (patient.status === "discharged") {
+        return res.status(400).json({ message: "Patient is already discharged" });
+      }
+
+      // Check if there's already a pending request
+      const existingPendingRequest = patient.dischargeRequests?.find(
+        (req: any) => req.status === "pending"
+      );
+
+      if (existingPendingRequest) {
+        return res.status(400).json({ message: "A discharge request is already pending for this patient" });
+      }
+
+      // Add discharge request
+      const dischargeRequest = {
+        requestedBy: userId,
+        requestedAt: new Date(),
+        reason: reason.trim(),
+        status: "pending"
+      };
+
+      await Patient.findByIdAndUpdate(patientId, {
+        $push: { dischargeRequests: dischargeRequest }
+      });
+
+      // Log the discharge request
+      await logActivity(userId, "discharge_request", "patient", patientId, {
+        reason: reason.trim()
+      });
+
+      // Emit WebSocket event
+      const io = (global as any).io;
+      if (io) {
+        io.emit('discharge_request_created', { patientId, request: dischargeRequest });
+      }
+
+      res.json({
+        success: true,
+        message: "Discharge request submitted successfully",
+        request: dischargeRequest
+      });
+    } catch (error) {
+      console.error("Error creating discharge request:", error);
+      res.status(500).json({ message: "Failed to create discharge request" });
+    }
+  });
+
+  app.get("/api/patients/:id/discharge-requests", isAuthenticated, async (req: any, res) => {
+    try {
+      const patientId = req.params.id;
+      const patient = await Patient.findById(patientId).populate([
+        { path: "dischargeRequests.requestedBy", select: "firstName lastName role" },
+        { path: "dischargeRequests.reviewedBy", select: "firstName lastName role" }
+      ]);
+      
+      if (!patient) {
+        return res.status(404).json({ message: "Patient not found" });
+      }
+
+      res.json(patient.dischargeRequests || []);
+    } catch (error) {
+      console.error("Error fetching discharge requests:", error);
+      res.status(500).json({ message: "Failed to fetch discharge requests" });
+    }
+  });
+
+  app.patch("/api/patients/:id/discharge-requests/:requestId", isAuthenticated, async (req: any, res) => {
+    try {
+      const patientId = req.params.id;
+      const requestId = req.params.requestId;
+      const userId = req.user.id;
+      const { status, reviewNotes } = req.body;
+
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Only admin and supervisor can review discharge requests
+      if (user.role !== "admin" && user.role !== "supervisor") {
+        return res.status(403).json({ message: "Only administrators and supervisors can review discharge requests" });
+      }
+
+      const patient = await storage.getPatient(patientId);
+      if (!patient) {
+        return res.status(404).json({ message: "Patient not found" });
+      }
+
+      const request = patient.dischargeRequests?.find((req: any) => req._id.toString() === requestId);
+      if (!request) {
+        return res.status(404).json({ message: "Discharge request not found" });
+      }
+
+      if (request.status !== "pending") {
+        return res.status(400).json({ message: "Request has already been reviewed" });
+      }
+
+      // Update the request
+      await Patient.updateOne(
+        { 
+          _id: patientId, 
+          "dischargeRequests._id": requestId 
+        },
+        { 
+          $set: { 
+            "dischargeRequests.$.status": status,
+            "dischargeRequests.$.reviewedBy": userId,
+            "dischargeRequests.$.reviewedAt": new Date(),
+            ...(reviewNotes && { "dischargeRequests.$.reviewNotes": reviewNotes })
+          }
+        }
+      );
+
+      // If approved, discharge the patient
+      if (status === "approved") {
+        await storage.updatePatient(patientId, { status: "discharged" });
+        
+        // Log the discharge
+        await logActivity(userId, "discharge_approved", "patient", patientId, {
+          originalRequest: request,
+          reviewNotes
+        });
+
+        // Emit WebSocket event
+        const io = (global as any).io;
+        if (io) {
+          io.emit('patient_updated', { id: patientId, status: 'discharged' });
+          io.emit('discharge_request_updated', { patientId, requestId, status });
+        }
+      } else {
+        // Log the denial
+        await logActivity(userId, "discharge_denied", "patient", patientId, {
+          originalRequest: request,
+          reviewNotes
+        });
+
+        // Emit WebSocket event
+        const io = (global as any).io;
+        if (io) {
+          io.emit('discharge_request_updated', { patientId, requestId, status });
+        }
+      }
+
+      res.json({
+        success: true,
+        message: `Discharge request ${status}`,
+        status
+      });
+    } catch (error) {
+      console.error("Error updating discharge request:", error);
+      res.status(500).json({ message: "Failed to update discharge request" });
+    }
+  });
+
+  app.get("/api/discharge-requests/pending", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Only admin and supervisor can view pending requests
+      if (user.role !== "admin" && user.role !== "supervisor") {
+        return res.status(403).json({ message: "Only administrators and supervisors can view pending discharge requests" });
+      }
+
+      const patients = await Patient.find({
+        "dischargeRequests.status": "pending"
+      }).populate([
+        { path: "dischargeRequests.requestedBy", select: "firstName lastName role" },
+        { path: "assignedTherapistId", select: "firstName lastName" }
+      ]);
+
+      const pendingRequests = patients.flatMap(patient => 
+        patient.dischargeRequests
+          .filter((req: any) => req.status === "pending")
+          .map((req: any) => ({
+            ...req.toObject(),
+            patientId: patient._id,
+            patientName: `${patient.firstName} ${patient.lastName}`,
+            assignedTherapist: patient.assignedTherapistId
+          }))
+      );
+
+      res.json(pendingRequests);
+    } catch (error) {
+      console.error("Error fetching pending discharge requests:", error);
+      res.status(500).json({ message: "Failed to fetch pending discharge requests" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

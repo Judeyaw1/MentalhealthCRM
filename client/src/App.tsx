@@ -29,6 +29,7 @@ import Reports from "@/pages/Reports";
 import AuditLogs from "@/pages/AuditLogs";
 import Settings from "@/pages/Settings";
 import Notifications from "@/pages/Notifications";
+import DischargeRequests from "@/pages/DischargeRequests";
 
 function RouterComponent() {
   const { logout, isAuthenticated, user, forcePasswordChange } = useAuth();
@@ -77,6 +78,7 @@ function RouterComponent() {
             <Route path="/audit" component={AuditLogs} />
             <Route path="/settings" component={Settings} />
             <Route path="/notifications" component={Notifications} />
+            <Route path="/discharge-requests" component={DischargeRequests} />
             <Route path="*" component={NotFound} />
           </>
         ) : (

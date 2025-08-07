@@ -30,6 +30,7 @@ import {
   XCircle,
   Search,
   LogOut,
+  AlertTriangle,
 } from "lucide-react";
 import { Link } from "wouter";
 import { isUnauthorizedError, canSeeCreatedBy } from "@/lib/authUtils";
@@ -43,6 +44,8 @@ import { format, parseISO, isValid } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 import PatientNotes from "@/components/patients/PatientNotes";
+import { DischargeRequestForm } from "@/components/patients/DischargeRequestForm";
+import { DischargeRequestsList } from "@/components/patients/DischargeRequestsList";
 
 export default function PatientDetail() {
   const params = useParams();
@@ -53,6 +56,7 @@ export default function PatientDetail() {
   const queryClient = useQueryClient();
   const canPerformAssessments = ['admin', 'supervisor', 'therapist'].includes(user?.role || '');
   const canUseChat = ['admin', 'supervisor', 'therapist'].includes(user?.role || '');
+  const isAdmin = user?.role === 'admin';
 
   // Get tab from URL query parameter
   const urlParams = new URLSearchParams(location.split('?')[1]);
@@ -66,6 +70,9 @@ export default function PatientDetail() {
   
   // Delete confirmation state
   const [isDeleting, setIsDeleting] = useState(false);
+  
+  // Discharge request state
+  const [showDischargeRequest, setShowDischargeRequest] = useState(false);
   
   // Real-time socket connection for instant updates
   useSocket({
@@ -89,6 +96,14 @@ export default function PatientDetail() {
     onTreatmentRecordUpdated: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/patients/${patientId}/records`] });
       queryClient.invalidateQueries({ queryKey: ['/api/records'] });
+    },
+    onDischargeRequestCreated: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/patients/${patientId}/discharge-requests`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/discharge-requests/pending'] });
+    },
+    onDischargeRequestUpdated: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/patients/${patientId}/discharge-requests`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/discharge-requests/pending'] });
     },
   });
 
@@ -493,6 +508,18 @@ export default function PatientDetail() {
                     </Button>
                   )}
 
+                  {/* Request discharge button - for non-admin users */}
+                  {user?.role !== "admin" && user?.role !== "supervisor" && patient.status !== "discharged" && (
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowDischargeRequest(true)}
+                      className="border-orange-200 text-orange-700 hover:bg-orange-50"
+                    >
+                      <AlertTriangle className="h-4 w-4 mr-2" />
+                      Request Discharge
+                    </Button>
+                  )}
+
                   {/* Simple delete button */}
 
                   
@@ -511,6 +538,9 @@ export default function PatientDetail() {
                 )}
                 {canPerformAssessments && (
                   <TabsTrigger value="assessment">Assessment</TabsTrigger>
+                )}
+                {(user?.role === "admin" || user?.role === "supervisor") && (
+                  <TabsTrigger value="discharge-requests">Discharge Requests</TabsTrigger>
                 )}
               </TabsList>
 
@@ -954,10 +984,30 @@ export default function PatientDetail() {
                   </Card>
                 </TabsContent>
               )}
+
+              {(user?.role === "admin" || user?.role === "supervisor") && (
+                <TabsContent value="discharge-requests">
+                  <DischargeRequestsList patientId={patientId} />
+                </TabsContent>
+              )}
             </Tabs>
           </div>
         </main>
       </div>
+
+      {/* Discharge Request Dialog */}
+      <Dialog open={showDischargeRequest} onOpenChange={setShowDischargeRequest}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Request Discharge</DialogTitle>
+          </DialogHeader>
+          <DischargeRequestForm
+            patientId={patientId}
+            patientName={`${patient.firstName} ${patient.lastName}`}
+            onRequestSubmitted={() => setShowDischargeRequest(false)}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -965,6 +1015,7 @@ export default function PatientDetail() {
 function AssessmentsSection({ patientId, patient }: { patientId: string, patient: any }) {
   const { user } = useAuth();
   const canPerformAssessments = ['admin', 'supervisor', 'therapist'].includes(user?.role || '');
+  const isAdmin = user?.role === 'admin';
   
   // If user cannot perform assessments, show access denied message
   if (!canPerformAssessments) {
@@ -1305,7 +1356,6 @@ function AssessmentsSection({ patientId, patient }: { patientId: string, patient
           </div>
         </DialogContent>
       </Dialog>
-
 
     </div>
   );

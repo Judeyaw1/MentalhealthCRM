@@ -24,6 +24,8 @@ interface UseSocketOptions {
   onInquiryCreated?: (data: any) => void;
   onInquiryUpdated?: (data: any) => void;
   onAuditLogCreated?: (data: any) => void;
+  onDischargeRequestCreated?: (data: any) => void;
+  onDischargeRequestUpdated?: (data: any) => void;
 }
 
 export function useSocket(options: UseSocketOptions = {}) {
@@ -53,6 +55,8 @@ export function useSocket(options: UseSocketOptions = {}) {
     options.onInquiryCreated,
     options.onInquiryUpdated,
     options.onAuditLogCreated,
+    options.onDischargeRequestCreated,
+    options.onDischargeRequestUpdated,
   ]);
 
   const connect = useCallback(() => {
@@ -179,6 +183,12 @@ export function useSocket(options: UseSocketOptions = {}) {
     }
     if (memoizedOptions.onAuditLogCreated) {
       socket.on('audit_log_created', memoizedOptions.onAuditLogCreated);
+    }
+    if (memoizedOptions.onDischargeRequestCreated) {
+      socket.on('discharge_request_created', memoizedOptions.onDischargeRequestCreated);
+    }
+    if (memoizedOptions.onDischargeRequestUpdated) {
+      socket.on('discharge_request_updated', memoizedOptions.onDischargeRequestUpdated);
     }
 
     socketRef.current = socket;

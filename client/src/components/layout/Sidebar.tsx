@@ -15,6 +15,7 @@ import {
   Bell,
   ClipboardList,
   Archive,
+  MessageSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -135,6 +136,17 @@ export function Sidebar({
                 icon: UserCog,
                 current: location.startsWith("/staff"),
               },
+              // Show Discharge Requests for admin and supervisor
+              ...((isAdmin || isSupervisor)
+                ? [
+                    {
+                      name: "Discharge Requests",
+                      href: "/discharge-requests",
+                      icon: MessageSquare,
+                      current: location.startsWith("/discharge-requests"),
+                    },
+                  ]
+                : []),
               // Only show Settings for admins
               ...(isAdmin
                 ? [

@@ -32,6 +32,7 @@ import { useState } from "react";
 export default function Staff() {
   const { toast } = useToast();
   const { isAuthenticated, isLoading: authLoading, user } = useAuth();
+  const queryClient = useQueryClient();
   const [selectedStaff, setSelectedStaff] = useState<User | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [patients, setPatients] = useState<any[]>([]);

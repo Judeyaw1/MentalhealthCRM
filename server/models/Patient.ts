@@ -159,6 +159,40 @@ const patientSchema = new mongoose.Schema({
     }
   },
   inquiries: [inquirySchema],
+  // Discharge request tracking
+  dischargeRequests: {
+    type: [{
+      requestedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        required: true,
+      },
+      requestedAt: {
+        type: Date,
+        default: Date.now,
+      },
+      reason: {
+        type: String,
+        required: true,
+      },
+      status: {
+        type: String,
+        enum: ["pending", "approved", "denied"],
+        default: "pending",
+      },
+      reviewedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+      reviewedAt: {
+        type: Date,
+      },
+      reviewNotes: {
+        type: String,
+      },
+    }],
+    default: [],
+  },
   createdAt: {
     type: Date,
     default: Date.now,
