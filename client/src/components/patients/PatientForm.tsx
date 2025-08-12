@@ -43,7 +43,7 @@ const patientFormSchema = z.object({
     .refine((val) => !isNaN(new Date(val).getTime()), {
       message: "Invalid date",
     }),
-  gender: z.string().optional(),
+  gender: z.string().min(1, "Gender is required"),
   email: z.string().email("Please enter a valid email address").min(1, "Email is required"),
   phone: z.string().optional(),
   emergencyContact: z.object({
@@ -57,16 +57,16 @@ const patientFormSchema = z.object({
   reasonForVisit: z.string().optional(),
   status: z.enum(["active", "inactive", "discharged"]).default("active"),
   hipaaConsent: z.boolean().refine((val) => val === true, "HIPAA consent is required"),
-  assignedTherapistId: z.string().min(1, "Please assign a therapist").refine((val) => val !== "unassigned", "Please assign a therapist"),
-  loc: z.string().min(1, "Level of Care is required"),
-  authNumber: z.string().min(1, "Authorization Number is required"),
+  assignedTherapistId: z.string().optional(),
+  loc: z.string().optional(),
+  authNumber: z.string().optional(),
 });
 
 type PatientFormValues = {
   firstName: string;
   lastName: string;
   dateOfBirth: string;
-  gender?: string;
+  gender: string;
   email: string;
   phone?: string;
   emergencyContact?: {
@@ -80,9 +80,9 @@ type PatientFormValues = {
   reasonForVisit?: string;
   status: string;
   hipaaConsent: boolean;
-  assignedTherapistId: string;
-  loc: string;
-  authNumber: string;
+  assignedTherapistId?: string;
+  loc?: string;
+  authNumber?: string;
 };
 
 export function PatientForm({
@@ -162,7 +162,7 @@ export function PatientForm({
       reasonForVisit: initialData?.reasonForVisit || "",
       status: initialData?.status || "active",
       hipaaConsent: initialData?.hipaaConsent || false,
-      assignedTherapistId: initialData?.assignedTherapistId || "",
+      assignedTherapistId: (typeof initialData?.assignedTherapistId === 'object' && (initialData?.assignedTherapistId as any)?._id) || initialData?.assignedTherapistId || "",
       loc: initialData?.loc || "",
       authNumber: initialData?.authNumber || "",
     },
@@ -205,12 +205,102 @@ export function PatientForm({
   };
 
   const handleSubmit = async (data: PatientFormValues) => {
-    // Convert dateOfBirth string to Date object and handle unassigned therapist
-    const processedData: InsertPatient = {
+    console.log("🔍 Form data before processing:", data);
+    console.log("🔍 Form submission started");
+    
+    // For updates, only validate fields that have values (not empty strings)
+    const hasInitialData = !!initialData;
+    const fieldsToValidate = hasInitialData ? 
+      Object.keys(data).filter(key => data[key as keyof PatientFormValues] !== "" && data[key as keyof PatientFormValues] !== undefined) :
+      Object.keys(data);
+    
+    console.log("🔍 Fields to validate:", fieldsToValidate);
+    
+    // Validate only the fields that are being updated
+    const validationErrors: string[] = [];
+    
+    if (fieldsToValidate.includes('firstName') && !data.firstName) {
+      validationErrors.push("First name is required");
+    }
+    if (fieldsToValidate.includes('lastName') && !data.lastName) {
+      validationErrors.push("Last name is required");
+    }
+    if (fieldsToValidate.includes('dateOfBirth') && !data.dateOfBirth) {
+      validationErrors.push("Date of birth is required");
+    }
+    if (fieldsToValidate.includes('gender') && !data.gender) {
+      validationErrors.push("Gender is required");
+    }
+    if (fieldsToValidate.includes('email') && !data.email) {
+      validationErrors.push("Email is required");
+    }
+    if (fieldsToValidate.includes('address') && !data.address) {
+      validationErrors.push("Address is required");
+    }
+    
+    if (validationErrors.length > 0) {
+      console.error("❌ Validation errors:", validationErrors);
+      return;
+    }
+    
+    console.log("✅ Form validation passed");
+    
+    // Convert dateOfBirth string to Date object and handle optional fields
+    const processedData: any = {
       ...data,
-      dateOfBirth: new Date(data.dateOfBirth),
       status: data.status as "active" | "inactive" | "discharged" | undefined,
+      // Handle optional fields - only include if they have values
+      ...(data.loc && { loc: data.loc }),
+      ...(data.authNumber && { authNumber: data.authNumber }),
     };
+
+    // Handle assignedTherapistId - always include it for updates to preserve assignment
+    if (hasInitialData) {
+      // For updates, always include the assignedTherapistId to preserve assignment
+      if (data.assignedTherapistId) {
+        processedData.assignedTherapistId = data.assignedTherapistId;
+      } else if (initialData?.assignedTherapistId) {
+        // If not explicitly changed, preserve existing assignment
+        const existingAssignment = typeof initialData.assignedTherapistId === 'object' 
+          ? (initialData.assignedTherapistId as any)?._id 
+          : initialData.assignedTherapistId;
+        if (existingAssignment) {
+          processedData.assignedTherapistId = existingAssignment;
+        }
+      }
+    } else {
+      // For new patients, only include if explicitly set
+      if (data.assignedTherapistId) {
+        processedData.assignedTherapistId = data.assignedTherapistId;
+      }
+    }
+    
+    // ALWAYS include assignedTherapistId for updates to ensure permission check passes
+    if (hasInitialData && initialData?.assignedTherapistId) {
+      const existingAssignment = typeof initialData.assignedTherapistId === 'object' 
+        ? (initialData.assignedTherapistId as any)?._id 
+        : initialData.assignedTherapistId;
+      if (existingAssignment && !processedData.assignedTherapistId) {
+        processedData.assignedTherapistId = existingAssignment;
+      }
+    }
+    
+    // Only include dateOfBirth if it exists
+    if (data.dateOfBirth) {
+      processedData.dateOfBirth = new Date(data.dateOfBirth);
+    }
+    
+    // Remove undefined values for updates
+    if (hasInitialData) {
+      Object.keys(processedData).forEach(key => {
+        if (processedData[key as keyof InsertPatient] === undefined) {
+          delete processedData[key as keyof InsertPatient];
+        }
+      });
+    }
+    
+    console.log("🔍 Processed data for submission:", processedData);
+    
     // Handle file uploads (to be implemented in backend)
     if (insuranceCardFile || photoFile) {
       const formData = new FormData();
@@ -225,18 +315,31 @@ export function PatientForm({
       onSubmit(formData as any);
       return;
     }
+    
+    console.log("🔍 Submitting patient data to API...");
+    console.log("🔍 Final processed data:", JSON.stringify(processedData, null, 2));
+    console.log("🔍 Calling onSubmit function...");
     onSubmit(processedData);
+    console.log("🔍 onSubmit function called successfully");
   };
 
   // Handle form submission with error focus
   const onSubmitWithErrorFocus = form.handleSubmit(handleSubmit, (errors) => {
+    console.log("❌ Form submission failed with errors:", errors);
+    alert("Form submission failed with errors: " + JSON.stringify(errors));
+    console.log("❌ Error details:", errors);
     // Focus on the first error field
     focusOnFirstError();
   });
 
   return (
     <Form {...form}>
-      <form onSubmit={onSubmitWithErrorFocus} className="space-y-6">
+      <form onSubmit={(e) => {
+        console.log("🔍 Form submit event triggered");
+        e.preventDefault(); // Prevent default form submission
+        console.log("🔍 Calling onSubmitWithErrorFocus");
+        onSubmitWithErrorFocus(e);
+      }} className="space-y-6">
         <Card>
           <CardHeader>
             <CardTitle>Personal Information</CardTitle>
@@ -725,7 +828,11 @@ export function PatientForm({
           <Button type="button" variant="outline" disabled={isLoading}>
             Cancel
           </Button>
-          <Button type="submit" disabled={isLoading}>
+          <Button 
+            type="submit" 
+            disabled={isLoading}
+            onClick={() => console.log("🔍 Submit button clicked")}
+          >
             {isLoading ? "Saving..." : submitLabel}
           </Button>
         </div>

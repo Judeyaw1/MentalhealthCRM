@@ -8,6 +8,7 @@ import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ChangePasswordForm } from "@/components/staff/ChangePasswordForm";
 import { PatientDialogProvider } from "@/contexts/PatientDialogContext";
+import { WebSocketProvider } from "@/contexts/WebSocketContext";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
 import Login from "@/pages/Login";
@@ -30,6 +31,7 @@ import AuditLogs from "@/pages/AuditLogs";
 import Settings from "@/pages/Settings";
 import Notifications from "@/pages/Notifications";
 import DischargeRequests from "@/pages/DischargeRequests";
+import TreatmentOutcomes from "@/pages/TreatmentOutcomes";
 
 function RouterComponent() {
   const { logout, isAuthenticated, user, forcePasswordChange } = useAuth();
@@ -65,6 +67,8 @@ function RouterComponent() {
             <Route path="/patients/new" component={NewPatient} />
             <Route path="/patients/:id" component={PatientDetail} />
             <Route path="/patients/:id/edit" component={EditPatient} />
+            <Route path="/patients/:id/treatment-outcomes" component={TreatmentOutcomes} />
+
             <Route path="/appointments" component={Appointments} />
             <Route path="/appointments/new" component={NewAppointment} />
             <Route path="/appointments/:id" component={AppointmentDetail} />
@@ -110,10 +114,12 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <PatientDialogProvider>
-          <WouterRouter>
-            <RouterComponent />
-            <Toaster />
-          </WouterRouter>
+          <WebSocketProvider>
+            <WouterRouter>
+              <RouterComponent />
+              <Toaster />
+            </WouterRouter>
+          </WebSocketProvider>
         </PatientDialogProvider>
       </TooltipProvider>
     </QueryClientProvider>

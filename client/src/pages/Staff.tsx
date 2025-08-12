@@ -26,7 +26,7 @@ import { InviteStaffForm } from "@/components/staff/InviteStaffForm";
 import { EditStaffForm } from "@/components/staff/EditStaffForm";
 import { RemoveStaffForm } from "@/components/staff/RemoveStaffForm";
 import { ResetPasswordForm } from "@/components/staff/ResetPasswordForm";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useState } from "react";
 
 export default function Staff() {
@@ -416,6 +416,9 @@ export default function Staff() {
             <DialogTitle>
               Patients Created by {selectedStaff?.firstName} {selectedStaff?.lastName}
             </DialogTitle>
+            <DialogDescription>
+              View all patients that were created by this staff member.
+            </DialogDescription>
           </DialogHeader>
           {loadingPatients ? (
             <div className="text-center py-8">Loading...</div>

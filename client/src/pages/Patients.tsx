@@ -60,7 +60,7 @@ import type { PatientWithTherapist } from "@shared/types";
 import { RecentPatients } from "@/components/dashboard/RecentPatients";
 import { Input } from "@/components/ui/input";
 import { useDebounce } from "@/hooks/use-mobile";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { format } from "date-fns";
 import * as XLSX from "xlsx";
@@ -75,6 +75,8 @@ export default function Patients() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [therapistFilter, setTherapistFilter] = useState("");
+  const [createdByFilter, setCreatedByFilter] = useState("");
+
   const [viewMode, setViewMode] = useState<"dashboard" | "list" | "grid">(
     "list",
   );
@@ -127,6 +129,7 @@ export default function Patients() {
         search: debouncedSearch || undefined,
         status: statusFilter || undefined,
         therapist: therapistFilter || undefined,
+        createdBy: createdByFilter || undefined,
       },
     ],
     queryFn: async ({ queryKey }) => {
@@ -158,6 +161,7 @@ export default function Patients() {
         search: debouncedSearch || undefined,
         status: statusFilter || undefined,
         therapist: therapistFilter || undefined,
+        createdBy: createdByFilter || undefined,
         // No pagination for grid view - fetch all patients
       },
     ],
@@ -197,41 +201,32 @@ export default function Patients() {
     refetchIntervalInBackground: true, // Continue polling even when tab is not active
   });
 
+  const { data: staff } = useQuery<
+    { id: string; firstName: string; lastName: string; role: string }[]
+  >({
+    queryKey: ["/api/staff/list"],
+    retry: false,
+    refetchInterval: 30000, // Refetch every 30 seconds
+    refetchIntervalInBackground: true,
+  });
+
   // Real-time socket connection for instant updates
   const { isConnected, socket } = useSocket({
     onPatientCreated: (data) => {
-      console.log('🔌 Patient created event received:', data);
-      console.log('🔌 Invalidating queries...');
       queryClient.invalidateQueries({ queryKey: ['/api/patients'], exact: false });
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
-      console.log('✅ Queries invalidated for patient created');
     },
     onPatientUpdated: (data) => {
-      console.log('🔌 Patient updated event received:', data);
-      console.log('🔌 Invalidating queries...');
       queryClient.invalidateQueries({ queryKey: ['/api/patients'], exact: false });
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
-      console.log('✅ Queries invalidated for patient updated');
     },
     onPatientDeleted: (data) => {
-      console.log('🔌 Patient deleted event received:', data);
-      console.log('🔌 Invalidating queries...');
       queryClient.invalidateQueries({ queryKey: ['/api/patients'], exact: false });
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
-      console.log('✅ Queries invalidated for patient deleted');
     },
   });
 
-  // Test WebSocket connection
-  useEffect(() => {
-    if (socket && isConnected) {
-      console.log('🔌 WebSocket connected, testing...');
-      socket.emit('ping');
-      socket.on('pong', () => {
-        console.log('✅ WebSocket connection test successful');
-      });
-    }
-  }, [socket, isConnected]);
+
 
   // Export mutation
   const exportMutation = useMutation({
@@ -713,7 +708,7 @@ export default function Patients() {
         
         // Show detailed errors if any
         if (result.errors && result.errors.length > 0) {
-          console.log("Import errors:", result.errors);
+  
           // You could show these in a dialog or toast
         }
         
@@ -918,6 +913,18 @@ export default function Patients() {
         })) || []),
       ],
     },
+    ...(canSeeCreatedBy(user) ? [{
+      key: "createdBy",
+      label: "Created By",
+      options: [
+        { value: "all", label: "All Creators" },
+        ...(staff?.map((s) => ({
+          value: s.id,
+          label: `${s.firstName} ${s.lastName}`,
+        })) || []),
+      ],
+    }] : []),
+
   ];
 
   const handlePageChange = (page: number) => {
@@ -925,7 +932,7 @@ export default function Patients() {
   };
 
   const handleSearch = (query: string) => {
-    console.log("DataTable search input:", query);
+
     setSearchQuery(query);
     setCurrentPage(1);
   };
@@ -936,6 +943,9 @@ export default function Patients() {
       setCurrentPage(1);
     } else if (filter.key === "therapist") {
       setTherapistFilter(filter.value === "all" ? "" : filter.value);
+      setCurrentPage(1);
+    } else if (filter.key === "createdBy") {
+      setCreatedByFilter(filter.value === "all" ? "" : filter.value);
       setCurrentPage(1);
     }
   };
@@ -1006,22 +1016,7 @@ export default function Patients() {
     </div>
   );
 
-  console.log("User:", user, "Role:", user?.role, "isFrontDesk:", user?.role === "frontdesk");
-  console.log("ViewMode:", viewMode);
-  console.log(
-    "List patients data:",
-    patientsData?.patients?.length || 0,
-    "patients",
-  );
-  console.log(
-    "Grid patients data:",
-    gridPatientsData?.patients?.length || 0,
-    "patients",
-  );
-  console.log(
-    "RecentPatients should show:",
-    user?.role === "frontdesk" && viewMode === "dashboard",
-  );
+
 
   if (authLoading) {
     return (
@@ -1310,6 +1305,9 @@ export default function Patients() {
         <DialogContent className="max-w-2xl overflow-y-auto max-h-[90vh]">
           <DialogHeader>
             <DialogTitle>New Patient Assessment</DialogTitle>
+            <DialogDescription>
+              Complete a comprehensive assessment for the selected patient including presenting problem, medical history, and initial recommendations.
+            </DialogDescription>
           </DialogHeader>
           {assessmentPatient && (
             <form className="space-y-4">
@@ -1371,6 +1369,9 @@ export default function Patients() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Assign Therapist to Selected Patients</DialogTitle>
+            <DialogDescription>
+              Select a therapist to assign to the selected patients. This will update their primary therapist assignment.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
@@ -1406,6 +1407,9 @@ export default function Patients() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Schedule Follow-up for Selected Patients</DialogTitle>
+            <DialogDescription>
+              Schedule a follow-up appointment for the selected patients on the specified date.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
@@ -1435,6 +1439,9 @@ export default function Patients() {
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Import Patients (CSV or Excel)</DialogTitle>
+            <DialogDescription>
+              Import multiple patients from a CSV or Excel file. Download the sample template to see the required format.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             {/* Sample Template Download */}

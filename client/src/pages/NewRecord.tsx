@@ -188,8 +188,8 @@ export default function NewRecord() {
               <TreatmentRecordForm
                 initialData={{
                   patientId: prefilledData?.patientId || preselectedPatientId || "",
-                  therapistId: prefilledData?.therapistId || user?.id || "",
-                  sessionDate: prefilledData?.sessionDate || new Date().getTime(),
+                  therapistId: prefilledData?.therapistId || "",
+                  sessionDate: prefilledData?.sessionDate ? new Date(prefilledData.sessionDate) : new Date(),
                   sessionType: prefilledData?.sessionType || "therapy",
                   notes: prefilledData?.notes || "",
                   goals: "",

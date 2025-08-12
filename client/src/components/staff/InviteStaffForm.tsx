@@ -20,6 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   Plus,
@@ -239,6 +240,9 @@ export function InviteStaffForm({ onSuccess }: InviteStaffFormProps) {
             <Mail className="h-5 w-5" />
             Invite New Staff Member
           </DialogTitle>
+          <DialogDescription>
+            Send an invitation to a new staff member. They will receive an email with login credentials.
+          </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">

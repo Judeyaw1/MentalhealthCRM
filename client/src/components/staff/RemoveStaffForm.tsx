@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Trash2, AlertTriangle, Loader2, X } from "lucide-react";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -104,6 +105,9 @@ export function RemoveStaffForm({
             <AlertTriangle className="h-5 w-5" />
             Remove Staff Member
           </DialogTitle>
+          <DialogDescription>
+            Permanently remove this staff member from the team. This action cannot be undone.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">

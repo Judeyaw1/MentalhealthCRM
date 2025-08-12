@@ -54,25 +54,41 @@ export default function EditPatient() {
   });
 
   const updatePatientMutation = useMutation({
-    mutationFn: async (patientData: Partial<InsertPatient> | FormData) => {
+            mutationFn: async (patientData: Partial<InsertPatient> | FormData) => {
+      
       if (typeof FormData !== 'undefined' && patientData instanceof FormData) {
         // Send as multipart/form-data
         const response = await fetch(`/api/patients/${patientId}`, {
           method: "PATCH",
           body: patientData,
         });
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Failed to update patient: ${response.status} ${errorText}`);
+        }
         return response.json();
       } else {
         // Send as JSON
-        const response = await apiRequest(
-          "PATCH",
-          `/api/patients/${patientId}`,
-          patientData,
-        );
-        return response.json();
+                  const response = await fetch(`/api/patients/${patientId}`, {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(patientData),
+            credentials: "include",
+          });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Failed to update patient: ${response.status} ${errorText}`);
+        }
+        
+                  const result = await response.json();
+          return result;
       }
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log("✅ Mutation onSuccess called with data:", data);
       queryClient.invalidateQueries({
         queryKey: [`/api/patients/${patientId}`],
       });
@@ -177,12 +193,15 @@ export default function EditPatient() {
 
             {/* Patient Form */}
             <div className="max-w-4xl">
-              <PatientForm
-                initialData={patient}
-                onSubmit={(data) => updatePatientMutation.mutate(data)}
-                isLoading={updatePatientMutation.isPending}
-                submitLabel="Update Patient Record"
-              />
+                          <PatientForm
+              initialData={patient}
+              onSubmit={(data) => {
+                console.log("🔍 EditPatient onSubmit called with data:", data);
+                updatePatientMutation.mutate(data);
+              }}
+              isLoading={updatePatientMutation.isPending}
+              submitLabel="Update Patient Record"
+            />
             </div>
           </div>
         </main>

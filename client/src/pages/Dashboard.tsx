@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { useSocket } from "@/hooks/useSocket";
+import { useWebSocket } from "@/contexts/WebSocketContext";
 import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { StatsCards } from "@/components/dashboard/StatsCards";
@@ -10,6 +10,8 @@ import { RecentPatients } from "@/components/dashboard/RecentPatients";
 import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import PatientChangesSummary from "@/components/dashboard/PatientChangesSummary";
+
+
 import { Button } from "@/components/ui/button";
 import { Download, Plus, UserCheck, User } from "lucide-react";
 import { Link } from "wouter";
@@ -18,13 +20,13 @@ import type { DashboardStats } from "@/components/dashboard/StatsCards";
 import { Card } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import * as XLSX from "xlsx";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 
 export default function Dashboard() {
   const { toast } = useToast();
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const queryClient = useQueryClient();
   const [dateRange, setDateRange] = useState<{ startDate: string; endDate: string }>({
     startDate: "",
@@ -34,27 +36,55 @@ export default function Dashboard() {
   const [showExportDialog, setShowExportDialog] = useState(false);
 
   // Setup WebSocket for real-time updates
-  const { isConnected, socket } = useSocket({
-    onPatientCreated: () => {
+  const { isConnected, socket, addEventListener, removeEventListener } = useWebSocket();
+
+  // Debug WebSocket connection
+  useEffect(() => {
+    console.log('🔌 Dashboard WebSocket state:', { isConnected, socket: !!socket });
+  }, [isConnected, socket]);
+
+  // Add event listeners for real-time updates
+  useEffect(() => {
+    const onPatientCreated = () => {
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
       queryClient.invalidateQueries({ queryKey: ['/api/patients'] });
-    },
-    onPatientUpdated: () => {
+    };
+
+    const onPatientUpdated = () => {
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
       queryClient.invalidateQueries({ queryKey: ['/api/patients'] });
-    },
-    onAppointmentCreated: () => {
+    };
+
+    const onAppointmentCreated = () => {
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
       queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
-    },
-    onAppointmentUpdated: () => {
+    };
+
+    const onAppointmentUpdated = () => {
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
       queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
-    },
-    onDashboardStatsUpdated: () => {
+    };
+
+    const onDashboardStatsUpdated = () => {
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
-    },
-  });
+    };
+
+    // Add event listeners
+    addEventListener('patient_created', onPatientCreated);
+    addEventListener('patient_updated', onPatientUpdated);
+    addEventListener('appointment_created', onAppointmentCreated);
+    addEventListener('appointment_updated', onAppointmentUpdated);
+    addEventListener('dashboard_stats_updated', onDashboardStatsUpdated);
+
+    // Cleanup event listeners
+    return () => {
+      removeEventListener('patient_created', onPatientCreated);
+      removeEventListener('patient_updated', onPatientUpdated);
+      removeEventListener('appointment_created', onAppointmentCreated);
+      removeEventListener('appointment_updated', onAppointmentUpdated);
+      removeEventListener('dashboard_stats_updated', onDashboardStatsUpdated);
+    };
+  }, [addEventListener, removeEventListener, queryClient]);
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -114,6 +144,8 @@ export default function Dashboard() {
     refetchInterval: 10000,
     refetchIntervalInBackground: true, // Continue polling even when tab is not active
   });
+
+
 
   const handleExportReport = async (format: string) => {
     // Gather comprehensive data with enhanced information
@@ -427,6 +459,8 @@ export default function Dashboard() {
               <StatsCards stats={statsData} isLoading={statsLoading} />
             </div>
 
+
+
             {/* Patient Changes Summary - Only for Front Desk */}
             <div className="mb-8">
               <PatientChangesSummary />
@@ -451,6 +485,8 @@ export default function Dashboard() {
                 />
               </div>
             </div>
+
+
           </div>
 
           {/* Quick Actions */}
@@ -463,6 +499,9 @@ export default function Dashboard() {
         <DialogContent className="max-w-lg w-[95vw] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Advanced Export Options</DialogTitle>
+            <DialogDescription>
+              Configure export settings and choose your preferred format and date range.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-6">
             <div>

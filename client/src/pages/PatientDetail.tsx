@@ -41,7 +41,7 @@ import type {
   TreatmentRecordWithDetails,
 } from "@shared/types";
 import { format, parseISO, isValid } from "date-fns";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 import PatientNotes from "@/components/patients/PatientNotes";
 import { DischargeRequestForm } from "@/components/patients/DischargeRequestForm";
@@ -218,7 +218,7 @@ export default function PatientDetail() {
   }) as { data: any; isLoading: boolean };
 
   const { data: appointments, isLoading: appointmentsLoading } = useQuery({
-    queryKey: ["/api/appointments", { patientId }],
+    queryKey: [`/api/patients/${patientId}/appointments`],
     retry: false,
     enabled: !!patientId,
     staleTime: 0, // Force fresh fetch
@@ -226,6 +226,23 @@ export default function PatientDetail() {
     refetchInterval: 5000, // Refetch every 5 seconds for real-time updates
     refetchIntervalInBackground: true, // Continue polling even when tab is not active
   }) as { data: any[]; isLoading: boolean };
+
+  // Debug appointments data
+  useEffect(() => {
+    if (appointments && appointments.length > 0) {
+      console.log('🔍 PatientDetail - Appointments data:', {
+        patientId,
+        appointmentsCount: appointments.length,
+        appointments: appointments.map(apt => ({
+          id: apt.id,
+          patientId: apt.patientId,
+          patientName: apt.patient?.firstName + ' ' + apt.patient?.lastName,
+          date: apt.appointmentDate,
+          type: apt.type
+        }))
+      });
+    }
+  }, [appointments, patientId]);
 
   const { data: records, isLoading: recordsLoading } = useQuery({
     queryKey: [`/api/patients/${patientId}/records`],
@@ -297,7 +314,7 @@ export default function PatientDetail() {
         description: "Appointment deleted successfully",
       });
       queryClient.invalidateQueries({
-        queryKey: ["/api/appointments", { patientId }],
+        queryKey: [`/api/patients/${patientId}/appointments`],
       });
       queryClient.invalidateQueries({
         queryKey: ["/api/dashboard/today-appointments"],
@@ -542,6 +559,7 @@ export default function PatientDetail() {
                 {(user?.role === "admin" || user?.role === "supervisor") && (
                   <TabsTrigger value="discharge-requests">Discharge Requests</TabsTrigger>
                 )}
+                <TabsTrigger value="treatment-outcomes">Treatment Outcomes</TabsTrigger>
               </TabsList>
 
               <TabsContent value="overview" className="space-y-6">
@@ -580,7 +598,7 @@ export default function PatientDetail() {
                             Date of Birth
                           </label>
                           <p className="text-sm text-gray-900">
-                            {formatDate(patient.dateOfBirth)}
+                            {formatDate(patient.dateOfBirth)} ({calculateAge(patient.dateOfBirth)} years old)
                           </p>
                         </div>
                         <div>
@@ -593,28 +611,49 @@ export default function PatientDetail() {
                         </div>
                       </div>
 
-                      <div>
-                        <label className="text-sm font-medium text-gray-500">
-                          Registration Date
-                        </label>
-                        <p className="text-sm text-gray-900">
-                          {formatDate(patient.createdAt!)}
-                        </p>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-sm font-medium text-gray-500">
+                            Registration Date
+                          </label>
+                          <p className="text-sm text-gray-900">
+                            {formatDate(patient.createdAt!)}
+                          </p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-500">
+                            Intake Date
+                          </label>
+                          <p className="text-sm text-gray-900">
+                            {patient.intakeDate ? formatDate(patient.intakeDate) : "Not specified"}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <label className="text-sm font-medium text-gray-500">
-                          Length of Stay (LOS)
-                        </label>
-                        <p className="text-sm text-gray-900">
-                          {(() => {
-                            const intake = patient.intakeDate ? new Date(patient.intakeDate) : (patient.createdAt ? new Date(patient.createdAt) : null);
-                            const discharge = patient.dischargeDate ? new Date(patient.dischargeDate) : (patient.status === 'discharged' ? new Date() : null);
-                            if (!intake) return 'N/A';
-                            const end = discharge || new Date();
-                            const diff = Math.max(0, Math.floor((end.getTime() - intake.getTime()) / (1000 * 60 * 60 * 24)));
-                            return `${diff} day${diff !== 1 ? 's' : ''}`;
-                          })()}
-                        </p>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-sm font-medium text-gray-500">
+                            Length of Stay (LOS)
+                          </label>
+                          <p className="text-sm text-gray-900">
+                            {(() => {
+                              const intake = patient.intakeDate ? new Date(patient.intakeDate) : (patient.createdAt ? new Date(patient.createdAt) : null);
+                              const discharge = patient.dischargeDate ? new Date(patient.dischargeDate) : (patient.status === 'discharged' ? new Date() : null);
+                              if (!intake) return 'N/A';
+                              const end = discharge || new Date();
+                              const diff = Math.max(0, Math.floor((end.getTime() - intake.getTime()) / (1000 * 60 * 60 * 24)));
+                              return `${diff} day${diff !== 1 ? 's' : ''}`;
+                            })()}
+                          </p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-500">
+                            Discharge Date
+                          </label>
+                          <p className="text-sm text-gray-900">
+                            {patient.dischargeDate ? formatDate(patient.dischargeDate) : "Not discharged"}
+                          </p>
+                        </div>
                       </div>
 
                       {patient.createdBy && canSeeCreatedBy(user) && (
@@ -643,8 +682,7 @@ export default function PatientDetail() {
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <div className="flex items-center space-x-3">
-                        <Mail className="h-4 w-4 text-gray-400" />
+                      <div className="grid grid-cols-2 gap-4">
                         <div>
                           <label className="text-sm font-medium text-gray-500">
                             Email
@@ -653,10 +691,6 @@ export default function PatientDetail() {
                             {patient.email || "Not provided"}
                           </p>
                         </div>
-                      </div>
-
-                      <div className="flex items-center space-x-3">
-                        <Phone className="h-4 w-4 text-gray-400" />
                         <div>
                           <label className="text-sm font-medium text-gray-500">
                             Phone
@@ -667,28 +701,22 @@ export default function PatientDetail() {
                         </div>
                       </div>
 
-                      <div className="flex items-center space-x-3">
-                        <Phone className="h-4 w-4 text-gray-400" />
-                        <div>
-                          <label className="text-sm font-medium text-gray-500">
-                            Emergency Contact
-                          </label>
-                          <p className="text-sm text-gray-900">
-                            {patient.emergencyContact ? `${patient.emergencyContact.name} (${patient.emergencyContact.relationship}) - ${patient.emergencyContact.phone}` : "Not provided"}
-                          </p>
-                        </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">
+                          Emergency Contact
+                        </label>
+                        <p className="text-sm text-gray-900">
+                          {patient.emergencyContact ? `${patient.emergencyContact.name} (${patient.emergencyContact.relationship}) - ${patient.emergencyContact.phone}` : "Not provided"}
+                        </p>
                       </div>
 
-                      <div className="flex items-start space-x-3">
-                        <MapPin className="h-4 w-4 text-gray-400 mt-1" />
-                        <div>
-                          <label className="text-sm font-medium text-gray-500">
-                            Address
-                          </label>
-                          <p className="text-sm text-gray-900">
-                            {patient.address || "Not provided"}
-                          </p>
-                        </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">
+                          Address
+                        </label>
+                        <p className="text-sm text-gray-900">
+                          {patient.address || "Not provided"}
+                        </p>
                       </div>
                     </CardContent>
                   </Card>
@@ -708,7 +736,7 @@ export default function PatientDetail() {
                             Insurance Provider
                           </label>
                           <p className="text-sm text-gray-900">
-                            {patient.insurance || "-"}
+                            {patient.insurance || "Not specified"}
                           </p>
                         </div>
                         <div>
@@ -716,7 +744,7 @@ export default function PatientDetail() {
                             Authorization Number
                           </label>
                           <p className="text-sm text-gray-900">
-                            {patient.authNumber || "-"}
+                            {patient.authNumber || "Not specified"}
                           </p>
                         </div>
                         <div>
@@ -724,7 +752,7 @@ export default function PatientDetail() {
                             Level of Care (LOC)
                           </label>
                           <p className="text-sm text-gray-900">
-                            {patient.loc || "-"}
+                            {patient.loc || "Not specified"}
                           </p>
                         </div>
                         <div>
@@ -732,7 +760,7 @@ export default function PatientDetail() {
                             Reason for Visit
                           </label>
                           <p className="text-sm text-gray-900">
-                            {patient.reasonForVisit || "-"}
+                            {patient.reasonForVisit || "Not specified"}
                           </p>
                         </div>
                         <div>
@@ -741,6 +769,14 @@ export default function PatientDetail() {
                           </label>
                           <p className="text-sm text-gray-900">
                             {patient.hipaaConsent ? "Provided" : "Not Provided"}
+                          </p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-500">
+                            Assigned Therapist
+                          </label>
+                          <p className="text-sm text-gray-900">
+                            {patient.assignedTherapist ? `${patient.assignedTherapist.firstName} ${patient.assignedTherapist.lastName}` : "Not assigned"}
                           </p>
                         </div>
                       </div>
@@ -772,6 +808,67 @@ export default function PatientDetail() {
                           Add Treatment Note
                         </Button>
                       </Link>
+                    </CardContent>
+                  </Card>
+
+                  {/* Treatment Statistics */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center space-x-2">
+                        <FileText className="h-5 w-5" />
+                        <span>Treatment Statistics</span>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-sm font-medium text-gray-500">
+                            Total Appointments
+                          </label>
+                          <p className="text-2xl font-semibold text-gray-900">
+                            {appointments ? appointments.length : 0}
+                          </p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-500">
+                            Total Treatment Records
+                          </label>
+                          <p className="text-2xl font-semibold text-gray-900">
+                            {records ? records.length : 0}
+                          </p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-500">
+                            Completed Appointments
+                          </label>
+                          <p className="text-lg font-medium text-green-600">
+                            {appointments ? appointments.filter(a => a.status === 'completed').length : 0}
+                          </p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-500">
+                            Upcoming Appointments
+                          </label>
+                          <p className="text-lg font-medium text-blue-600">
+                            {appointments ? appointments.filter(a => a.status === 'scheduled').length : 0}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      {records && records.length > 0 && (
+                        <div>
+                          <label className="text-sm font-medium text-gray-500">
+                            Last Treatment Session
+                          </label>
+                          <p className="text-sm text-gray-900">
+                            {(() => {
+                              const sortedRecords = [...records].sort((a, b) => new Date(b.sessionDate).getTime() - new Date(a.sessionDate).getTime());
+                              const lastRecord = sortedRecords[0];
+                              return lastRecord ? `${formatDate(lastRecord.sessionDate)} - ${lastRecord.sessionType}` : "No sessions";
+                            })()}
+                          </p>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 </div>
@@ -827,8 +924,11 @@ export default function PatientDetail() {
                                   • {appointment.duration} minutes
                                 </p>
                                 <p className="text-sm text-gray-500">
-                                  with {appointment.therapist.firstName}{" "}
-                                  {appointment.therapist.lastName}
+                                  {appointment.therapist ? (
+                                    <>with {appointment.therapist.firstName} {appointment.therapist.lastName}</>
+                                  ) : (
+                                    <>No therapist assigned</>
+                                  )}
                                 </p>
                               </div>
                               <Badge
@@ -912,7 +1012,9 @@ export default function PatientDetail() {
                       </div>
                     ) : records && records.length > 0 ? (
                       <div className="space-y-4">
-                        {records.map((record: TreatmentRecordWithDetails) => (
+                        {[...records]
+                          .sort((a: any, b: any) => new Date(b.sessionDate).getTime() - new Date(a.sessionDate).getTime())
+                          .map((record: TreatmentRecordWithDetails) => (
                           <div
                             key={record.id}
                             className="p-4 border rounded-lg hover:bg-gray-50"
@@ -990,6 +1092,22 @@ export default function PatientDetail() {
                   <DischargeRequestsList patientId={patientId} />
                 </TabsContent>
               )}
+
+              <TabsContent value="treatment-outcomes">
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-lg font-semibold">Treatment Outcomes</h3>
+                    <Link href={`/patients/${patientId}/treatment-outcomes`}>
+                      <Button variant="outline">
+                        View Full Treatment Outcomes
+                      </Button>
+                    </Link>
+                  </div>
+                  <p className="text-gray-600">
+                    Track patient progress, symptom severity, and treatment goals over time.
+                  </p>
+                </div>
+              </TabsContent>
             </Tabs>
           </div>
         </main>
@@ -1000,6 +1118,9 @@ export default function PatientDetail() {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Request Discharge</DialogTitle>
+            <DialogDescription>
+              Submit a discharge request for this patient. The request will be reviewed by authorized staff.
+            </DialogDescription>
           </DialogHeader>
           <DischargeRequestForm
             patientId={patientId}
@@ -1295,6 +1416,9 @@ function AssessmentsSection({ patientId, patient }: { patientId: string, patient
           <div className="sticky top-0 z-10 bg-white border-b px-6 pt-4 pb-2 rounded-t-lg shadow-sm">
             <DialogHeader>
               <DialogTitle className="text-lg font-bold">Edit Assessment</DialogTitle>
+              <DialogDescription>
+                Update the patient's assessment information. Some fields may be restricted based on your role and assessment status.
+              </DialogDescription>
             </DialogHeader>
           </div>
           <form id="edit-assessment-form" className="space-y-5 px-6 pt-2 pb-20" onSubmit={handleEditSubmit}>

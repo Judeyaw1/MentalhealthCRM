@@ -16,6 +16,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { PatientNote } from "./models/PatientNote";
+import { TreatmentOutcome } from "./models/TreatmentOutcome";
 
 // Custom schema for MongoDB treatment records
 const insertTreatmentRecordSchema = z.object({
@@ -349,6 +350,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/patients/:id/appointments", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const patientId = req.params.id;
+
+      // Get user and check permissions
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      let therapistId: string | undefined = undefined;
+      let allowAll = false;
+      if (user?.role === "therapist") {
+        therapistId = userId;
+      } else if (user?.role === "admin") {
+        allowAll = true;
+      } else if (user?.role === "staff") {
+        // Staff cannot see appointments
+        return res.json([]);
+      }
+
+      // Get appointments specifically for this patient
+      const appointments = await storage.getAppointments(
+        allowAll ? undefined : therapistId,
+        patientId,
+        undefined, // startDate
+        undefined, // endDate
+        undefined  // search
+      );
+
+      await logActivity(userId, "view", "patient_appointments", patientId);
+      res.json(appointments);
+    } catch (error) {
+      console.error("Error fetching patient appointments:", error);
+      res.status(500).json({ message: "Failed to fetch patient appointments" });
+    }
+  });
+
   app.post("/api/patients", isAuthenticated, upload.fields([
     { name: "insuranceCard", maxCount: 1 },
     { name: "photo", maxCount: 1 },
@@ -388,15 +428,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         parsed,
       );
       
-      // Emit WebSocket event for real-time updates
-      const io = (global as any).io;
-      console.log('🔌 Emitting patient_created event:', { patientId: patient.id, io: !!io });
-      if (io) {
-        io.emit('patient_created', patient);
-        console.log('✅ Patient created event emitted successfully');
-      } else {
-        console.log('❌ No WebSocket io instance available');
-      }
+
       
       res.status(201).json(patient);
     } catch (error) {
@@ -430,19 +462,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updates = req.body;
       }
 
+      // Get user and check permissions for patient updates
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
       // Check if status is being updated and validate permissions
       if (updates.status) {
-        const user = await storage.getUser(userId);
-        if (!user) {
-          return res.status(404).json({ message: "User not found" });
-        }
-
         // Only admin, supervisor, and front desk can change patient status
         if (user.role !== "admin" && user.role !== "supervisor" && user.role !== "frontdesk") {
           return res.status(403).json({ 
             message: "Only administrators, supervisors, and front desk staff can change patient status" 
           });
         }
+      }
+
+      // General permission check for patient updates
+      // Allow: admin, supervisor, and therapists for their assigned patients
+      let canUpdate = 
+        user.role === "admin" || 
+        user.role === "supervisor";
+
+      // Check if therapist is assigned to this patient
+      if (user.role === "therapist") {
+        const currentPatient = await Patient.findById(patientId as any);
+        if (!currentPatient) {
+          return res.status(404).json({ message: "Patient not found" });
+        }
+
+        // Check if therapist is assigned to this patient
+        const isAssigned = currentPatient.assignedTherapistId && 
+          currentPatient.assignedTherapistId.toString() === user.id.toString();
+        
+        if (isAssigned) {
+          canUpdate = true;
+  
+        } else {
+  
+        }
+      }
+
+
+
+      if (canUpdate) {
+
+      } else {
+
+        return res.status(403).json({ 
+          message: "NEW PERMISSION CHECK: You don't have permission to update patient information. Only administrators, supervisors, front desk staff, and assigned therapists can update patients." 
+        });
       }
 
       // Clean up ObjectId fields - convert empty strings to null
@@ -453,7 +522,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ? null
             : updates.assignedTherapistId,
       };
+      
+
+
+
+      
       const patient = await storage.updatePatient(patientId, cleanedUpdates);
+
+      
       await logActivity(
         userId,
         "update",
@@ -462,24 +538,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         cleanedUpdates,
       );
       
-      // Emit WebSocket event for real-time updates
-      const io = (global as any).io;
-      console.log('🔌 Emitting patient_updated event:', { patientId: patient?.id, io: !!io });
-      if (io && patient) {
-        io.emit('patient_updated', patient);
-        console.log('✅ Patient updated event emitted successfully');
-      } else {
-        console.log('❌ No WebSocket io instance available or patient is undefined');
-      }
+
       
       res.json(patient);
     } catch (error) {
       console.error("Error updating patient:", error);
+      console.error("Error details:", {
+        message: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : undefined,
+        patientId: req.params.id,
+        updates: req.body
+      });
+      
       if (error instanceof z.ZodError) {
         return res
           .status(400)
           .json({ message: "Invalid patient data", errors: error.errors });
       }
+      
+      // Check for MongoDB validation errors
+      if (error instanceof Error && error.message.includes("validation failed")) {
+        return res.status(400).json({ 
+          message: "Patient data validation failed", 
+          error: error.message 
+        });
+      }
+      
       res.status(500).json({ message: "Failed to update patient" });
     }
   });
@@ -624,12 +708,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.id;
       const { patients } = req.body;
-      console.log("=== BULK IMPORT START ===");
-      console.log("Request body:", JSON.stringify(req.body, null, 2));
-      console.log("Patients array length:", patients?.length);
+
       
       if (!Array.isArray(patients) || patients.length === 0) {
-        console.log("No patients provided or empty array");
         return res.status(400).json({ message: "No patients provided" });
       }
       
@@ -639,8 +720,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (let i = 0; i < patients.length; i++) {
         const data = patients[i];
         try {
-          console.log(`\n--- Processing row ${i + 1} ---`);
-          console.log("Raw data:", JSON.stringify(data, null, 2));
           
           // Basic validation: require firstName, lastName, dateOfBirth (email is optional)
           if (!data.firstName || !data.lastName || !data.dateOfBirth) {
@@ -689,21 +768,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await patient.save();
           await logActivity(userId, "create", "patient", patient._id.toString(), data);
           successCount++;
-          console.log(`Successfully created patient: ${cleanedData.firstName} ${cleanedData.lastName}`);
         } catch (err: any) {
           console.error(`Error creating patient in row ${i + 1}:`, err);
           errors.push(`Row ${i + 1}: ${err.message || "Unknown error"}`);
         }
       }
       
-      console.log("=== BULK IMPORT END ===");
-      console.log("Success count:", successCount);
-      console.log("Error count:", errors.length);
-      console.log("Errors:", errors);
+
       
       res.json({ successCount, errors, message: `${successCount} patients imported. ${errors.length ? errors.length + ' errors.' : ''}` });
     } catch (error) {
-      console.error("Bulk import error:", error);
+
       res.status(500).json({ message: "Failed to import patients" });
     }
   });
@@ -980,10 +1055,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const record = await storage.createTreatmentRecord(recordData);
 
-      // Debug: Log the record object
-      console.log("Record object from storage:", record);
-      console.log("Record _id:", record._id);
-      console.log("Record _id type:", typeof record._id);
+
 
       // Safely get the record ID for logging
       const recordId = record._id ? record._id.toString() : "unknown";
@@ -1044,7 +1116,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userId,
         "update",
         "treatment_record",
-        recordId.toString(),
+        recordId,
         updates,
       );
 
@@ -1082,7 +1154,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userId,
         "delete",
         "treatment_record",
-        recordId.toString(),
+        recordId,
       );
 
       // Emit WebSocket event for real-time updates
@@ -1114,7 +1186,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userId,
         "update",
         "treatment_record",
-        recordId.toString(),
+        recordId,
         updateData,
       );
       
@@ -1179,6 +1251,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching appointment:", error);
       res.status(500).json({ message: "Failed to fetch appointment" });
+    }
+  });
+
+  // Manual appointment status update endpoint (for testing)
+  app.post("/api/appointments/update-statuses", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+      
+      // Only admins can manually trigger status updates
+      if (user?.role !== 'admin') {
+        return res.status(403).json({ message: "Only admins can trigger status updates" });
+      }
+
+      const { AppointmentStatusService } = await import('./appointmentStatusService');
+      const updatedCount = await AppointmentStatusService.updateAppointmentStatuses();
+      
+      await logActivity(userId, "trigger", "appointment_status_update", "manual");
+      
+      res.json({ 
+        message: "Appointment statuses updated successfully", 
+        updatedCount 
+      });
+    } catch (error) {
+      console.error("Error updating appointment statuses:", error);
+      res.status(500).json({ message: "Failed to update appointment statuses" });
     }
   });
 
@@ -1329,14 +1427,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const userId = req.user.id;
         const appointmentId = req.params.id;
 
-        console.log("Delete appointment request:", { userId, appointmentId });
+
 
         const deletedAppointment =
           await storage.deleteAppointment(appointmentId);
-        console.log("Delete result:", deletedAppointment);
+
 
         if (!deletedAppointment) {
-          console.log("Appointment not found for deletion");
           return res.status(404).json({ message: "Appointment not found" });
         }
 
@@ -1348,7 +1445,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           io.emit('appointment_deleted', deletedAppointment);
         }
         
-        console.log("Appointment deleted successfully");
+
         res.json({ message: "Appointment deleted successfully" });
       } catch (error) {
         console.error("Error deleting appointment:", error);
@@ -1426,20 +1523,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied" });
       }
 
-      console.log(
-        "Staff invitation request body:",
-        JSON.stringify(req.body, null, 2),
-      );
+
       const { email, firstName, lastName, role, message } = req.body;
 
       // Validate required fields
       if (!email || !firstName || !lastName || !role) {
-        console.log("Missing required fields:", {
-          email,
-          firstName,
-          lastName,
-          role,
-        });
+
         return res.status(400).json({
           message: "Email, first name, last name, and role are required",
         });
@@ -1448,7 +1537,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Validate role
       const validRoles = ["admin", "supervisor", "therapist", "staff", "frontdesk"];
       if (!validRoles.includes(role)) {
-        console.log("Invalid role:", role);
+
         return res.status(400).json({
           message:
             "Invalid role. Must be one of: admin, supervisor, therapist, staff, frontdesk",
@@ -1472,7 +1561,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check if user already exists
       const existingUser = await storage.getUserByEmail(email);
       if (existingUser) {
-        console.log("User already exists:", email);
+
         return res.status(400).json({
           message: "A user with this email already exists",
         });
@@ -1481,14 +1570,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate a secure default password
       const defaultPassword = generateSecurePassword();
 
-      console.log("Creating user with data:", {
-        email,
-        firstName,
-        lastName,
-        role,
-        password: defaultPassword.substring(0, 3) + "...",
-        forcePasswordChange: true,
-      });
+
 
       // Hash the password before creating the user
       const hashedPassword = await hashPassword(defaultPassword);
@@ -1503,7 +1585,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         forcePasswordChange: true, // Force them to change password on first login
       });
 
-      console.log("User created successfully:", newUser.id);
+
 
       // Generate invitation URL
       const inviteUrl = `${req.protocol}://${req.get("host")}/login`;
@@ -1564,18 +1646,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       console.error("Error inviting staff:", error);
-      console.error("Error details:", {
-        name: error.name,
-        message: error.message,
-        stack: error.stack,
-        code: error.code,
-        path: error.path,
-        issues: error.issues,
-      });
+
 
       // Handle validation errors specifically
       if (error instanceof z.ZodError) {
-        console.error("Zod validation errors:", error.errors);
         return res.status(400).json({
           message: "Invalid data provided",
           errors: error.errors,
@@ -1584,7 +1658,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Handle Mongoose validation errors
       if (error.name === "ValidationError") {
-        console.error("Mongoose validation errors:", error.errors);
         return res.status(400).json({
           message: "Validation failed",
           errors: Object.values(error.errors).map((e: any) => e.message),
@@ -1789,7 +1862,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const userId = req.user.id;
         const { firstName, lastName, email } = req.body;
 
-        console.log("Update profile request:", { userId, firstName, lastName, email });
+
 
         if (!firstName || !lastName || !email) {
           return res
@@ -1826,7 +1899,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           email,
         };
 
-        console.log("Updating user with data:", updateData);
+
 
         const updatedUser = await storage.updateUser(userId, updateData);
 
@@ -1834,7 +1907,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(500).json({ message: "Failed to update profile" });
         }
 
-        console.log("User updated successfully:", updatedUser);
+
 
         await logActivity(userId, "update", "user", userId, {
           updatedFields: ["firstName", "lastName", "email"],
@@ -1854,7 +1927,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       } catch (error: any) {
         console.error("Error updating profile:", error);
-        console.error("Error details:", error.message, error.stack);
+
         res.status(500).json({ message: "Failed to update profile" });
       }
     },
@@ -2049,10 +2122,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/search", isAuthenticated, async (req: any, res) => {
     try {
       const q = (req.query.q || "").toString().trim();
-      console.log("Search request received:", { q, length: q.length });
 
       if (!q || q.length < 2) {
-        console.log("Query too short, returning empty results");
         return res.json([]);
       }
 
@@ -2071,7 +2142,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return age;
       };
 
-      console.log("Searching patients...");
       // Search patients
       const patientResult = await storage.getPatients(10, 0, q);
       const patients = (patientResult.patients || []).map((p: any) => {
@@ -2089,9 +2159,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           href: `/patients/${p.id}`,
         };
       });
-      console.log("Patient results:", patients.length);
 
-      console.log("Searching appointments...");
       // Search appointments (by patient name or appointment id)
       const appointments = (await storage.getAppointments())
         .filter((apt: any) => {
@@ -2111,9 +2179,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           subtitle: `Appointment on ${new Date(apt.appointmentDate).toLocaleString()}`,
           href: `/appointments/${apt.id}`,
         }));
-      console.log("Appointment results:", appointments.length);
 
-      console.log("Searching records...");
       // Search treatment records (by patient name or record id)
       const records = (await storage.getAllTreatmentRecords())
         .filter((rec: any) => {
@@ -2133,12 +2199,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           subtitle: `Record on ${rec.sessionDate ? new Date(rec.sessionDate).toLocaleDateString() : "Unknown date"}`,
           href: `/patients/${rec.patient?._id || rec.patientId}`,
         }));
-      console.log("Record results:", records.length);
 
       // Combine and return
       const results = [...patients, ...appointments, ...records];
-      console.log("Total search results:", results.length);
-      console.log("Sending response:", results);
       res.json(results);
     } catch (error) {
       console.error("/api/search error:", error);
@@ -2590,7 +2653,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const { userId, type, title, message, data } = req.body;
         
-        console.log("🔍 Debug notification request:", { userId, type, title, message, data });
+
 
         const notification = await notificationService.createNotification(
           userId,
@@ -2600,7 +2663,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           data
         );
 
-        console.log("✅ Debug notification created:", notification);
+
 
         res.json({ 
           message: "Debug notification created", 
@@ -2729,14 +2792,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           threadKey = 'general_chat';
         }
         
-        console.log(`🔍 Note grouping debug:`, {
-          noteId: note._id,
-          content: note.content.substring(0, 30) + '...',
-          directedTo: note.directedTo,
-          directedToName: note.directedToName,
-          threadKey: threadKey,
-          authorName: note.authorName
-        });
+
         
         if (!acc[threadKey]) {
           acc[threadKey] = {
@@ -2754,12 +2810,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return acc;
       }, {});
 
-      console.log(`📊 Final threads:`, Object.keys(groupedNotes).map(key => ({
-        threadKey: key,
-        noteCount: groupedNotes[key].notes.length,
-        directedTo: groupedNotes[key].directedTo,
-        directedToName: groupedNotes[key].directedToName
-      })));
+
 
       // Convert to array and sort threads by most recent activity
       const threads = Object.values(groupedNotes).map((thread: any) => {
@@ -2798,16 +2849,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       if (!content || content.trim().length === 0) { return res.status(400).json({ message: "Note content is required" }); }
 
-      console.log(`📝 Received note creation request:`, {
-        patientId: id,
-        content: content.substring(0, 30) + '...',
-        directedTo,
-        directedToName,
-        parentNoteId,
-        authorId: user.id,
-        authorName: `${user.firstName} ${user.lastName}`,
-        isSelfChat: user.id === directedTo
-      });
+
 
       let finalDirectedTo = directedTo;
       let finalDirectedToName = directedToName;
@@ -2826,21 +2868,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         finalDirectedTo = parentNote.directedTo;
         finalDirectedToName = parentNote.directedToName;
         
-        console.log(`🔍 Reply inheritance debug:`, {
-          parentNoteId: parentNoteId,
-          parentDirectedTo: parentNote.directedTo,
-          parentDirectedToName: parentNote.directedToName,
-          finalDirectedTo: finalDirectedTo,
-          finalDirectedToName: finalDirectedToName,
-          currentUserId: user.id
-        });
+
       }
 
       // Validate that the directedTo user exists (if specified)
       if (finalDirectedTo) {
         const targetUser = await storage.getUser(finalDirectedTo);
         if (!targetUser) {
-          console.log(`⚠️ Warning: directedTo user ${finalDirectedTo} not found in database`);
+
           // Reset to null if user doesn't exist
           finalDirectedTo = null;
           finalDirectedToName = null;
@@ -2859,27 +2894,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       await note.save();
 
-      console.log(`📝 Note created:`, {
-        noteId: note._id,
-        authorId: user.id,
-        authorName: `${user.firstName} ${user.lastName}`,
-        directedTo: finalDirectedTo,
-        directedToName: finalDirectedToName,
-        parentNoteId: parentNoteId,
-        isReply: !!parentNoteId,
-        content: content.trim().substring(0, 50) + '...'
-      });
+
 
       // Create notification if note is directed to someone specific
       if (finalDirectedTo && finalDirectedTo !== user.id) {
         try {
-          console.log(`🔔 Creating notification for reply:`, {
-            recipientId: finalDirectedTo,
-            authorId: user.id,
-            authorName: `${user.firstName} ${user.lastName}`,
-            isReply: !!parentNoteId,
-            parentNoteId: parentNoteId
-          });
+
           
           const notification = await notificationService.createNotification(
             finalDirectedTo,
@@ -2911,8 +2931,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Emit WebSocket event for real-time updates
       const io = (global as any).io;
       if (io) {
-        console.log(`🔌 Emitting note_created to room: patient_${id}`);
-        console.log(`🔌 Room members:`, io.sockets.adapter.rooms.get(`patient_${id}`)?.size || 0);
+
         
         io.to(`patient_${id}`).emit('note_created', {
           note,
@@ -3066,15 +3085,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         role: member.role,
       }));
 
-      console.log(`📋 Staff list for directed notes:`, staffList);
 
-      // Validate that all staff members have valid IDs
-      for (const member of staffList) {
-        const user = await storage.getUser(member.id);
-        if (!user) {
-          console.log(`⚠️ Warning: Staff member ${member.firstName} ${member.lastName} has invalid ID: ${member.id}`);
-        }
-      }
 
       res.json(staffList);
     } catch (error) {
@@ -3126,7 +3137,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         createdAt: { $lt: oneDayAgo }
       });
 
-      console.log(`🧹 Cleaned up ${result.deletedCount} old notes (older than 24 hours)`);
+
 
       // Log activity
       await logActivity(user.id, "cleanup_notes", "system", "notes_cleanup", {
@@ -3300,9 +3311,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // If reset parameter is provided, use a shorter time range to show fresh data
       if (reset) {
         startDate = new Date(Date.now() - 60 * 60 * 1000); // Last 1 hour for refresh (increased from 10 minutes)
-        console.log(`🔍 Patient changes debug - Reset requested, using 1 hour: ${startDate}`);
-        console.log(`🔍 Patient changes debug - Current time: ${new Date()}`);
-        console.log(`🔍 Patient changes debug - Time difference: ${Date.now() - startDate.getTime()} ms`);
       } else if (since === "last-login") {
         // Get user's last login from audit logs
         const lastLogin = await storage.db.collection("auditlogs").findOne(
@@ -3318,16 +3326,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         if (lastLogin) {
           startDate = new Date(lastLogin.createdAt);
-          console.log(`🔍 Patient changes debug - Last login found: ${startDate}`);
         } else {
           // If no previous login found, default to 7 days ago to show more recent changes
           startDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-          console.log(`🔍 Patient changes debug - No last login, using 7 days ago: ${startDate}`);
         }
       } else {
         // Use provided date or default to 7 days ago
         startDate = since ? new Date(since) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-        console.log(`🔍 Patient changes debug - Using provided date: ${startDate}`);
       }
 
       const endDate = new Date();
@@ -3336,8 +3341,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const newPatients = await Patient.find({
         createdAt: { $gte: startDate, $lte: endDate }
       }).populate("createdBy", "firstName lastName");
-
-      console.log(`🔍 Patient changes debug - New patients found: ${newPatients.length}`);
 
       // Get patients with status changes
       const statusChanges = await Patient.find({
@@ -3349,11 +3352,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ]
       }).populate("createdBy", "firstName lastName")
         .populate("assignedTherapistId", "firstName lastName");
-
-      console.log(`🔍 Patient changes debug - Status changes found: ${statusChanges.length}`);
-      statusChanges.forEach(patient => {
-        console.log(`🔍 Patient changes debug - Patient: ${patient.firstName} ${patient.lastName}, Updated: ${patient.updatedAt}, Assigned: ${patient.assignedTherapistId ? 'Yes' : 'No'}`);
-      });
 
       // Get audit logs for patient-related actions
       const patientActions = await storage.db.collection("auditlogs").find({
@@ -3380,7 +3378,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         statusChanges: await Promise.all(statusChanges.filter(patient => {
           // Include patients that were updated within the time range (regardless of when they were created)
           const wasUpdatedInTimeRange = patient.updatedAt >= startDate;
-          console.log(`🔍 Patient changes debug - ${patient.firstName} ${patient.lastName}: createdAt=${patient.createdAt}, updatedAt=${patient.updatedAt}, startDate=${startDate}, wasUpdatedInTimeRange=${wasUpdatedInTimeRange}`);
           return wasUpdatedInTimeRange;
         }).map(async (patient) => {
           // Find who made the most recent update for this patient from audit logs
@@ -3425,7 +3422,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })),
          therapistAssignments: await Promise.all(statusChanges.filter(patient => {
            const hasTherapist = !!patient.assignedTherapistId;
-           console.log(`🔍 Therapist assignment debug - ${patient.firstName} ${patient.lastName}: hasTherapist=${hasTherapist}, assignedTherapistId=${patient.assignedTherapistId}`);
            return hasTherapist;
          }).map(async (patient) => {
            // Find who assigned the therapist
@@ -3500,20 +3496,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
 
-      // Log the response for debugging
-      if (reset) {
-        console.log(`🔍 Patient changes debug - Reset response:`, {
-          newPatientsCount: changes.newPatients.length,
-          statusChangesCount: changes.statusChanges.length,
-          therapistAssignmentsCount: changes.therapistAssignments.length,
-          importantUpdatesCount: changes.importantUpdates.length,
-          totalChanges: changes.newPatients.length + changes.statusChanges.length + changes.therapistAssignments.length + changes.importantUpdates.length,
-          dateRange: {
-            start: startDate,
-            end: endDate
-          }
-        });
-      }
+
     } catch (error) {
       console.error("Error fetching patient changes:", error);
       res.status(500).json({ message: "Failed to fetch patient changes" });
@@ -3915,7 +3898,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Calculate averages
       const averageAge = validAgeCount > 0 ? Math.round(totalAge / validAgeCount) : 0;
-      console.log(`📊 Age calculation summary: totalAge=${totalAge}, validAgeCount=${validAgeCount}, averageAge=${averageAge}`);
       const averageTreatmentDuration = treatmentDurations.length > 0 
         ? Math.round(treatmentDurations.reduce((a, b) => a + b, 0) / treatmentDurations.length)
         : 0;
@@ -4261,36 +4243,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const patientsResult = await storage.getPatients(1000, 0, undefined, undefined, undefined, undefined, undefined, true);
       const patients = (patientsResult.patients || []) as any[];
       
-      console.log('Staff Performance Debug:');
-      console.log(`Total users: ${users.length}`);
-      console.log(`Total appointments: ${appointments.length}`);
-      console.log(`Total treatment records: ${treatmentRecords.length}`);
-      console.log(`Total patients: ${patients.length}`);
-      
       // Filter only staff members (non-admin users)
       const staffMembers = users.filter(user => user.role !== 'admin');
-      console.log(`Staff members (non-admin): ${staffMembers.length}`);
       
       // Calculate staff performance metrics
       const staffPerformance = staffMembers.map(staff => {
-        // Get appointments for this staff member
-        const staffAppointments = appointments.filter(apt => apt.therapistId?.toString() === (staff as any)._id?.toString());
+        // Get appointments for this staff member (only if therapistId exists and matches)
+        const staffAppointments = appointments.filter(apt => {
+          return apt.therapistId && 
+                 apt.therapistId.toString() === (staff as any)._id?.toString();
+        });
         const completedAppointments = staffAppointments.filter(apt => apt.status === 'completed');
         const cancelledAppointments = staffAppointments.filter(apt => apt.status === 'cancelled');
         const noShowAppointments = staffAppointments.filter(apt => apt.status === 'no-show');
         
-        // Get treatment records for this staff member
-        const staffRecords = treatmentRecords.filter(record => record.therapistId?.toString() === (staff as any)._id?.toString());
+        // Get treatment records for this staff member (only if therapistId exists and matches)
+        const staffRecords = treatmentRecords.filter(record => {
+          return record.therapistId && 
+                 record.therapistId.toString() === (staff as any)._id?.toString();
+        });
         const completedRecords = staffRecords.filter(record => record.status === 'completed');
         
-        // Get patients assigned to this staff member
-        const assignedPatients = (patients as any[]).filter(patient => patient.assignedTherapistId?.toString() === (staff as any)._id?.toString());
+        // Get patients assigned to this staff member (only if assignedTherapistId exists and matches)
+        const assignedPatients = (patients as any[]).filter(patient => {
+          return patient.assignedTherapistId && 
+                 patient.assignedTherapistId.toString() === (staff as any)._id?.toString();
+        });
         const dischargedPatients = assignedPatients.filter(patient => patient.status === 'discharged');
         
-        console.log(`Staff ${staff.firstName} ${staff.lastName}:`);
-        console.log(`  Appointments: ${staffAppointments.length} (${completedAppointments.length} completed)`);
-        console.log(`  Records: ${staffRecords.length} (${completedRecords.length} completed)`);
-        console.log(`  Patients: ${assignedPatients.length} (${dischargedPatients.length} discharged)`);
+
         
         // Calculate metrics
         const appointmentCompletionRate = staffAppointments.length > 0 
@@ -4307,7 +4288,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Calculate average session duration
         const sessionDurations = completedAppointments
-          .filter(apt => apt.duration)
+          .filter(apt => apt.duration && typeof apt.duration === 'number' && !isNaN(apt.duration))
           .map(apt => apt.duration);
         const averageSessionDuration = sessionDurations.length > 0
           ? Math.round(sessionDurations.reduce((sum, duration) => sum + duration, 0) / sessionDurations.length)
@@ -4317,8 +4298,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const currentMonth = new Date();
         const monthKey = currentMonth.toISOString().slice(0, 7);
         const monthlyAppointments = staffAppointments.filter(apt => {
-          const aptDate = new Date(apt.dateTime);
-          return aptDate.toISOString().slice(0, 7) === monthKey;
+          try {
+            if (!apt.dateTime) return false;
+            const aptDate = new Date(apt.dateTime);
+            // Check if the date is valid
+            if (isNaN(aptDate.getTime())) return false;
+            return aptDate.toISOString().slice(0, 7) === monthKey;
+          } catch (error) {
+            // Skip appointments with invalid dates
+            return false;
+          }
         }).length;
         
         return {
@@ -4484,12 +4473,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Patient not found" });
       }
 
-      res.json(patient.dischargeRequests || []);
+      // Add patient information to each discharge request
+      const dischargeRequestsWithPatient = (patient.dischargeRequests || []).map((request: any) => ({
+        ...request.toObject(),
+        patient: {
+          id: patient._id,
+          firstName: patient.firstName,
+          lastName: patient.lastName,
+          fullName: `${patient.firstName} ${patient.lastName}`
+        }
+      }));
+
+      res.json(dischargeRequestsWithPatient);
     } catch (error) {
       console.error("Error fetching discharge requests:", error);
       res.status(500).json({ message: "Failed to fetch discharge requests" });
     }
   });
+
+
 
   app.patch("/api/patients/:id/discharge-requests/:requestId", isAuthenticated, async (req: any, res) => {
     try {
@@ -4549,22 +4551,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
 
         // Send notification to the requester
-        console.log("🔔 Sending discharge request approved notification...");
-        console.log("Request data:", {
-          patientName: `${patient.firstName} ${patient.lastName}`,
-          patientId: patientId,
-          requestedBy: {
-            userId: request.requestedBy.toString(),
-            firstName: req.user.firstName,
-            lastName: req.user.lastName
-          },
-          reviewedBy: {
-            firstName: req.user.firstName,
-            lastName: req.user.lastName,
-            role: req.user.role
-          },
-          reviewNotes
-        });
         
         try {
           await notificationService.sendDischargeRequestApprovedNotification({
@@ -4582,7 +4568,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             },
             reviewNotes
           });
-          console.log("✅ Discharge request approved notification sent successfully");
+
         } catch (error) {
           console.error("❌ Error sending discharge request approved notification:", error);
         }
@@ -4601,22 +4587,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
 
         // Send notification to the requester
-        console.log("🔔 Sending discharge request denied notification...");
-        console.log("Request data:", {
-          patientName: `${patient.firstName} ${patient.lastName}`,
-          patientId: patientId,
-          requestedBy: {
-            userId: request.requestedBy.toString(),
-            firstName: req.user.firstName,
-            lastName: req.user.lastName
-          },
-          reviewedBy: {
-            firstName: req.user.firstName,
-            lastName: req.user.lastName,
-            role: req.user.role
-          },
-          reviewNotes
-        });
         
         try {
           await notificationService.sendDischargeRequestDeniedNotification({
@@ -4634,7 +4604,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             },
             reviewNotes
           });
-          console.log("✅ Discharge request denied notification sent successfully");
+
         } catch (error) {
           console.error("❌ Error sending discharge request denied notification:", error);
         }
@@ -4693,6 +4663,190 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching pending discharge requests:", error);
       res.status(500).json({ message: "Failed to fetch pending discharge requests" });
+    }
+  });
+
+  // Treatment Outcomes API Endpoints
+  
+  // Create a new treatment outcome assessment
+  app.post("/api/treatment-outcomes", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      console.log("Creating treatment outcome with data:", JSON.stringify(req.body, null, 2));
+      console.log("User ID:", userId);
+      
+      const outcomeData = {
+        ...req.body,
+        createdBy: userId,
+      };
+
+      console.log("Final outcome data:", JSON.stringify(outcomeData, null, 2));
+
+      const outcome = await storage.createTreatmentOutcome(outcomeData);
+      res.json(outcome);
+    } catch (error) {
+      console.error("Error creating treatment outcome:", error);
+      res.status(500).json({ error: "Failed to create treatment outcome" });
+    }
+  });
+
+  // Summary route must come BEFORE the generic :id route to avoid conflicts
+  app.get("/api/treatment-outcomes/summary", isAuthenticated, async (req: any, res) => {
+    try {
+      const { patientId, therapistId, startDate, endDate } = req.query;
+      
+      const start = startDate ? new Date(startDate as string) : undefined;
+      const end = endDate ? new Date(endDate as string) : undefined;
+      
+      const summary = await storage.getTreatmentOutcomesSummary(
+        patientId as string,
+        therapistId as string,
+        start,
+        end
+      );
+
+      res.json(summary);
+    } catch (error) {
+      console.error("Error getting treatment outcomes summary:", error);
+      res.status(500).json({ error: "Failed to get treatment outcomes summary" });
+    }
+  });
+
+  // Analytics route for comprehensive treatment outcomes data
+  app.get("/api/treatment-outcomes/analytics", isAuthenticated, async (req: any, res) => {
+    try {
+      const { startDate, endDate } = req.query;
+      
+      const start = startDate ? new Date(startDate as string) : undefined;
+      const end = endDate ? new Date(endDate as string) : undefined;
+      
+      const analytics = await storage.getTreatmentOutcomesAnalytics(start, end);
+
+      res.json(analytics);
+    } catch (error) {
+      console.error("Error getting treatment outcomes analytics:", error);
+      res.status(500).json({ error: "Failed to get treatment outcomes analytics" });
+    }
+  });
+
+  app.get("/api/treatment-outcomes/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const outcome = await storage.getTreatmentOutcome(id);
+      
+      if (!outcome) {
+        return res.status(404).json({ error: "Treatment outcome not found" });
+      }
+
+      res.json(outcome);
+    } catch (error) {
+      console.error("Error getting treatment outcome:", error);
+      res.status(500).json({ error: "Failed to get treatment outcome" });
+    }
+  });
+
+  app.get("/api/treatment-outcomes", isAuthenticated, async (req: any, res) => {
+    try {
+      const { limit, offset, patientId, therapistId, startDate, endDate } = req.query;
+      
+      const start = startDate ? new Date(startDate as string) : undefined;
+      const end = endDate ? new Date(endDate as string) : undefined;
+      
+      const result = await storage.getAllTreatmentOutcomes(
+        parseInt(limit as string) || 50,
+        parseInt(offset as string) || 0,
+        undefined,
+        patientId as string,
+        therapistId as string,
+        start,
+        end
+      );
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error getting treatment outcomes:", error);
+      res.status(500).json({ error: "Failed to get treatment outcomes" });
+    }
+  });
+
+  app.get("/api/patients/:patientId/treatment-outcomes", isAuthenticated, async (req: any, res) => {
+    try {
+      const { patientId } = req.params;
+      const { limit, offset } = req.query;
+      
+      const result = await storage.getPatientTreatmentOutcomes(
+        patientId,
+        parseInt(limit as string) || 50,
+        parseInt(offset as string) || 0
+      );
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error getting patient treatment outcomes:", error);
+      res.status(500).json({ error: "Failed to get patient treatment outcomes" });
+    }
+  });
+
+  app.get("/api/therapists/:therapistId/treatment-outcomes", isAuthenticated, async (req: any, res) => {
+    try {
+      const { therapistId } = req.params;
+      const { limit, offset } = req.query;
+      
+      const result = await storage.getTherapistTreatmentOutcomes(
+        therapistId,
+        parseInt(limit as string) || 50,
+        parseInt(offset as string) || 0
+      );
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error getting therapist treatment outcomes:", error);
+      res.status(500).json({ error: "Failed to get therapist treatment outcomes" });
+    }
+  });
+
+  app.patch("/api/treatment-outcomes/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user.id;
+      
+      const outcome = await storage.updateTreatmentOutcome(id, req.body, userId);
+      res.json(outcome);
+    } catch (error) {
+      console.error("Error updating treatment outcome:", error);
+      res.status(500).json({ error: "Failed to update treatment outcome" });
+    }
+  });
+
+  app.delete("/api/treatment-outcomes/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteTreatmentOutcome(id);
+      res.json({ message: "Treatment outcome deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting treatment outcome:", error);
+      res.status(500).json({ error: "Failed to delete treatment outcome" });
+    }
+  });
+
+  app.get("/api/treatment-outcomes/summary", isAuthenticated, async (req: any, res) => {
+    try {
+      const { patientId, therapistId, startDate, endDate } = req.query;
+      
+      const start = startDate ? new Date(startDate as string) : undefined;
+      const end = endDate ? new Date(endDate as string) : undefined;
+      
+      const summary = await storage.getTreatmentOutcomesSummary(
+        patientId as string,
+        therapistId as string,
+        start,
+        end
+      );
+
+      res.json(summary);
+    } catch (error) {
+      console.error("Error getting treatment outcomes summary:", error);
+      res.status(500).json({ error: "Failed to get treatment outcomes summary" });
     }
   });
 

@@ -20,7 +20,7 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { isUnauthorizedError } from "@/lib/authUtils";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -31,6 +31,7 @@ import { PatientDemographics } from "@/components/reports/PatientDemographics";
 import { AppointmentAnalytics } from "@/components/reports/AppointmentAnalytics";
 import { TreatmentCompletion } from "@/components/reports/TreatmentCompletion";
 import { StaffPerformance } from "@/components/reports/StaffPerformance";
+import { TreatmentOutcomes } from "@/components/reports/TreatmentOutcomes";
 
 export default function Reports() {
   const { toast } = useToast();
@@ -51,6 +52,7 @@ export default function Reports() {
   const [showAppointmentAnalyticsDialog, setShowAppointmentAnalyticsDialog] = useState(false);
   const [showTreatmentCompletionDialog, setShowTreatmentCompletionDialog] = useState(false);
   const [showStaffPerformanceDialog, setShowStaffPerformanceDialog] = useState(false);
+  const [showTreatmentOutcomesDialog, setShowTreatmentOutcomesDialog] = useState(false);
 
   // Redirect to home if not authenticated
   useEffect(() => {
@@ -524,6 +526,8 @@ export default function Reports() {
                         setShowDemographicsDialog(true);
                       } else if (report.title === "Appointment Analytics") {
                         setShowAppointmentAnalyticsDialog(true);
+                      } else if (report.title === "Treatment Outcomes") {
+                        setShowTreatmentOutcomesDialog(true);
                       } else if (report.title === "Treatment Completion Rate") {
                         setShowTreatmentCompletionDialog(true);
                       } else if (report.title === "Staff Performance") {
@@ -552,7 +556,7 @@ export default function Reports() {
                               {report.metric}
                             </span>
                             <Button variant="outline" size="sm">
-                              {report.title === "Patient Demographics" || report.title === "Appointment Analytics" || report.title === "Treatment Completion Rate" || report.title === "Staff Performance" ? "View Report" : "Generate"}
+                              {report.title === "Patient Demographics" || report.title === "Appointment Analytics" || report.title === "Treatment Outcomes" || report.title === "Treatment Completion Rate" || report.title === "Staff Performance" ? "View Report" : "Generate"}
                             </Button>
                           </div>
                         </div>
@@ -624,6 +628,9 @@ export default function Reports() {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Add Patients to {levelsOfCare.find(l => l.value === selectedLevel)?.label}</DialogTitle>
+            <DialogDescription>
+              Search and select patients to add to this level of care program.
+            </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleBulkAdd} className="space-y-4">
             <Input
@@ -662,6 +669,9 @@ export default function Reports() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Remove Patient from Program</DialogTitle>
+            <DialogDescription>
+              Confirm removal of the patient from this level of care program. They can be reassigned later.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-gray-600">
@@ -700,6 +710,9 @@ export default function Reports() {
         <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Patient Demographics Report</DialogTitle>
+            <DialogDescription>
+              View detailed demographic information and statistics about patients in the system.
+            </DialogDescription>
           </DialogHeader>
           <PatientDemographics />
         </DialogContent>
@@ -710,6 +723,9 @@ export default function Reports() {
         <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Appointment Analytics Report</DialogTitle>
+            <DialogDescription>
+              Analyze appointment patterns, attendance rates, and scheduling trends.
+            </DialogDescription>
           </DialogHeader>
           <AppointmentAnalytics />
         </DialogContent>
@@ -720,6 +736,9 @@ export default function Reports() {
         <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Treatment Completion Rate Report</DialogTitle>
+            <DialogDescription>
+              Track and analyze treatment completion rates and outcomes across different programs.
+            </DialogDescription>
           </DialogHeader>
           <TreatmentCompletion />
         </DialogContent>
@@ -730,8 +749,24 @@ export default function Reports() {
         <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Staff Performance Report</DialogTitle>
+            <DialogDescription>
+              Monitor staff performance metrics, productivity, and effectiveness across different roles.
+            </DialogDescription>
           </DialogHeader>
           <StaffPerformance />
+        </DialogContent>
+      </Dialog>
+
+      {/* Treatment Outcomes Dialog */}
+      <Dialog open={showTreatmentOutcomesDialog} onOpenChange={setShowTreatmentOutcomesDialog}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Treatment Outcomes Report</DialogTitle>
+            <DialogDescription>
+              Comprehensive analysis of treatment effectiveness, symptom improvement, and goal achievement across all patients.
+            </DialogDescription>
+          </DialogHeader>
+          <TreatmentOutcomes />
         </DialogContent>
       </Dialog>
     </div>

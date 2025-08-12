@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 import nodemailer from 'nodemailer';
 
 // Connect to MongoDB
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/mentalhealthcrm';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/mentalhealthtracker';
 
 async function resetAdminPassword() {
   try {

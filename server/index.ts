@@ -95,11 +95,30 @@ app.use((req, res, next) => {
     }
   };
 
+  // Auto-update appointment statuses
+  const updateAppointmentStatuses = async () => {
+    try {
+      const { AppointmentStatusService } = await import('./appointmentStatusService');
+      const updatedCount = await AppointmentStatusService.updateAppointmentStatuses();
+      if (updatedCount > 0) {
+        log(`🔄 Auto-updated ${updatedCount} appointment statuses`);
+      }
+    } catch (error) {
+      log(`❌ Appointment status update error: ${error}`);
+    }
+  };
+
   // Run cleanup every 6 hours
   setInterval(cleanupOldNotes, 6 * 60 * 60 * 1000);
   
   // Run initial cleanup after 1 minute
   setTimeout(cleanupOldNotes, 60 * 1000);
+
+  // Run appointment status updates every hour
+  setInterval(updateAppointmentStatuses, 60 * 60 * 1000);
+  
+  // Run initial appointment status update after 2 minutes
+  setTimeout(updateAppointmentStatuses, 2 * 60 * 1000);
 
   // Serve the app on port 3000 for local development
   const port = process.env.PORT || 3000;

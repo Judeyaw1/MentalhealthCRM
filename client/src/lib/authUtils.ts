@@ -9,6 +9,6 @@ export function redirectToLogin() {
 export function canSeeCreatedBy(user: any): boolean {
   if (!user || !user.role) return false;
 
-  // Only staff and admin can see "Created By" information
-  return user.role === "staff" || user.role === "admin";
+  // Most roles can see "Created By" information for transparency
+  return ["admin", "supervisor", "therapist", "staff", "frontdesk"].includes(user.role);
 }

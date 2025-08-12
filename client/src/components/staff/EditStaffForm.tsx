@@ -19,6 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Edit, Shield, UserCheck, Users, Loader2, Save, X, UserCog } from "lucide-react";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -215,6 +216,9 @@ export function EditStaffForm({ staffMember, onSuccess }: EditStaffFormProps) {
             <Edit className="h-5 w-5" />
             Edit Staff Member
           </DialogTitle>
+          <DialogDescription>
+            Update the staff member's information and role. Email address cannot be changed.
+          </DialogDescription>
         </DialogHeader>
 
         {isLoadingStaff ? (

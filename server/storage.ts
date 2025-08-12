@@ -6,6 +6,7 @@ import { TreatmentRecord } from "./models/TreatmentRecord";
 import { TreatmentCompletionService } from "./treatmentCompletionService";
 import { Notification as NotificationModel } from "./models/Notification";
 import { Notification, NotificationType } from "./notificationService";
+import { TreatmentOutcome } from "./models/TreatmentOutcome";
 
 // Simplified MongoDB-only storage for now
 export class DatabaseStorage {
@@ -79,12 +80,7 @@ export class DatabaseStorage {
 
     const patientsWithId = patients.map((p) => {
       const { _id, ...rest } = p;
-      console.log("Patient createdBy debug:", {
-        patientId: _id.toString(),
-        hasCreatedBy: !!rest.createdBy,
-        createdByData: rest.createdBy,
-        createdByType: typeof rest.createdBy,
-      });
+
 
       const transformed = {
         ...rest,
@@ -97,17 +93,10 @@ export class DatabaseStorage {
             }
           : undefined,
       };
-      console.log("Patient transformation:", {
-        originalId: _id,
-        transformedId: transformed.id,
-        type: typeof transformed.id,
-      });
+
       return transformed;
     });
-    console.log(
-      "Transformed patients:",
-      patientsWithId.map((p) => ({ id: p.id, type: typeof p.id })),
-    );
+
     return { patients: patientsWithId, total };
   }
 
@@ -121,7 +110,12 @@ export class DatabaseStorage {
     return {
       ...rest,
       id: _id.toString(),
-      assignedTherapist: undefined,
+      assignedTherapist: rest.assignedTherapistId
+        ? {
+            ...rest.assignedTherapistId,
+            id: rest.assignedTherapistId._id.toString(),
+          }
+        : undefined,
       createdBy: rest.createdBy
         ? {
             ...rest.createdBy,
@@ -132,10 +126,7 @@ export class DatabaseStorage {
   }
 
   async createPatient(patient: any) {
-    console.log(
-      "Storage: Creating patient with data:",
-      JSON.stringify(patient, null, 2),
-    );
+
 
     try {
       // Clean up ObjectId fields - convert empty strings to null
@@ -147,26 +138,15 @@ export class DatabaseStorage {
             : patient.assignedTherapistId,
       };
 
-      console.log(
-        "Storage: Cleaned patient data:",
-        JSON.stringify(cleanedPatient, null, 2),
-      );
+
 
       const newPatient = new PatientModel(cleanedPatient);
-      console.log("Storage: Patient model created, attempting to save...");
+
 
       await newPatient.save();
-      console.log(
-        "Storage: Patient saved successfully with ID:",
-        newPatient._id,
-      );
 
-      // Debug: Check if createdBy was saved
-      console.log("Storage: Checking createdBy field:", {
-        savedCreatedBy: newPatient.createdBy,
-        createdByType: typeof newPatient.createdBy,
-        patientData: newPatient.toObject(),
-      });
+
+
 
       // Fetch the patient with populated fields
       const populatedPatient = await PatientModel.findById(newPatient._id)
@@ -207,7 +187,7 @@ export class DatabaseStorage {
             }
           );
           
-          console.log("✅ New patient assignment notification sent to therapist:", populatedPatient.assignedTherapistId._id.toString());
+  
         } catch (error) {
           console.error("❌ Failed to send new patient assignment notification:", error);
           if (error instanceof Error) {
@@ -215,7 +195,7 @@ export class DatabaseStorage {
           }
         }
       } else {
-        console.log("ℹ️ No therapist assigned, skipping notification");
+
       }
 
       const { _id, ...rest } = populatedPatient;
@@ -254,11 +234,21 @@ export class DatabaseStorage {
     const prevTherapistId = currentPatient.assignedTherapistId?.toString();
     const newTherapistId = cleanedPatient.assignedTherapistId?.toString();
 
-    const updatedPatient = await PatientModel.findByIdAndUpdate(id, {
-      ...cleanedPatient,
-      updatedAt: new Date()
-    }, {
+
+
+    // Only include fields that are actually being updated
+    const updateFields: any = { updatedAt: new Date() };
+    Object.keys(cleanedPatient).forEach(key => {
+      if (cleanedPatient[key] !== undefined && cleanedPatient[key] !== null) {
+        updateFields[key] = cleanedPatient[key];
+      }
+    });
+
+
+
+    const updatedPatient = await PatientModel.findByIdAndUpdate(id, updateFields, {
       new: true,
+      runValidators: false // Disable validation for updates
     }).lean();
     if (!updatedPatient) return undefined;
 
@@ -279,7 +269,7 @@ export class DatabaseStorage {
           }
         );
         
-        console.log("✅ Patient assignment notification sent to therapist:", newTherapistId);
+
       } catch (error) {
         console.error("❌ Failed to send patient assignment notification:", error);
         if (error instanceof Error) {
@@ -448,11 +438,7 @@ export class DatabaseStorage {
       .sort({ createdAt: -1 })
       .lean();
 
-    console.log("[getAppointments] search:", search);
-    console.log(
-      "[getAppointments] appointments before filter:",
-      appointments.slice(0, 3),
-    );
+
     if (search) {
       const searchLower = search.toLowerCase();
       appointments = appointments.filter((apt: any) => {
@@ -468,26 +454,23 @@ export class DatabaseStorage {
           ).toLowerCase();
         }
         const match = patientName.includes(searchLower);
-        console.log(`[search filter] search='${searchLower}' patientName='${patientName}' match=${match}`);
+  
         return match;
       });
-      console.log(
-        "[getAppointments] appointments after filter:",
-        appointments.slice(0, 3),
-      );
+
     }
 
     return appointments.map((apt: any) => ({
       ...apt,
       id: apt._id.toString(),
-      patient: {
+      patient: apt.patientId ? {
         ...apt.patientId,
         id: apt.patientId._id.toString(),
-      },
-      therapist: {
+      } : null,
+      therapist: apt.therapistId ? {
         ...apt.therapistId,
         id: apt.therapistId._id.toString(),
-      },
+      } : null,
     }));
   }
 
@@ -502,14 +485,14 @@ export class DatabaseStorage {
     return {
       ...appointment,
       id: appointment._id.toString(),
-      patient: {
+      patient: appointment.patientId ? {
         ...appointment.patientId,
         id: appointment.patientId._id.toString(),
-      },
-      therapist: {
+      } : null,
+      therapist: appointment.therapistId ? {
         ...appointment.therapistId,
         id: appointment.therapistId._id.toString(),
-      },
+      } : null,
     };
   }
 
@@ -520,20 +503,12 @@ export class DatabaseStorage {
       updatedAt: new Date(),
     };
 
-    console.log(
-      "Creating appointment with timestamp:",
-      appointmentData.createdAt,
-    );
+
 
     const appointment = new Appointment(appointmentData);
     await appointment.save();
 
-    console.log(
-      "Appointment created with ID:",
-      appointment._id,
-      "Created at:",
-      appointment.createdAt,
-    );
+
 
     // Fetch the appointment with populated data
     const populatedAppointment = await Appointment.findById(appointment._id)
@@ -603,11 +578,7 @@ export class DatabaseStorage {
     const prevTherapistId = currentAppointment.therapistId?.toString();
     const newTherapistId = updates.therapistId?.toString();
     
-    console.log("🔍 Therapist assignment check:", {
-      prevTherapistId,
-      newTherapistId,
-      hasChanged: newTherapistId && newTherapistId !== prevTherapistId
-    });
+
 
     const appointment = await Appointment.findByIdAndUpdate(id, updates, {
       new: true,
@@ -620,7 +591,7 @@ export class DatabaseStorage {
 
     // Send notification if therapist assignment changed
     if (newTherapistId && newTherapistId !== prevTherapistId) {
-      console.log("🔔 Sending appointment reassignment notification to:", newTherapistId);
+
       try {
         const { notificationService } = await import("./notificationService");
         // Defensive: patientId may be ObjectId or object
@@ -640,7 +611,7 @@ export class DatabaseStorage {
           duration: appointment.duration,
         };
 
-        console.log("🔔 Notification data:", notificationData);
+
 
         await notificationService.createNotification(
           newTherapistId,
@@ -649,12 +620,12 @@ export class DatabaseStorage {
           notificationMessage,
           notificationData
         );
-        console.log("✅ Appointment reassignment notification sent successfully");
+
       } catch (error) {
         console.error("❌ Failed to send appointment reassignment notification:", error);
       }
     } else {
-      console.log("ℹ️ No therapist change detected, skipping notification");
+
     }
 
     return {
@@ -671,14 +642,75 @@ export class DatabaseStorage {
     };
   }
 
+  async updateAppointmentStatus(id: string, newStatus: string) {
+    try {
+      const appointment = await Appointment.findByIdAndUpdate(
+        id,
+        { 
+          status: newStatus,
+          updatedAt: new Date()
+        },
+        { new: true }
+      ).populate("patientId", "firstName lastName")
+       .populate("therapistId", "firstName lastName")
+       .lean();
+
+      if (!appointment) {
+        throw new Error("Appointment not found");
+      }
+
+      return {
+        ...appointment,
+        id: appointment._id.toString(),
+        patient: appointment.patientId ? {
+          ...appointment.patientId,
+          id: appointment.patientId._id.toString(),
+        } : null,
+        therapist: appointment.therapistId ? {
+          ...appointment.therapistId,
+          id: appointment.therapistId._id.toString(),
+        } : null,
+      };
+    } catch (error) {
+      console.error("Storage: Error updating appointment status:", error);
+      throw error;
+    }
+  }
+
   async deleteAppointment(id: string) {
-    console.log("Storage: Deleting appointment with ID:", id);
+
     try {
       const deletedAppointment = await Appointment.findByIdAndDelete(id);
-      console.log("Storage: Delete result:", deletedAppointment);
+
       return deletedAppointment;
     } catch (error) {
       console.error("Storage: Error deleting appointment:", error);
+      throw error;
+    }
+  }
+
+  async getAllAppointments() {
+    try {
+      const appointments = await Appointment.find({})
+        .populate("patientId", "firstName lastName")
+        .populate("therapistId", "firstName lastName")
+        .sort({ createdAt: -1 })
+        .lean();
+
+      return appointments.map((apt: any) => ({
+        ...apt,
+        id: apt._id.toString(),
+        patient: apt.patientId ? {
+          ...apt.patientId,
+          id: apt.patientId._id.toString(),
+        } : null,
+        therapist: apt.therapistId ? {
+          ...apt.therapistId,
+          id: apt.therapistId._id.toString(),
+        } : null,
+      }));
+    } catch (error) {
+      console.error("Storage: Error getting all appointments:", error);
       throw error;
     }
   }
@@ -712,19 +744,19 @@ export class DatabaseStorage {
     return appointments.map((apt: any) => ({
       ...apt,
       id: apt._id.toString(),
-      patient: {
+      patient: apt.patientId ? {
         ...apt.patientId,
         id: apt.patientId._id.toString(),
-      },
-      therapist: {
+      } : null,
+      therapist: apt.therapistId ? {
         ...apt.therapistId,
         id: apt.therapistId._id.toString(),
-      },
+      } : null,
     }));
   }
 
   async getAllTreatmentRecords(query: any = {}) {
-    console.log("🔍 Storage - getAllTreatmentRecords called with query:", query);
+
     // If searching by patientName, use aggregation
     let useAggregation = false;
     let searchRegex = null;
@@ -792,6 +824,7 @@ export class DatabaseStorage {
     } else {
       // Fallback to normal query
       const records = await TreatmentRecord.find(query)
+        .sort({ sessionDate: -1 })
         .populate("patientId", "firstName lastName")
         .populate("therapistId", "firstName lastName")
         .lean();
@@ -812,17 +845,15 @@ export class DatabaseStorage {
   }
 
   async getTreatmentRecords(patientId: string) {
-    console.log("getTreatmentRecords called with patientId:", patientId);
+
 
     const records = await TreatmentRecord.find({ patientId })
+      .sort({ sessionDate: -1 })
       .populate("patientId", "firstName lastName")
       .populate("therapistId", "firstName lastName")
       .lean();
 
-    console.log("Raw records from DB:", records.length);
-    if (records.length > 0) {
-      console.log("First raw record:", JSON.stringify(records[0], null, 2));
-    }
+
 
     const transformedRecords = records.map((record: any) => {
       const transformed = {
@@ -908,7 +939,7 @@ export class DatabaseStorage {
       patient: populatedRecord.patientId,
       therapist: populatedRecord.therapistId,
     };
-    console.log("Saved treatment record:", obj);
+
     return obj;
   }
 
@@ -997,7 +1028,7 @@ export class DatabaseStorage {
 
   async getDashboardStats() {
     const totalPatients = await PatientModel.countDocuments();
-    console.log("Dashboard stats - totalPatients from DB:", totalPatients);
+
 
     // Get today's appointments
     const todayAppointments = await this.getTodayAppointments();
@@ -1080,7 +1111,7 @@ export class DatabaseStorage {
       archivedPatients,
     };
 
-    console.log("Dashboard stats response:", stats);
+
     return stats;
   }
 
@@ -1244,7 +1275,7 @@ export class DatabaseStorage {
       // Remove updatedAt from userData if it exists, let Mongoose handle it
       const { updatedAt, ...dataToUpdate } = userData;
       
-      console.log("Storage updateUser called with:", { id, dataToUpdate });
+
       
       const updatedUser = await User.findByIdAndUpdate(
         id, 
@@ -1256,7 +1287,7 @@ export class DatabaseStorage {
       ).lean();
       
       if (!updatedUser) {
-        console.log("No user found with id:", id);
+
         return undefined;
       }
       
@@ -1449,23 +1480,17 @@ export class DatabaseStorage {
 
   async updatePracticeSettings(settings: any, userId: string) {
     // Implementation for updating practice settings
-    console.log("Updating practice settings:", settings);
+
     return { success: true };
   }
 
   // Notification methods
   async createNotification(notification: Notification): Promise<void> {
-    console.log("🔔 Creating notification:", {
-      id: notification.id,
-      userId: notification.userId,
-      type: notification.type,
-      title: notification.title,
-      message: notification.message
-    });
+
     
     try {
       await NotificationModel.create(notification);
-      console.log("✅ Notification created successfully");
+
     } catch (error) {
       console.error("❌ Failed to create notification:", error);
       throw error;
@@ -1681,6 +1706,507 @@ export class DatabaseStorage {
       return result.deletedCount > 0;
     } catch (error) {
       console.error("Error deleting assessment:", error);
+      throw error;
+    }
+  }
+
+  // Treatment Outcomes Storage Functions
+  async createTreatmentOutcome(data: any) {
+    try {
+      console.log("Storage: Creating treatment outcome with data:", JSON.stringify(data, null, 2));
+      
+      const outcome = new TreatmentOutcome(data);
+      console.log("Storage: TreatmentOutcome model created:", outcome);
+      
+      const savedOutcome = await outcome.save();
+      console.log("Storage: Treatment outcome saved successfully:", savedOutcome._id);
+      
+      const populatedOutcome = await outcome.populate([
+        { path: "patientId", select: "firstName lastName dateOfBirth" },
+        { path: "therapistId", select: "firstName lastName" },
+        { path: "createdBy", select: "firstName lastName" },
+      ]);
+      
+      console.log("Storage: Treatment outcome populated and returned:", populatedOutcome._id);
+      return populatedOutcome;
+    } catch (error) {
+      console.error("Storage: Error creating treatment outcome:", error);
+      if (error instanceof Error) {
+        console.error("Storage: Error details:", error.message);
+        console.error("Storage: Error stack:", error.stack);
+      }
+      throw error;
+    }
+  }
+
+  async getTreatmentOutcome(id: string) {
+    try {
+      const outcome = await TreatmentOutcome.findById(id).populate([
+        { path: "patientId", select: "firstName lastName dateOfBirth" },
+        { path: "therapistId", select: "firstName lastName" },
+        { path: "createdBy", select: "firstName lastName" },
+        { path: "updatedBy", select: "firstName lastName" },
+      ]);
+      return outcome;
+    } catch (error) {
+      console.error("Error getting treatment outcome:", error);
+      throw error;
+    }
+  }
+
+  async getPatientTreatmentOutcomes(
+    patientId: string,
+    limit: number = 50,
+    offset: number = 0
+  ) {
+    try {
+      const outcomes = await TreatmentOutcome.find({ patientId })
+        .sort({ assessmentDate: -1 })
+        .limit(limit)
+        .skip(offset)
+        .populate([
+          { path: "therapistId", select: "firstName lastName" },
+          { path: "createdBy", select: "firstName lastName" },
+        ]);
+
+      const total = await TreatmentOutcome.countDocuments({ patientId });
+
+      return {
+        outcomes,
+        total,
+        hasMore: offset + outcomes.length < total,
+      };
+    } catch (error) {
+      console.error("Error getting patient treatment outcomes:", error);
+      throw error;
+    }
+  }
+
+  async getTherapistTreatmentOutcomes(
+    therapistId: string,
+    limit: number = 50,
+    offset: number = 0
+  ) {
+    try {
+      const outcomes = await TreatmentOutcome.find({ therapistId })
+        .sort({ assessmentDate: -1 })
+        .limit(limit)
+        .skip(offset)
+        .populate([
+          { path: "patientId", select: "firstName lastName dateOfBirth" },
+          { path: "createdBy", select: "firstName lastName" },
+        ]);
+
+      const total = await TreatmentOutcome.countDocuments({ therapistId });
+
+      return {
+        outcomes,
+        total,
+        hasMore: offset + outcomes.length < total,
+      };
+    } catch (error) {
+      console.error("Error getting therapist treatment outcomes:", error);
+      throw error;
+    }
+  }
+
+  async getAllTreatmentOutcomes(
+    limit: number = 50,
+    offset: number = 0,
+    search?: string,
+    patientId?: string,
+    therapistId?: string,
+    startDate?: Date,
+    endDate?: Date
+  ) {
+    try {
+      const filter: any = {};
+
+      if (patientId) filter.patientId = patientId;
+      if (therapistId) filter.therapistId = therapistId;
+      if (startDate || endDate) {
+        filter.assessmentDate = {};
+        if (startDate) filter.assessmentDate.$gte = startDate;
+        if (endDate) filter.assessmentDate.$lte = endDate;
+      }
+
+      const outcomes = await TreatmentOutcome.find(filter)
+        .sort({ assessmentDate: -1 })
+        .limit(limit)
+        .skip(offset)
+        .populate([
+          { path: "patientId", select: "firstName lastName dateOfBirth" },
+          { path: "therapistId", select: "firstName lastName" },
+          { path: "createdBy", select: "firstName lastName" },
+        ]);
+
+      const total = await TreatmentOutcome.countDocuments(filter);
+
+      return {
+        outcomes,
+        total,
+        hasMore: offset + outcomes.length < total,
+      };
+    } catch (error) {
+      console.error("Error getting all treatment outcomes:", error);
+      throw error;
+    }
+  }
+
+  async updateTreatmentOutcome(
+    id: string,
+    data: any,
+    userId: string
+  ) {
+    try {
+      const outcome = await TreatmentOutcome.findByIdAndUpdate(
+        id,
+        { ...data, updatedBy: userId },
+        { new: true, runValidators: true }
+      ).populate([
+        { path: "patientId", select: "firstName lastName dateOfBirth" },
+        { path: "therapistId", select: "firstName lastName" },
+        { path: "createdBy", select: "firstName lastName" },
+        { path: "updatedBy", select: "firstName lastName" },
+      ]);
+
+      if (!outcome) {
+        throw new Error("Treatment outcome not found");
+      }
+
+      return outcome;
+    } catch (error) {
+      console.error("Error updating treatment outcome:", error);
+      throw error;
+    }
+  }
+
+  async deleteTreatmentOutcome(id: string) {
+    try {
+      const outcome = await TreatmentOutcome.findByIdAndDelete(id);
+      if (!outcome) {
+        throw new Error("Treatment outcome not found");
+      }
+      return outcome;
+    } catch (error) {
+      console.error("Error deleting treatment outcome:", error);
+      throw error;
+    }
+  }
+
+  async getTreatmentOutcomesSummary(
+    patientId?: string,
+    therapistId?: string,
+    startDate?: Date,
+    endDate?: Date
+  ) {
+    try {
+      console.log("Storage: getTreatmentOutcomesSummary called with:", { patientId, therapistId, startDate, endDate });
+      
+      const filter: any = {};
+
+      if (patientId) {
+        // Convert string ID to ObjectId for MongoDB query
+        filter.patientId = new mongoose.Types.ObjectId(patientId);
+        console.log("Storage: Converted patientId to ObjectId:", filter.patientId);
+      }
+      if (therapistId) {
+        filter.therapistId = new mongoose.Types.ObjectId(therapistId);
+      }
+      if (startDate || endDate) {
+        filter.assessmentDate = {};
+        if (startDate) filter.assessmentDate.$gte = startDate;
+        if (endDate) filter.assessmentDate.$lte = endDate;
+      }
+
+      console.log("Storage: Final filter:", JSON.stringify(filter, null, 2));
+      
+      const outcomes = await TreatmentOutcome.find(filter).sort({
+        assessmentDate: -1,
+      });
+      
+      console.log("Storage: Found outcomes count:", outcomes.length);
+
+      if (outcomes.length === 0) {
+        return {
+          totalAssessments: 0,
+          averageDepressionScore: 0,
+          averageAnxietyScore: 0,
+          averageStressScore: 0,
+          improvementTrend: "no_data",
+          goalAchievementRate: 0,
+          riskLevels: {},
+          functionalImprovement: "no_data",
+        };
+      }
+
+      // Calculate averages
+      const depressionScores = outcomes
+        .map((o) => o.depressionScore)
+        .filter((s) => s !== undefined && s !== null);
+      const anxietyScores = outcomes
+        .map((o) => o.anxietyScore)
+        .filter((s) => s !== undefined && s !== null);
+      const stressScores = outcomes
+        .map((o) => o.stressScore)
+        .filter((s) => s !== undefined && s !== null);
+
+      const averageDepressionScore =
+        depressionScores.length > 0
+          ? depressionScores.reduce((a, b) => a + b, 0) / depressionScores.length
+          : 0;
+      const averageAnxietyScore =
+        anxietyScores.length > 0
+          ? anxietyScores.reduce((a, b) => a + b, 0) / anxietyScores.length
+          : 0;
+      const averageStressScore =
+        stressScores.length > 0
+          ? stressScores.reduce((a, b) => a + b, 0) / stressScores.length
+          : 0;
+
+      // Calculate improvement trend
+      let improvementTrend = "no_data";
+      if (outcomes.length >= 2) {
+        const first = outcomes[outcomes.length - 1];
+        const last = outcomes[0];
+        
+        if (first.depressionScore && last.depressionScore) {
+          const depressionChange = first.depressionScore - last.depressionScore;
+          if (depressionChange > 2) improvementTrend = "improving";
+          else if (depressionChange < -2) improvementTrend = "declining";
+          else improvementTrend = "stable";
+        }
+      }
+
+      // Calculate goal achievement rate
+      const goalProgressCounts = outcomes.reduce((acc, outcome) => {
+        if (outcome.goalProgress) {
+          acc[outcome.goalProgress] = (acc[outcome.goalProgress] || 0) + 1;
+        }
+        return acc;
+      }, {} as Record<string, number>);
+
+      const achievedGoals = goalProgressCounts.achieved || 0;
+      const exceededGoals = goalProgressCounts.exceeded || 0;
+      const totalGoals = Object.values(goalProgressCounts).reduce((a, b) => a + b, 0);
+      const goalAchievementRate = totalGoals > 0 ? ((achievedGoals + exceededGoals) / totalGoals) * 100 : 0;
+
+      // Risk level analysis
+      const riskLevels = outcomes.reduce((acc, outcome) => {
+        if (outcome.riskFactors && outcome.riskFactors.length > 0) {
+          outcome.riskFactors.forEach((risk: string) => {
+            acc[risk] = (acc[risk] || 0) + 1;
+          });
+        }
+        return acc;
+      }, {} as Record<string, number>);
+
+      // Functional improvement analysis
+      let functionalImprovement = "no_data";
+      if (outcomes.length >= 2) {
+        const first = outcomes[outcomes.length - 1];
+        const last = outcomes[0];
+        
+        if (first.dailyFunctioning && last.dailyFunctioning) {
+          const functionLevels = ["severe", "poor", "fair", "good", "excellent"];
+          const firstIndex = functionLevels.indexOf(first.dailyFunctioning);
+          const lastIndex = functionLevels.indexOf(last.dailyFunctioning);
+          
+          if (lastIndex > firstIndex) functionalImprovement = "improving";
+          else if (lastIndex < firstIndex) functionalImprovement = "declining";
+          else functionalImprovement = "stable";
+        }
+      }
+
+      return {
+        totalAssessments: outcomes.length,
+        averageDepressionScore: Math.round(averageDepressionScore * 100) / 100,
+        averageAnxietyScore: Math.round(averageAnxietyScore * 100) / 100,
+        averageStressScore: Math.round(averageStressScore * 100) / 100,
+        improvementTrend,
+        goalAchievementRate: Math.round(goalAchievementRate * 100) / 100,
+        riskLevels,
+        functionalImprovement,
+        lastAssessmentDate: outcomes[0]?.assessmentDate,
+        firstAssessmentDate: outcomes[outcomes.length - 1]?.assessmentDate,
+      };
+    } catch (error) {
+      console.error("Error getting treatment outcomes summary:", error);
+      throw error;
+    }
+  }
+
+  async getTreatmentOutcomesAnalytics(startDate?: Date, endDate?: Date) {
+    try {
+      console.log("Storage: getTreatmentOutcomesAnalytics called with:", { startDate, endDate });
+      
+      const filter: any = {};
+
+      if (startDate || endDate) {
+        filter.assessmentDate = {};
+        if (startDate) filter.assessmentDate.$gte = startDate;
+        if (endDate) filter.assessmentDate.$lte = endDate;
+      }
+
+      const outcomes = await TreatmentOutcome.find(filter)
+        .populate('patientId', 'firstName lastName')
+        .populate('therapistId', 'firstName lastName')
+        .sort({ assessmentDate: -1 });
+
+      if (outcomes.length === 0) {
+        return {
+          totalAssessments: 0,
+          totalPatients: 0,
+          averageDepressionScore: 0,
+          averageAnxietyScore: 0,
+          averageStressScore: 0,
+          improvementTrend: "no_data",
+          goalAchievementRate: 0,
+          riskLevels: {},
+          functionalImprovement: "no_data",
+          moodDistribution: {},
+          therapyEngagement: {},
+          medicationEffectiveness: {},
+          recentOutcomes: [],
+        };
+      }
+
+      // Calculate basic metrics
+      const uniquePatients = new Set(outcomes.map(o => o.patientId.toString()));
+      const totalPatients = uniquePatients.size;
+
+      // Calculate averages
+      const depressionScores = outcomes
+        .map((o) => o.depressionScore)
+        .filter((s) => s !== undefined && s !== null);
+      const anxietyScores = outcomes
+        .map((o) => o.anxietyScore)
+        .filter((s) => s !== undefined && s !== null);
+      const stressScores = outcomes
+        .map((o) => o.stressScore)
+        .filter((s) => s !== undefined && s !== null);
+
+      const averageDepressionScore =
+        depressionScores.length > 0
+          ? depressionScores.reduce((a, b) => a + b, 0) / depressionScores.length
+          : 0;
+      const averageAnxietyScore =
+        anxietyScores.length > 0
+          ? anxietyScores.reduce((a, b) => a + b, 0) / anxietyScores.length
+          : 0;
+      const averageStressScore =
+        stressScores.length > 0
+          ? stressScores.reduce((a, b) => a + b, 0) / stressScores.length
+          : 0;
+
+      // Calculate improvement trend
+      let improvementTrend = "no_data";
+      if (outcomes.length >= 2) {
+        const first = outcomes[outcomes.length - 1];
+        const last = outcomes[0];
+        
+        if (first.depressionScore && last.depressionScore) {
+          const depressionChange = first.depressionScore - last.depressionScore;
+          if (depressionChange > 2) improvementTrend = "improving";
+          else if (depressionChange < -2) improvementTrend = "declining";
+          else improvementTrend = "stable";
+        }
+      }
+
+      // Calculate goal achievement rate
+      const goalProgressCounts = outcomes.reduce((acc, outcome) => {
+        if (outcome.goalProgress) {
+          acc[outcome.goalProgress] = (acc[outcome.goalProgress] || 0) + 1;
+        }
+        return acc;
+      }, {} as Record<string, number>);
+
+      const achievedGoals = goalProgressCounts.achieved || 0;
+      const exceededGoals = goalProgressCounts.exceeded || 0;
+      const totalGoals = Object.values(goalProgressCounts).reduce((a, b) => a + b, 0);
+      const goalAchievementRate = totalGoals > 0 ? ((achievedGoals + exceededGoals) / totalGoals) * 100 : 0;
+
+      // Risk level analysis
+      const riskLevels = outcomes.reduce((acc, outcome) => {
+        if (outcome.riskFactors && outcome.riskFactors.length > 0) {
+          outcome.riskFactors.forEach((risk: string) => {
+            acc[risk] = (acc[risk] || 0) + 1;
+          });
+        }
+        return acc;
+      }, {} as Record<string, number>);
+
+      // Functional improvement analysis
+      let functionalImprovement = "no_data";
+      if (outcomes.length >= 2) {
+        const first = outcomes[outcomes.length - 1];
+        const last = outcomes[0];
+        
+        if (first.dailyFunctioning && last.dailyFunctioning) {
+          const functionLevels = ["severe", "poor", "fair", "good", "excellent"];
+          const firstIndex = functionLevels.indexOf(first.dailyFunctioning);
+          const lastIndex = functionLevels.indexOf(last.dailyFunctioning);
+          
+          if (lastIndex > firstIndex) functionalImprovement = "improving";
+          else if (lastIndex < firstIndex) functionalImprovement = "declining";
+          else functionalImprovement = "stable";
+        }
+      }
+
+      // Mood distribution
+      const moodDistribution = outcomes.reduce((acc, outcome) => {
+        if (outcome.moodState) {
+          acc[outcome.moodState] = (acc[outcome.moodState] || 0) + 1;
+        }
+        return acc;
+      }, {} as Record<string, number>);
+
+      // Therapy engagement
+      const therapyEngagement = outcomes.reduce((acc, outcome) => {
+        if (outcome.therapyEngagement) {
+          acc[outcome.therapyEngagement] = (acc[outcome.therapyEngagement] || 0) + 1;
+        }
+        return acc;
+      }, {} as Record<string, number>);
+
+      // Medication effectiveness
+      const medicationEffectiveness = outcomes.reduce((acc, outcome) => {
+        if (outcome.medicationEffectiveness) {
+          acc[outcome.medicationEffectiveness] = (acc[outcome.medicationEffectiveness] || 0) + 1;
+        }
+        return acc;
+      }, {} as Record<string, number>);
+
+      // Recent outcomes for detailed view
+      const recentOutcomes = outcomes.slice(0, 20).map(outcome => ({
+        patientName: `${outcome.patientId?.firstName || 'Unknown'} ${outcome.patientId?.lastName || 'Patient'}`,
+        assessmentDate: outcome.assessmentDate,
+        depressionScore: outcome.depressionScore || 0,
+        anxietyScore: outcome.anxietyScore || 0,
+        stressScore: outcome.stressScore || 0,
+        goalProgress: outcome.goalProgress || 'not_started',
+        moodState: outcome.moodState || 'unknown',
+      }));
+
+      return {
+        totalAssessments: outcomes.length,
+        totalPatients,
+        averageDepressionScore: Math.round(averageDepressionScore * 100) / 100,
+        averageAnxietyScore: Math.round(averageAnxietyScore * 100) / 100,
+        averageStressScore: Math.round(averageStressScore * 100) / 100,
+        improvementTrend,
+        goalAchievementRate: Math.round(goalAchievementRate * 100) / 100,
+        riskLevels,
+        functionalImprovement,
+        moodDistribution,
+        therapyEngagement,
+        medicationEffectiveness,
+        recentOutcomes,
+        lastAssessmentDate: outcomes[0]?.assessmentDate,
+        firstAssessmentDate: outcomes[outcomes.length - 1]?.assessmentDate,
+      };
+    } catch (error) {
+      console.error("Error getting treatment outcomes analytics:", error);
       throw error;
     }
   }

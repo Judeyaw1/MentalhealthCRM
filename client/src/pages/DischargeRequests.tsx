@@ -14,6 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   Table,
@@ -321,6 +322,9 @@ export default function DischargeRequests() {
             <DialogTitle>
               {reviewAction === "approve" ? "Approve" : "Deny"} Discharge Request
             </DialogTitle>
+            <DialogDescription>
+              Review and {reviewAction} the discharge request. You can add optional notes about your decision.
+            </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4">

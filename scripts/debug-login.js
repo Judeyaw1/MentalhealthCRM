@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 
 // Connect to MongoDB
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/mentalhealthcrm';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/mentalhealthtracker';
 
 async function debugLogin() {
   try {
@@ -23,7 +23,7 @@ async function debugLogin() {
     }));
 
     // Test credentials
-    const testEmail = 'admin@newlife.com';
+    const testEmail = 'therapist@newlife.com';
     const testPassword = 'Admin123!@#';
 
     console.log(`\n=== DEBUGGING LOGIN PROCESS ===`);

@@ -156,13 +156,13 @@ export function NotificationBell() {
       // Patient-related notifications
       if (notification.data.patientId) {
         if (notification.type === "patient_assigned") {
-          // Open patient dialog for patient assignment notifications
+          // Navigate to patient overview for patient assignment notifications
           toast({
-            title: "Opening patient details",
-            description: "Opening patient details dialog...",
+            title: "Opening patient overview",
+            description: "Taking you to the patient overview...",
           });
           
-          openPatientDialog(notification.data.patientId);
+          setLocation(`/patients/${notification.data.patientId}`);
           return;
         }
         
@@ -209,30 +209,16 @@ export function NotificationBell() {
     // Handle notifications without specific data
     switch (notification.type) {
       case "patient_assigned":
-        console.log("🎯 patient_assigned case in switch statement");
-        console.log("🎯 Full notification data:", notification.data);
-        console.log("🎯 PatientId in data:", notification.data?.patientId);
-        console.log("🎯 PatientData in data:", notification.data?.patientData);
-        
-        // Check if patientId is in the main data or in patientData
+        // Navigate to patient overview for patient assignment notifications
         const patientId = notification.data?.patientId || notification.data?.patientData?.patientId;
         
         if (patientId) {
-          console.log("🎯 Opening patient dialog for patient assignment with patientId:", patientId);
           toast({
-            title: "Opening patient details",
-            description: "Opening patient details dialog...",
+            title: "Opening patient overview",
+            description: "Taking you to the patient overview...",
           });
-          try {
-            openPatientDialog(patientId);
-            console.log("✅ openPatientDialog called successfully");
-          } catch (error) {
-            console.error("❌ Error calling openPatientDialog:", error);
-          }
+          setLocation(`/patients/${patientId}`);
           return;
-        } else {
-          console.log("❌ No patientId found in notification data");
-          console.log("❌ Available data keys:", Object.keys(notification.data || {}));
         }
         break;
         

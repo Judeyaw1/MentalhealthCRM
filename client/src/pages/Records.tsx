@@ -12,6 +12,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -82,6 +85,9 @@ export default function Records() {
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [deleteRecordId, setDeleteRecordId] = useState<string | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [groupByPatient, setGroupByPatient] = useState(true);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailRecord, setDetailRecord] = useState<TreatmentRecordWithDetails | null>(null);
   const pageSize = 20;
 
   // Redirect to home if not authenticated
@@ -698,7 +704,7 @@ export default function Records() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">
-                    Active Patients
+                    Patients with Records
                   </CardTitle>
                   <User className="h-4 w-4 text-gray-600" />
                 </CardHeader>
@@ -706,12 +712,19 @@ export default function Records() {
                   <div className="text-2xl font-bold">
                     {recordsLoading
                       ? "..."
-                      : new Set(
-                          recordsData?.records?.map(
-                            (record: TreatmentRecordWithDetails) =>
-                              record.patient.id,
-                          ),
-                        ).size || 0}
+                      : (() => {
+                          const ids = new Set(
+                            (recordsData?.records ?? []).map((record: any) => {
+                              const p = record.patient;
+                              return String(
+                                typeof p === 'object'
+                                  ? (p.id || p._id)
+                                  : p
+                              );
+                            })
+                          );
+                          return ids.size;
+                        })()}
                   </div>
                   <p className="text-xs text-gray-600">With records</p>
                 </CardContent>
@@ -729,15 +742,21 @@ export default function Records() {
                     {recordsLoading
                       ? "..."
                       : recordsData?.total && recordsData.records
-                        ? Math.round(
-                            recordsData.total /
-                              new Set(
-                                recordsData.records.map(
-                                  (record: TreatmentRecordWithDetails) =>
-                                    record.patient.id,
-                                ),
-                              ).size,
-                          )
+                        ? (() => {
+                            const uniquePatients = new Set(
+                              (recordsData.records ?? []).map((record: any) => {
+                                const p = record.patient;
+                                return String(
+                                  typeof p === 'object'
+                                    ? (p.id || p._id)
+                                    : p
+                                );
+                              })
+                            ).size;
+                            return uniquePatients > 0
+                              ? Math.round(recordsData.total / uniquePatients)
+                              : 0;
+                          })()
                         : 0}
                   </div>
                   <p className="text-xs text-gray-600">Per patient</p>
@@ -826,6 +845,10 @@ export default function Records() {
                       <SelectItem value="month">Last Month</SelectItem>
                     </SelectContent>
                   </Select>
+                  <div className="flex items-center gap-2 ml-auto">
+                    <span className="text-sm text-gray-600">Group by patient</span>
+                    <Switch checked={groupByPatient} onCheckedChange={setGroupByPatient} />
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -850,11 +873,83 @@ export default function Records() {
                 ))
               ) : (recordsData?.records?.length ?? 0) > 0 ? (
                 <>
-                  {(recordsData?.records ?? []).map(
+                  {groupByPatient ? (
+                    <Accordion type="multiple" className="w-full">
+                      {(() => {
+                        const groupMap = (recordsData?.records ?? []).reduce((map, rec) => {
+                          const patientIdRaw = typeof rec.patient === 'object'
+                            ? ((rec.patient as any).id || (rec.patient as any)._id)
+                            : rec.patient;
+                          const pid = String(patientIdRaw ?? 'unknown');
+                          if (!map.has(pid)) map.set(pid, [] as TreatmentRecordWithDetails[]);
+                          map.get(pid)!.push(rec);
+                          return map;
+                        }, new Map<string, TreatmentRecordWithDetails[]>());
+
+                        const groupEntries = Array.from(groupMap.entries()).map(([pid, recs]) => {
+                          const sortedRecs = recs.slice().sort((a, b) => new Date(b.sessionDate).getTime() - new Date(a.sessionDate).getTime());
+                          return [pid, sortedRecs] as [string, TreatmentRecordWithDetails[]];
+                        }).sort(([, recsA], [, recsB]) => {
+                          const dateA = recsA.length ? new Date(recsA[0].sessionDate).getTime() : 0;
+                          const dateB = recsB.length ? new Date(recsB[0].sessionDate).getTime() : 0;
+                          return dateB - dateA;
+                        });
+
+                        return groupEntries.map(([patientId, recs]) => {
+                          const patient = (typeof recs[0].patient === 'object' && recs[0].patient)
+                            ? recs[0].patient
+                            : ({ firstName: 'Unknown', lastName: '' } as any);
+                          return (
+                          <AccordionItem key={patientId} value={patientId} className="border rounded-lg mb-2">
+                            <AccordionTrigger className="px-4 py-3 hover:no-underline">
+                              <div className="flex items-center gap-3">
+                                <Avatar className="h-8 w-8">
+                                  <AvatarFallback className="bg-primary-100 text-primary-600">
+                                    {getInitials(patient.firstName ?? 'U', patient.lastName ?? '')}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="text-left">
+                                  <div className="font-medium text-gray-900">{patient.firstName ?? 'Unknown'} {patient.lastName ?? ''}</div>
+                                  <div className="text-xs text-gray-500">{recs.length} record{recs.length !== 1 ? 's' : ''}</div>
+                                </div>
+                              </div>
+                            </AccordionTrigger>
+                            <AccordionContent className="px-4 pb-4">
+                              <div className="space-y-3">
+                                {recs.map((record) => (
+                                    <Card key={record.id} className="hover:shadow-sm transition cursor-pointer" onClick={() => { setDetailRecord(record); setDetailOpen(true); }}>
+                                      <CardContent className="p-4">
+                                        <div className="flex items-start justify-between">
+                                          <div className="space-y-1">
+                                            <div className="flex items-center gap-2">
+                                              {getSessionTypeBadge(record.sessionType)}
+                                              <span className="text-sm text-gray-500">{formatDateTime(record.sessionDate)}</span>
+                                            </div>
+                                            {record.notes && (
+                                              <p className="text-sm text-gray-700 line-clamp-2">{record.notes}</p>
+                                            )}
+                                          </div>
+                                          <Badge variant="outline" className="h-5 px-2 py-0 text-[10px] whitespace-nowrap max-w-[160px] overflow-hidden text-ellipsis">
+                                            {record.therapist ? `${record.therapist.firstName} ${record.therapist.lastName}` : 'Unknown'}
+                                          </Badge>
+                                        </div>
+                                      </CardContent>
+                                    </Card>
+                                  ))}
+                              </div>
+                            </AccordionContent>
+                          </AccordionItem>
+                          );
+                        });
+                      })()}
+                    </Accordion>
+                  ) : (
+                  (recordsData?.records ?? []).map(
                     (record: TreatmentRecordWithDetails) => (
                       <Card
                         key={record.id}
-                        className="hover:shadow-md transition-shadow"
+                        className="hover:shadow-md transition-shadow cursor-pointer"
+                        onClick={() => { setDetailRecord(record); setDetailOpen(true); }}
                       >
                         <CardContent className="p-6">
                           <div className="flex items-start space-x-4">
@@ -884,10 +979,10 @@ export default function Records() {
                                   </div>
                                 </div>
                                 <div className="flex items-center space-x-2">
-                                  <Badge variant="outline" className="text-xs">
+                                  <Badge variant="outline" className="h-5 px-2 py-0 text-[10px] whitespace-nowrap max-w-[160px] overflow-hidden text-ellipsis">
                                     {record.therapist
                                       ? `${record.therapist.firstName} ${record.therapist.lastName}`
-                                      : "Unknown Therapist"}
+                                      : "Unknown"}
                                   </Badge>
 
                                                                     <TooltipProvider>
@@ -1034,7 +1129,7 @@ export default function Records() {
                         </CardContent>
                       </Card>
                     ),
-                  )}
+                  ))}
 
                   {/* Pagination */}
                   {totalPages > 1 && (
@@ -1116,6 +1211,79 @@ export default function Records() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <Sheet open={detailOpen} onOpenChange={setDetailOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Treatment Record</SheetTitle>
+          </SheetHeader>
+          {detailRecord && (
+            <div className="space-y-4 mt-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm text-gray-500">Patient</div>
+                  <div className="font-medium">{detailRecord.patient.firstName} {detailRecord.patient.lastName}</div>
+                </div>
+                <Badge variant="outline" className="h-5 px-2 py-0 text-[10px] whitespace-nowrap max-w-[160px] overflow-hidden text-ellipsis">
+                  {detailRecord.therapist ? `${detailRecord.therapist.firstName} ${detailRecord.therapist.lastName}` : 'Unknown'}
+                </Badge>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <div className="text-sm text-gray-500">Session Date</div>
+                  <div className="font-medium">{formatDateTime(detailRecord.sessionDate)}</div>
+                </div>
+                <div>
+                  <div className="text-sm text-gray-500">Session Type</div>
+                  <div>{detailRecord.sessionType}</div>
+                </div>
+              </div>
+              {detailRecord.goals && (
+                <div>
+                  <div className="text-sm font-medium text-gray-700">Goals</div>
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{detailRecord.goals}</p>
+                </div>
+              )}
+              {detailRecord.notes && (
+                <div>
+                  <div className="text-sm font-medium text-gray-700">Notes</div>
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{detailRecord.notes}</p>
+                </div>
+              )}
+              {detailRecord.progress && (
+                <div>
+                  <div className="text-sm font-medium text-gray-700">Progress</div>
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{detailRecord.progress}</p>
+                </div>
+              )}
+              {detailRecord.planForNextSession && (
+                <div>
+                  <div className="text-sm font-medium text-gray-700">Plan for Next Session</div>
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{detailRecord.planForNextSession}</p>
+                </div>
+              )}
+              {detailRecord.interventions && (
+                <div>
+                  <div className="text-sm font-medium text-gray-700">Interventions</div>
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{detailRecord.interventions}</p>
+                </div>
+              )}
+              <div className="flex items-center gap-2 pt-2">
+                <Link href={`/records/${detailRecord.id}/edit`}>
+                  <Button variant="outline" size="sm">
+                    <Edit className="h-4 w-4 mr-2" /> Edit
+                  </Button>
+                </Link>
+                <Button variant="outline" size="sm" onClick={() => handleDownloadRecord(detailRecord)}>
+                  <Download className="h-4 w-4 mr-2" /> Download
+                </Button>
+                <Button variant="ghost" size="sm" className="text-red-600" onClick={() => handleDeleteRecord(detailRecord.id)}>
+                  <AlertTriangle className="h-4 w-4 mr-2" /> Delete
+                </Button>
+              </div>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

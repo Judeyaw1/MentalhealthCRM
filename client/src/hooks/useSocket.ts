@@ -65,8 +65,8 @@ export function useSocket(options: UseSocketOptions = {}) {
     const socket = io(process.env.NODE_ENV === 'production' 
       ? window.location.origin 
       : 'http://localhost:3000', {
-      transports: ['websocket', 'polling'],
-      autoConnect: true,
+      transports: ['polling', 'websocket'], // Try polling first, then upgrade to WebSocket
+      autoConnect: false, // Don't auto-connect, we'll do it manually
       reconnection: true,
       reconnectionAttempts: 10,
       reconnectionDelay: 500,
@@ -76,25 +76,38 @@ export function useSocket(options: UseSocketOptions = {}) {
     });
 
     socket.on('connect', () => {
-      console.log('🔌 WebSocket connected');
-      
+      console.log('🔌 WebSocket connected successfully');
       // Authenticate the user
       if (user?.id) {
+        console.log('🔌 Authenticating user:', user.id);
         socket.emit('authenticate', user.id);
       }
     });
 
     socket.on('disconnect', (reason) => {
       console.log('🔌 WebSocket disconnected:', reason);
+      console.log('🔌 Disconnect reason details:', {
+        reason,
+        socketId: socket.id,
+        connected: socket.connected,
+        timestamp: new Date().toISOString()
+      });
     });
 
     socket.on('connect_error', (error) => {
       console.error('🔌 WebSocket connection error:', error);
+      console.log('🔌 Current transport:', socket.io.engine.transport.name);
+    });
+
+    socket.on('upgrade', () => {
+      console.log('🔌 Transport upgraded to:', socket.io.engine.transport.name);
+    });
+
+    socket.on('upgrade_error', (error) => {
+      console.error('🔌 Transport upgrade error:', error);
     });
 
     socket.on('reconnect', (attemptNumber) => {
-      console.log('🔌 WebSocket reconnected after', attemptNumber, 'attempts');
-      
       // Re-authenticate after reconnection
       if (user?.id) {
         socket.emit('authenticate', user.id);
@@ -102,11 +115,11 @@ export function useSocket(options: UseSocketOptions = {}) {
     });
 
     socket.on('reconnect_attempt', (attemptNumber) => {
-      console.log('🔌 WebSocket reconnection attempt:', attemptNumber);
+      // Handle reconnection attempt
     });
 
     socket.on('reconnect_error', (error) => {
-      console.error('🔌 WebSocket reconnection error:', error);
+      // Handle reconnection error
     });
 
     // Heartbeat to keep connection alive
@@ -117,7 +130,7 @@ export function useSocket(options: UseSocketOptions = {}) {
     }, 30000); // Send ping every 30 seconds
 
     socket.on('pong', () => {
-      console.log('🔌 Heartbeat received');
+      // Heartbeat received
     });
 
     // Set up event listeners
@@ -193,6 +206,9 @@ export function useSocket(options: UseSocketOptions = {}) {
 
     socketRef.current = socket;
 
+    // Manually connect
+    socket.connect();
+
     // Cleanup heartbeat on disconnect
     return () => {
       clearInterval(heartbeat);
@@ -213,8 +229,17 @@ export function useSocket(options: UseSocketOptions = {}) {
   }, []);
 
   useEffect(() => {
+    // Only connect if we have a valid user ID
     if (user?.id) {
-      connect();
+      console.log('🔌 Connecting WebSocket for user:', user.id);
+      // Add a small delay to ensure server is ready
+      const timer = setTimeout(() => {
+        connect();
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    } else {
+      console.log('🔌 No user ID, skipping WebSocket connection');
     }
 
     // Handle visibility changes (tab switching)

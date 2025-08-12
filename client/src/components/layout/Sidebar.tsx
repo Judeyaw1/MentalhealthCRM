@@ -7,7 +7,6 @@ import {
   FileText,
   DollarSign,
   BarChart3,
-  TrendingUp,
   Shield,
   UserCog,
   Settings,
@@ -117,12 +116,6 @@ export function Sidebar({
                 href: "/reports",
                 icon: BarChart3,
                 current: location.startsWith("/reports"),
-              },
-              {
-                name: "Treatment Outcomes",
-                href: "/outcomes",
-                icon: TrendingUp,
-                current: location.startsWith("/outcomes"),
               },
               {
                 name: "Audit Logs",

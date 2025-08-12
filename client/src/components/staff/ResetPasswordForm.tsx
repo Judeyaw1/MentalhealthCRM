@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Key, AlertTriangle, Loader2, X, CheckCircle } from "lucide-react";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -119,6 +120,9 @@ export function ResetPasswordForm({
             <Key className="h-5 w-5" />
             Reset Password
           </DialogTitle>
+          <DialogDescription>
+            Send a password reset email to this staff member. They will receive instructions to set a new password.
+          </DialogDescription>
         </DialogHeader>
 
         {!isSuccess ? (

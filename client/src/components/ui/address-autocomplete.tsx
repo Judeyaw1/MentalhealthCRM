@@ -29,8 +29,10 @@ export const AddressAutocomplete = React.forwardRef<HTMLInputElement, AddressAut
   const [isLoading, setIsLoading] = useState(false);
   const [inputValue, setInputValue] = useState(value);
   const [hasUserInteracted, setHasUserInteracted] = useState(false);
+  const [justSelected, setJustSelected] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const selectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Mock address suggestions for demo (replace with Google Places API)
   const mockAddresses = [
@@ -228,6 +230,14 @@ export const AddressAutocomplete = React.forwardRef<HTMLInputElement, AddressAut
 
   // Simulate API call with debouncing
   useEffect(() => {
+    // Don't search if user just selected an address
+    if (justSelected) {
+      // Clear any existing suggestions and close dropdown
+      setSuggestions([]);
+      setIsOpen(false);
+      return;
+    }
+
     const timeoutId = setTimeout(() => {
       // Only search if user has interacted with the input
       if (inputValue.length > 2 && hasUserInteracted) {
@@ -285,7 +295,11 @@ export const AddressAutocomplete = React.forwardRef<HTMLInputElement, AddressAut
             }))
           );
           setIsLoading(false);
-          setIsOpen(true);
+          
+          // Only open dropdown if not just selected
+          if (!justSelected) {
+            setIsOpen(true);
+          }
         }, 300);
       } else {
         setSuggestions([]);
@@ -294,7 +308,16 @@ export const AddressAutocomplete = React.forwardRef<HTMLInputElement, AddressAut
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [inputValue, hasUserInteracted]);
+  }, [inputValue, hasUserInteracted, justSelected]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (selectionTimeoutRef.current) {
+        clearTimeout(selectionTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -312,15 +335,35 @@ export const AddressAutocomplete = React.forwardRef<HTMLInputElement, AddressAut
     const newValue = e.target.value;
     setInputValue(newValue);
     setHasUserInteracted(true);
+    
+    // Clear the justSelected flag when user starts typing again
+    if (justSelected) {
+      setJustSelected(false);
+    }
+    
     onChange(newValue);
   };
 
   const handleSuggestionClick = (suggestion: AddressSuggestion) => {
+    // Clear any existing timeout
+    if (selectionTimeoutRef.current) {
+      clearTimeout(selectionTimeoutRef.current);
+    }
+    
     setInputValue(suggestion.description);
     setHasUserInteracted(true);
+    setJustSelected(true);
     onChange(suggestion.description);
     setIsOpen(false);
-    inputRef.current?.focus();
+    
+    // Clear suggestions immediately to prevent dropdown from showing
+    setSuggestions([]);
+    
+    // Set a longer timeout to prevent immediate re-search
+    selectionTimeoutRef.current = setTimeout(() => {
+      setJustSelected(false);
+      inputRef.current?.focus();
+    }, 500);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

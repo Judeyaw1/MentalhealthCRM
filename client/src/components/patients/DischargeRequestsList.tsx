@@ -50,6 +50,12 @@ interface DischargeRequest {
   reviewNotes?: string;
   patientId: string;
   patientName: string;
+  patient?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    fullName: string;
+  };
   assignedTherapist?: {
     firstName: string;
     lastName: string;
@@ -279,7 +285,17 @@ export function DischargeRequestsList({ patientId }: DischargeRequestsListProps)
                     <TableRow key={request._id}>
                       <TableCell>
                         <div>
-                          <div className="font-medium">{request.patientName}</div>
+                          <div className="font-medium">
+                            {patientId ? (
+                              // If we're on a patient page, show initials
+                              <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-sm font-semibold">
+                                {request.patient?.firstName?.[0]}{request.patient?.lastName?.[0]}
+                              </div>
+                            ) : (
+                              // If we're on the global page, show full name
+                              request.patientName
+                            )}
+                          </div>
                           {request.assignedTherapist && (
                             <div className="text-sm text-gray-500">
                               Therapist: {request.assignedTherapist.firstName} {request.assignedTherapist.lastName}

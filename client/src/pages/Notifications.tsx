@@ -159,12 +159,12 @@ export default function Notifications() {
       // Patient-related notifications
       if (notification.data.patientId) {
         if (notification.type === "patient_assigned") {
-          // Open patient dialog for patient assignment notifications
+          // Navigate to patient overview for patient assignment notifications
           toast({
-            title: "Opening patient details",
-            description: "Opening patient details dialog...",
+            title: "Opening patient overview",
+            description: "Taking you to the patient overview...",
           });
-          openPatientDialog(notification.data.patientId);
+          setLocation(`/patients/${notification.data.patientId}`);
           return;
         }
         

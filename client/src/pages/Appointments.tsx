@@ -155,20 +155,7 @@ export default function Appointments() {
     retry: false,
     refetchInterval: 10000, // Refetch every 10 seconds for real-time updates
     refetchIntervalInBackground: true, // Continue polling even when tab is not active
-    onSuccess: (data) => {
-      console.log("Appointments fetched:", data?.length || 0, "appointments");
-      if (data && data.length > 0) {
-        console.log(
-          "First 3 appointments:",
-          data.slice(0, 3).map((apt) => ({
-            id: apt.id,
-            patient: `${apt.patient?.firstName} ${apt.patient?.lastName}`,
-            createdAt: apt.createdAt,
-            appointmentDate: apt.appointmentDate,
-          })),
-        );
-      }
-    },
+
   });
 
   const { data: todayAppointments, isLoading: todayLoading } = useQuery({

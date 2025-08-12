@@ -10,6 +10,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Key, Eye, EyeOff, Loader2, CheckCircle } from "lucide-react";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -201,6 +202,9 @@ export function ChangePasswordForm({
             <Key className="h-5 w-5" />
             Change Password
           </DialogTitle>
+          <DialogDescription>
+            Update your account password. Make sure to use a strong, unique password.
+          </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">

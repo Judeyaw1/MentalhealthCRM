@@ -68,43 +68,7 @@ interface TreatmentRecordFormProps {
   therapists?: { id: string; firstName: string; lastName: string }[];
 }
 
-const SESSION_TEMPLATES = {
-  therapy: {
-    goals:
-      "• Explore current challenges and stressors\n• Develop coping strategies\n• Work on identified treatment goals\n• Process recent experiences and emotions",
-    notes:
-      "Session focused on [specific topic/issue]. Patient demonstrated [observations about engagement, mood, etc.]. Key interventions included [list specific techniques used].",
-    interventions:
-      "• Cognitive Behavioral Therapy techniques\n• Mindfulness exercises\n• Psychoeducation on [topic]\n• Role-playing scenarios",
-    progress:
-      "Patient shows [specific progress indicators]. Areas of improvement include [list improvements]. Continued challenges include [list ongoing issues].",
-    planForNextSession:
-      "Continue work on [specific goals]. Focus on [next session priorities]. Consider [additional interventions or approaches].",
-  },
-  assessment: {
-    goals:
-      "• Complete comprehensive mental health assessment\n• Gather background information\n• Identify presenting problems\n• Establish baseline functioning",
-    notes:
-      "Initial assessment session. Patient presents with [primary concerns]. Background includes [relevant history]. Current functioning appears [level of functioning].",
-    interventions:
-      "• Clinical interview\n• Mental status examination\n• Risk assessment\n• Standardized assessment tools",
-    progress:
-      "Assessment phase - establishing baseline. No progress to report yet.",
-    planForNextSession:
-      "Complete assessment if needed. Begin treatment planning. Schedule follow-up session.",
-  },
-  intake: {
-    goals:
-      "• Complete intake process and paperwork\n• Establish therapeutic relationship\n• Gather initial information\n• Set expectations for treatment",
-    notes:
-      "Initial intake session. Patient completed all required paperwork. Presenting concerns include [list concerns]. Patient appears [observations about presentation].",
-    interventions:
-      "• Intake interview\n• Paperwork completion\n• Treatment orientation\n• Goal setting discussion",
-    progress: "Intake phase - establishing foundation for treatment.",
-    planForNextSession:
-      "Begin formal treatment sessions. Focus on [primary treatment goals].",
-  },
-};
+// Session templates removed per requirement
 
 export function TreatmentRecordForm({
   initialData,
@@ -117,7 +81,7 @@ export function TreatmentRecordForm({
   const [autoSaveStatus, setAutoSaveStatus] = useState<
     "idle" | "saving" | "saved" | "error"
   >("idle");
-  const [selectedTemplate, setSelectedTemplate] = useState<string>("");
+  // Template selection removed
 
   const form = useForm<InsertTreatmentRecord>({
     resolver: zodResolver(insertTreatmentRecordSchema),
@@ -134,7 +98,7 @@ export function TreatmentRecordForm({
     },
   });
 
-  const watchedSessionType = form.watch("sessionType");
+  // Removed template watchers
   const watchedValues = form.watch();
 
   // Reset form when initialData changes (for editing)
@@ -203,26 +167,7 @@ export function TreatmentRecordForm({
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [form, isLoading]);
 
-  // Apply template when session type changes
-  useEffect(() => {
-    if (
-      selectedTemplate &&
-      SESSION_TEMPLATES[watchedSessionType as keyof typeof SESSION_TEMPLATES]
-    ) {
-      const template =
-        SESSION_TEMPLATES[watchedSessionType as keyof typeof SESSION_TEMPLATES];
-      form.setValue("goals", template.goals);
-      form.setValue("notes", template.notes);
-      form.setValue("interventions", template.interventions);
-      form.setValue("progress", template.progress);
-      form.setValue("planForNextSession", template.planForNextSession);
-      setSelectedTemplate("");
-      toast({
-        title: "Template Applied",
-        description: `${watchedSessionType} template has been applied to your form.`,
-      });
-    }
-  }, [selectedTemplate, watchedSessionType, form, toast]);
+  // (Removed effect-driven application; handled directly in applyTemplate)
 
   const handleSubmit = (data: InsertTreatmentRecord) => {
     // Convert sessionDate from Date to timestamp for the backend
@@ -264,21 +209,25 @@ export function TreatmentRecordForm({
   };
 
   const formatDateTimeLocal = (date: Date) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    const hours = String(date.getHours()).padStart(2, "0");
-    const minutes = String(date.getMinutes()).padStart(2, "0");
+    // Ensure we preserve local date/time for datetime-local input
+    const local = new Date(date);
+    const year = local.getFullYear();
+    const month = String(local.getMonth() + 1).padStart(2, "0");
+    const day = String(local.getDate()).padStart(2, "0");
+    const hours = String(local.getHours()).padStart(2, "0");
+    const minutes = String(local.getMinutes()).padStart(2, "0");
     return `${year}-${month}-${day}T${hours}:${minutes}`;
   };
 
   const parseDateTimeLocal = (dateTimeLocal: string) => {
-    return new Date(dateTimeLocal);
+    // Interpret the value as local time (avoid timezone shift)
+    const [datePart, timePart] = dateTimeLocal.split("T");
+    const [y, m, d] = (datePart || '').split("-").map(Number);
+    const [hh, mm] = (timePart || '').split(":").map(Number);
+    return new Date(y || 0, (m || 1) - 1, d || 1, hh || 0, mm || 0, 0, 0);
   };
 
-  const applyTemplate = (sessionType: string) => {
-    setSelectedTemplate(sessionType);
-  };
+  // Template application removed
 
   const getAutoSaveIcon = () => {
     switch (autoSaveStatus) {
@@ -307,38 +256,31 @@ export function TreatmentRecordForm({
   };
 
   const getFormCompletionPercentage = () => {
-    const requiredFields = [
-      "patientId",
-      "therapistId",
-      "sessionDate",
-      "sessionType",
-      "notes",
-    ];
-    const optionalFields = [
-      "goals",
-      "interventions",
-      "progress",
-      "planForNextSession",
+    // Stricter checks: therapistId and patientId must be non-empty strings
+    // sessionDate must be a valid date; notes must be non-empty
+    const values = form.getValues();
+    const requiredChecks = [
+      typeof values.patientId === 'string' && values.patientId.trim().length > 0,
+      typeof values.therapistId === 'string' && values.therapistId.trim().length > 0,
+      !!values.sessionDate && !isNaN(new Date(values.sessionDate as any).getTime()),
+      typeof values.sessionType === 'string' && values.sessionType.trim().length > 0,
+      typeof values.notes === 'string' && values.notes.trim().length > 0,
     ];
 
-    const requiredCompleted = requiredFields.filter((field) => {
-      const value = form.getValues(field as any);
-      return value && (typeof value === "string" ? value.trim() : true);
-    }).length;
+    const optionalChecks = [
+      typeof values.goals === 'string' && values.goals.trim().length > 0,
+      typeof values.interventions === 'string' && values.interventions.trim().length > 0,
+      typeof values.progress === 'string' && values.progress.trim().length > 0,
+      typeof values.planForNextSession === 'string' && values.planForNextSession.trim().length > 0,
+    ];
 
-    const optionalCompleted = optionalFields.filter((field) => {
-      const value = form.getValues(field as any);
-      return value && value.trim();
-    }).length;
+    const requiredCompleted = requiredChecks.filter(Boolean).length;
+    const optionalCompleted = optionalChecks.filter(Boolean).length;
 
-    const totalRequired = requiredFields.length;
-    const totalOptional = optionalFields.length;
+    const totalRequired = requiredChecks.length;
+    const totalOptional = optionalChecks.length;
 
-    return Math.round(
-      ((requiredCompleted / totalRequired) * 0.7 +
-        (optionalCompleted / totalOptional) * 0.3) *
-        100,
-    );
+    return Math.round(((requiredCompleted / totalRequired) * 0.7 + (optionalCompleted / totalOptional) * 0.3) * 100);
   };
 
   return (
@@ -501,35 +443,7 @@ export function TreatmentRecordForm({
           </CardContent>
         </Card>
 
-        {/* Template Selection */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <FileText className="h-5 w-5" />
-              <span>Session Templates</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
-              {Object.keys(SESSION_TEMPLATES).map((templateType) => (
-                <Button
-                  key={templateType}
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => applyTemplate(templateType)}
-                  className="capitalize"
-                >
-                  {templateType} Template
-                </Button>
-              ))}
-            </div>
-            <p className="text-sm text-gray-600 mt-2">
-              Click a template to auto-fill common sections for that session
-              type.
-            </p>
-          </CardContent>
-        </Card>
+        {/* Session templates removed */}
 
         <Card>
           <CardHeader>

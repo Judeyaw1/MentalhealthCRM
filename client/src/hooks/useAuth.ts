@@ -1,17 +1,31 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { useToast } from "./use-toast";
 
 export function useAuth() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Simple authentication check without network requests
-  const isAuthenticated = localStorage.getItem("isLoggedIn") === "true";
-  const user = isAuthenticated
-    ? JSON.parse(localStorage.getItem("user") || "null")
-    : null;
-  const forcePasswordChange =
-    localStorage.getItem("forcePasswordChange") === "true";
+  // Check backend session status
+  const { data: sessionUser, isLoading: isLoadingSession } = useQuery({
+    queryKey: ['/api/auth/user'],
+    queryFn: async () => {
+      const response = await fetch('/api/auth/user', {
+        credentials: 'include',
+      });
+      if (response.ok) {
+        return response.json();
+      }
+      return null;
+    },
+    retry: false,
+    refetchInterval: 30000, // Check every 30 seconds
+    refetchIntervalInBackground: true,
+  });
+
+  // Use backend session if available, fallback to localStorage
+  const isAuthenticated = sessionUser ? true : localStorage.getItem("isLoggedIn") === "true";
+  const user = sessionUser || (isAuthenticated ? JSON.parse(localStorage.getItem("user") || "null") : null);
+  const forcePasswordChange = user?.forcePasswordChange || localStorage.getItem("forcePasswordChange") === "true";
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
@@ -61,7 +75,7 @@ export function useAuth() {
 
   return {
     user,
-    isLoading: false,
+    isLoading: isLoadingSession,
     isAuthenticated,
     forcePasswordChange,
     logout,
