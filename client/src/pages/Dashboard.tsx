@@ -412,8 +412,9 @@ export default function Dashboard() {
         <Sidebar
           patientCount={(() => {
             const archivedCount = statsData.archivedPatients || 0;
-            return statsData.activeTreatments + (statsData.totalPatients - archivedCount);
-          })()} // Active + Inactive patients (excluding discharged)
+            // Simply subtract discharged patients from total to get current patients
+            return statsData.totalPatients - archivedCount;
+          })()} // Current patients (total - discharged)
           todayAppointments={statsData.todayAppointments}
           archivedCount={statsData.archivedPatients || 0}
         />
