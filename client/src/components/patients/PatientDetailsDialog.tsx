@@ -102,8 +102,8 @@ export function PatientDetailsDialog({ patientId, isOpen, onClose }: PatientDeta
                   {/* LOS Calculation */}
                   <div style={{ gridColumn: '1 / -1' }}>
                     <strong>Length of Stay (LOS):</strong> {(() => {
-                      const intake = patient.intakeDate ? new Date(patient.intakeDate) : (patient.createdAt ? new Date(patient.createdAt) : null);
-                      const discharge = patient.dischargeDate ? new Date(patient.dischargeDate) : (patient.status === 'discharged' ? new Date() : null);
+                      const intake = patient.createdAt ? new Date(patient.createdAt) : null;
+                      const discharge = patient.dischargeCriteria?.dischargeDate ? new Date(patient.dischargeCriteria.dischargeDate) : (patient.status === 'discharged' ? new Date() : null);
                       if (!intake) return 'N/A';
                       const end = discharge || new Date();
                       const diff = Math.max(0, Math.floor((end.getTime() - intake.getTime()) / (1000 * 60 * 60 * 24)));

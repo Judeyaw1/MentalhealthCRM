@@ -21,6 +21,7 @@ import { Card } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import * as XLSX from "xlsx";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import PatientReport from "@/components/reports/PatientReport";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 
@@ -34,6 +35,8 @@ export default function Dashboard() {
   });
   const [exportType, setExportType] = useState<string>("full"); // full, stats-only, patients-only, appointments-only
   const [showExportDialog, setShowExportDialog] = useState(false);
+  const [showReportDialog, setShowReportDialog] = useState(false);
+  const [selectedPatientForReport, setSelectedPatientForReport] = useState<any>(null);
 
   // Setup WebSocket for real-time updates
   const { isConnected, socket, addEventListener, removeEventListener } = useWebSocket();
@@ -373,6 +376,11 @@ export default function Dashboard() {
     }
   };
 
+  const handleGenerateReport = (patient: any) => {
+    setSelectedPatientForReport(patient);
+    setShowReportDialog(true);
+  };
+
   // Helper function to calculate age
   const calculateAge = (dateOfBirth: string | Date) => {
     const today = new Date();
@@ -476,6 +484,11 @@ export default function Dashboard() {
                     localStorage.setItem("showAllPatients", "true");
                     window.location.href = "/patients";
                   }}
+                  onPatientClick={(patient) => {
+                    // Navigate to patient detail
+                    window.location.href = `/patients/${patient.id}`;
+                  }}
+                  onGenerateReport={handleGenerateReport}
                 />
               </div>
               <div>
@@ -581,6 +594,26 @@ export default function Dashboard() {
                 Export PDF
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Patient Report Dialog */}
+      <Dialog open={showReportDialog} onOpenChange={setShowReportDialog}>
+        <DialogContent className="max-w-7xl w-[95vw] max-h-[90vh] overflow-hidden p-0">
+          <DialogHeader className="px-6 py-4 border-b">
+            <DialogTitle>Patient Report</DialogTitle>
+            <DialogDescription>
+              Comprehensive treatment and progress report for {selectedPatientForReport?.fullPatient?.firstName} {selectedPatientForReport?.fullPatient?.lastName}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="overflow-y-auto max-h-[calc(90vh-120px)]">
+            {selectedPatientForReport && (
+              <PatientReport 
+                patientId={selectedPatientForReport.id} 
+                onClose={() => setShowReportDialog(false)}
+              />
+            )}
           </div>
         </DialogContent>
       </Dialog>

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -42,6 +42,7 @@ import type {
 } from "@shared/types";
 import { format, parseISO, isValid } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import PatientReport from "@/components/reports/PatientReport";
 
 import PatientNotes from "@/components/patients/PatientNotes";
 import { DischargeRequestForm } from "@/components/patients/DischargeRequestForm";
@@ -73,6 +74,18 @@ export default function PatientDetail() {
   
   // Discharge request state
   const [showDischargeRequest, setShowDischargeRequest] = useState(false);
+  const [showReportDialog, setShowReportDialog] = useState(false);
+
+  // Debug: Monitor showReportDialog state changes
+  useEffect(() => {
+    console.log("🔍 showReportDialog state changed to:", showReportDialog);
+    console.log("🔍 Component re-rendering with showReportDialog:", showReportDialog);
+  }, [showReportDialog]);
+
+  // Debug: Track component renders
+  const renderCount = useRef(0);
+  renderCount.current += 1;
+  console.log("🔍 PatientDetail component render #", renderCount.current, "showReportDialog:", showReportDialog);
   
   // Real-time socket connection for instant updates
   useSocket({
@@ -216,6 +229,16 @@ export default function PatientDetail() {
     refetchInterval: 5000, // Refetch every 5 seconds for real-time updates
     refetchIntervalInBackground: true, // Continue polling even when tab is not active
   }) as { data: any; isLoading: boolean };
+
+  // Debug: Monitor patient data changes
+  useEffect(() => {
+    console.log("🔍 Patient data changed:", { 
+      patient, 
+      patientLoading, 
+      patientId: patient?._id,
+      patientKeys: patient ? Object.keys(patient) : 'no patient'
+    });
+  }, [patient, patientLoading]);
 
   const { data: appointments, isLoading: appointmentsLoading } = useQuery({
     queryKey: [`/api/patients/${patientId}/appointments`],
@@ -537,6 +560,45 @@ export default function PatientDetail() {
                     </Button>
                   )}
 
+                  {/* Generate Report button */}
+                  {user?.role !== "frontdesk" && (
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        console.log("🔍 Generate Report button clicked!");
+                        console.log("🔍 Current showReportDialog state:", showReportDialog);
+                        console.log("🔍 Patient data when button clicked:", { 
+                          patient, 
+                          patientLoading, 
+                          patientId: patient?.id,
+                          patientKeys: patient ? Object.keys(patient) : 'no patient',
+                          patientType: typeof patient,
+                          patientIsNull: patient === null,
+                          patientIsUndefined: patient === undefined
+                        });
+                        // Log the full patient object to see its structure
+                        if (patient) {
+                          console.log("🔍 Full patient object:", JSON.stringify(patient, null, 2));
+                          console.log("🔍 Patient ID field check:", {
+                            _id: patient._id,
+                            id: patient.id,
+                            patientId: patient.patientId,
+                            hasOwnProperty_id: patient.hasOwnProperty('_id'),
+                            hasOwnProperty_id2: patient.hasOwnProperty('id')
+                          });
+                        }
+                        setShowReportDialog(true);
+                        console.log("🔍 Set showReportDialog to true");
+                      }}
+                      className="border-blue-200 text-blue-700 hover:bg-blue-50"
+                    >
+                      <FileText className="h-4 w-4 mr-2" />
+                      Generate Report
+                    </Button>
+                  )}
+
+
+
                   {/* Simple delete button */}
 
                   
@@ -620,14 +682,7 @@ export default function PatientDetail() {
                             {formatDate(patient.createdAt!)}
                           </p>
                         </div>
-                        <div>
-                          <label className="text-sm font-medium text-gray-500">
-                            Intake Date
-                          </label>
-                          <p className="text-sm text-gray-900">
-                            {patient.intakeDate ? formatDate(patient.intakeDate) : "Not specified"}
-                          </p>
-                        </div>
+
                       </div>
 
                       <div className="grid grid-cols-2 gap-4">
@@ -637,8 +692,8 @@ export default function PatientDetail() {
                           </label>
                           <p className="text-sm text-gray-900">
                             {(() => {
-                              const intake = patient.intakeDate ? new Date(patient.intakeDate) : (patient.createdAt ? new Date(patient.createdAt) : null);
-                              const discharge = patient.dischargeDate ? new Date(patient.dischargeDate) : (patient.status === 'discharged' ? new Date() : null);
+                              const intake = patient.createdAt ? new Date(patient.createdAt) : null;
+                              const discharge = patient.dischargeCriteria?.dischargeDate ? new Date(patient.dischargeCriteria.dischargeDate) : (patient.status === 'discharged' ? new Date() : null);
                               if (!intake) return 'N/A';
                               const end = discharge || new Date();
                               const diff = Math.max(0, Math.floor((end.getTime() - intake.getTime()) / (1000 * 60 * 60 * 24)));
@@ -651,7 +706,8 @@ export default function PatientDetail() {
                             Discharge Date
                           </label>
                           <p className="text-sm text-gray-900">
-                            {patient.dischargeDate ? formatDate(patient.dischargeDate) : "Not discharged"}
+                            {patient.dischargeCriteria?.dischargeDate ? formatDate(patient.dischargeCriteria.dischargeDate) : 
+                             patient.status === 'discharged' ? "Not recorded" : "Not discharged"}
                           </p>
                         </div>
                       </div>
@@ -1127,6 +1183,47 @@ export default function PatientDetail() {
             patientName={`${patient.firstName} ${patient.lastName}`}
             onRequestSubmitted={() => setShowDischargeRequest(false)}
           />
+        </DialogContent>
+      </Dialog>
+
+      {/* Patient Report Dialog */}
+      <Dialog open={showReportDialog} onOpenChange={(open) => {
+        console.log("🔍 Dialog onOpenChange called with:", open);
+        console.log("🔍 Current showReportDialog in Dialog:", showReportDialog);
+        console.log("🔍 Patient data in Dialog:", { patient, patientLoading, patientId: patient?._id });
+        // Only allow closing, not opening from external sources
+        if (!open) {
+          setShowReportDialog(false);
+        }
+      }}>
+        <DialogContent className="max-w-7xl w-[95vw] max-h-[90vh] overflow-hidden p-0">
+          <DialogHeader className="px-6 py-4 border-b">
+            <DialogTitle>Patient Report - Dialog State: {showReportDialog.toString()}</DialogTitle>
+            <DialogDescription>
+              Comprehensive treatment and progress report for {patient?.firstName} {patient?.lastName}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="overflow-y-auto max-h-[calc(90vh-120px)]">
+            {patientLoading ? (
+              <div className="flex items-center justify-center p-8">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                  <p>Loading patient data...</p>
+                </div>
+              </div>
+            ) : patient && patient.id ? (
+              <PatientReport 
+                patientId={patient.id} 
+                onClose={() => setShowReportDialog(false)}
+              />
+            ) : (
+              <div className="flex items-center justify-center p-8">
+                <div className="text-center text-red-600">
+                  <p>Error: Patient data not available</p>
+                </div>
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>

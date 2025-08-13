@@ -253,6 +253,7 @@ export function Sidebar({
             </ul>
           </div>
         ))}
+
       </nav>
     </aside>
   );

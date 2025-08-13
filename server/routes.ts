@@ -522,10 +522,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ? null
             : updates.assignedTherapistId,
       };
-      
 
-
-
+      // Automatically set discharge date when status is changed to "discharged"
+      console.log("🔍 Patient update - Status:", updates.status);
+      console.log("🔍 Patient update - Updates object:", updates);
+      if (updates.status === "discharged") {
+        console.log("🔍 Setting automatic discharge date for patient:", patientId);
+        const dischargeDate = new Date();
+        // Set discharge date in the correct nested location according to the Patient model
+        cleanedUpdates['dischargeCriteria.dischargeDate'] = dischargeDate;
+        console.log("🔍 Discharge date set to:", cleanedUpdates['dischargeCriteria.dischargeDate']);
+        console.log("🔍 Discharge date type:", typeof cleanedUpdates['dischargeCriteria.dischargeDate']);
+        console.log("🔍 Discharge date value:", cleanedUpdates['dischargeCriteria.dischargeDate']);
+      }
+      console.log("🔍 Final cleanedUpdates object:", cleanedUpdates);
+      console.log("🔍 About to call storage.updatePatient with:", JSON.stringify(cleanedUpdates, null, 2));
       
       const patient = await storage.updatePatient(patientId, cleanedUpdates);
 
@@ -4385,6 +4396,183 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Patient report endpoint for comprehensive patient information
+  app.get("/api/patients/:id/report", isAuthenticated, async (req: any, res) => {
+    // Disable caching for reports to ensure fresh data
+    res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+    try {
+      const { id } = req.params;
+      const { user } = req;
+
+      // Check if user has access to this patient - use direct DB query for fresh data
+      const patient = await Patient.findById(id).populate('assignedTherapistId');
+      if (!patient) {
+        return res.status(404).json({ error: "Patient not found" });
+      }
+      
+      // Debug: Check what patient data we have
+      console.log("🔍 Report endpoint - Patient data (direct DB query):", {
+        patientId: patient.id,
+        status: patient.status,
+        dischargeDate: patient.dischargeCriteria?.dischargeDate,
+        dischargeDateType: typeof patient.dischargeCriteria?.dischargeDate,
+        hasDischargeDate: !!patient.dischargeCriteria?.dischargeDate,
+        fullPatient: patient
+      });
+
+      // Get all related data for the patient
+      const [
+        appointments,
+        treatmentRecords,
+        treatmentOutcomesResult,
+        patientNotes
+      ] = await Promise.all([
+        storage.getAppointments(undefined, id),
+        storage.getPatientTreatmentRecords(id),
+        storage.getPatientTreatmentOutcomes(id),
+        storage.getPatientNotes(id)
+      ]);
+
+      // Extract outcomes array from the result object
+      const treatmentOutcomes = treatmentOutcomesResult.outcomes || [];
+
+      // Calculate statistics
+      const totalSessions = appointments.length;
+      const completedSessions = appointments.filter(apt => apt.status === 'completed').length;
+      const attendanceRate = totalSessions > 0 ? Math.round((completedSessions / totalSessions) * 100) : 0;
+
+      // Calculate average scores from treatment outcomes
+      const averageMoodScore = treatmentOutcomes.length > 0 
+        ? Math.round(treatmentOutcomes.reduce((sum, outcome) => sum + (outcome.moodState === 'stable' ? 5 : outcome.moodState === 'elevated' ? 8 : outcome.moodState === 'low' ? 3 : outcome.moodState === 'depressed' ? 2 : outcome.moodState === 'anxious' ? 4 : 5), 0) / treatmentOutcomes.length * 10) / 10
+        : 0;
+      
+      const averageAnxietyScore = treatmentOutcomes.length > 0 
+        ? Math.round(treatmentOutcomes.reduce((sum, outcome) => sum + (outcome.anxietyScore || 0), 0) / treatmentOutcomes.length * 10) / 10
+        : 0;
+      
+      const averageDepressionScore = treatmentOutcomes.length > 0 
+        ? Math.round(treatmentOutcomes.reduce((sum, outcome) => sum + (outcome.depressionScore || 0), 0) / treatmentOutcomes.length * 10) / 10
+        : 0;
+
+      // Calculate goal achievement and functional improvement rates
+      const goalAchievementRate = treatmentOutcomes.length > 0 
+        ? Math.round(treatmentOutcomes.reduce((sum, outcome) => sum + (outcome.goalProgress === 'achieved' ? 100 : outcome.goalProgress === 'exceeded' ? 120 : outcome.goalProgress === 'progressing' ? 75 : outcome.goalProgress === 'beginning' ? 25 : 0), 0) / treatmentOutcomes.length)
+        : 0;
+      
+      const functionalImprovementRate = treatmentOutcomes.length > 0 
+        ? Math.round(treatmentOutcomes.reduce((sum, outcome) => sum + (outcome.dailyFunctioning === 'excellent' ? 100 : outcome.dailyFunctioning === 'good' ? 80 : outcome.dailyFunctioning === 'fair' ? 60 : outcome.dailyFunctioning === 'poor' ? 40 : outcome.dailyFunctioning === 'severe' ? 20 : 0), 0) / treatmentOutcomes.length)
+        : 0;
+
+      const reportData = {
+        patient: {
+          id: patient.id,
+          firstName: patient.firstName,
+          lastName: patient.lastName,
+          dateOfBirth: patient.dateOfBirth,
+          gender: patient.gender,
+          email: patient.email,
+          phone: patient.phone,
+          address: patient.address,
+          insurance: patient.insurance,
+          reasonForVisit: patient.reasonForVisit,
+          authNumber: patient.authNumber,
+          loc: patient.loc,
+          status: patient.status,
+          hipaaConsent: patient.hipaaConsent,
+          important: patient.important,
+          createdAt: patient.createdAt,
+          dischargeCriteria: patient.dischargeCriteria || {
+            targetSessions: 12,
+            autoDischarge: false,
+            dischargeDate: patient.dischargeCriteria?.dischargeDate
+          },
+          assignedTherapist: patient.assignedTherapistId && typeof patient.assignedTherapistId === 'object' && 'firstName' in patient.assignedTherapistId && 'lastName' in patient.assignedTherapistId && 'email' in patient.assignedTherapistId ? {
+            firstName: patient.assignedTherapistId.firstName,
+            lastName: patient.assignedTherapistId.lastName,
+            email: patient.assignedTherapistId.email
+          } : undefined
+        },
+        appointments: appointments.map(apt => ({
+          id: apt.id,
+          date: apt.date,
+          time: apt.time,
+          status: apt.status,
+          notes: apt.notes,
+          therapist: {
+            firstName: apt.therapist?.firstName || 'Unknown',
+            lastName: apt.therapist?.lastName || 'Therapist'
+          }
+        })),
+        treatmentRecords: treatmentRecords.map(record => ({
+          id: record._id?.toString() || record._id,
+          assessmentDate: record.sessionDate,
+          symptoms: [], // Not available in current model
+          moodScore: 0, // Not available in current model
+          anxietyScore: 0, // Not available in current model
+          depressionScore: 0, // Not available in current model
+          functionalScore: 0, // Not available in current model
+          riskLevel: 'Unknown', // Not available in current model
+          notes: record.notes || '',
+          therapist: {
+            firstName: record.therapistId && typeof record.therapistId === 'object' && 'firstName' in record.therapistId ? record.therapistId.firstName : 'Unknown',
+            lastName: record.therapistId && typeof record.therapistId === 'object' && 'lastName' in record.therapistId ? record.therapistId.lastName : 'Therapist'
+          }
+        })),
+        treatmentOutcomes: treatmentOutcomes.map(outcome => ({
+          id: outcome._id?.toString() || outcome._id,
+          assessmentDate: outcome.assessmentDate,
+          symptomScores: {
+            anxiety: outcome.anxietyScore || 0,
+            depression: outcome.depressionScore || 0,
+            stress: outcome.stressScore || 0,
+            sleep: 0, // Not available in current model
+            social: outcome.socialEngagement === 'very_active' ? 10 : outcome.socialEngagement === 'active' ? 8 : outcome.socialEngagement === 'moderate' ? 6 : outcome.socialEngagement === 'limited' ? 4 : outcome.socialEngagement === 'isolated' ? 2 : 0
+          },
+          moodRating: outcome.moodState === 'stable' ? 5 : outcome.moodState === 'elevated' ? 8 : outcome.moodState === 'low' ? 3 : outcome.moodState === 'depressed' ? 2 : outcome.moodState === 'anxious' ? 4 : 5,
+          goalAchievement: outcome.goalProgress === 'achieved' ? 100 : outcome.goalProgress === 'exceeded' ? 120 : outcome.goalProgress === 'progressing' ? 75 : outcome.goalProgress === 'beginning' ? 25 : 0,
+          functionalImprovement: outcome.dailyFunctioning === 'excellent' ? 100 : outcome.dailyFunctioning === 'good' ? 80 : outcome.dailyFunctioning === 'fair' ? 60 : outcome.dailyFunctioning === 'poor' ? 40 : outcome.dailyFunctioning === 'severe' ? 20 : 0,
+          notes: outcome.clinicalNotes || ''
+        })),
+        dischargeRequests: (patient.dischargeRequests || []).map(request => ({
+          id: request._id?.toString() || request._id,
+          requestDate: request.requestedAt,
+          status: request.status,
+          reason: request.reason,
+          requestedBy: {
+            firstName: request.requestedBy && typeof request.requestedBy === 'object' && 'firstName' in request.requestedBy ? request.requestedBy.firstName : 'Unknown',
+            lastName: request.requestedBy && typeof request.requestedBy === 'object' && 'lastName' in request.requestedBy ? request.requestedBy.lastName : 'Staff'
+          }
+        })),
+        patientNotes: patientNotes.map(note => ({
+          id: note._id?.toString() || note._id,
+          date: note.createdAt,
+          note: note.content || '',
+          author: {
+            firstName: note.authorName ? note.authorName.split(' ')[0] : 'Unknown',
+            lastName: note.authorName ? note.authorName.split(' ').slice(1).join(' ') : 'Staff'
+          },
+          type: 'General' // Not available in current model
+        })),
+        statistics: {
+          totalSessions,
+          attendanceRate,
+          averageMoodScore,
+          averageAnxietyScore,
+          averageDepressionScore,
+          goalAchievementRate,
+          functionalImprovementRate
+        }
+      };
+
+      res.json(reportData);
+    } catch (error) {
+      console.error("Error generating patient report:", error);
+      res.status(500).json({ error: "Failed to generate patient report" });
+    }
+  });
+
   // Discharge request endpoints
   app.post("/api/patients/:id/discharge-request", isAuthenticated, async (req: any, res) => {
     try {
@@ -4542,7 +4730,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // If approved, discharge the patient
       if (status === "approved") {
-        await storage.updatePatient(patientId, { status: "discharged" });
+        const dischargeUpdates = { 
+          status: "discharged",
+          'dischargeCriteria.dischargeDate': new Date()
+        };
+        console.log("🔍 Approving discharge request - Setting automatic discharge date for patient:", patientId);
+        console.log("🔍 Discharge updates:", dischargeUpdates);
+        await storage.updatePatient(patientId, dischargeUpdates);
         
         // Log the discharge
         await logActivity(userId, "discharge_approved", "patient", patientId, {

@@ -86,6 +86,12 @@ export function EditStaffForm({ staffMember, onSuccess }: EditStaffFormProps) {
       description: "Administrative support staff",
       icon: Users,
     },
+    {
+      value: "frontdesk",
+      label: "Front Desk",
+      description: "Front desk staff with limited patient management access",
+      icon: Users,
+    },
     // Only show supervisor option for admins
     ...(user?.role === "admin" ? [{
       value: "supervisor",

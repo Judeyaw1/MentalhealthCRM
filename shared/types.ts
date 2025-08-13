@@ -39,6 +39,13 @@ export interface Patient {
   assignedTherapistId?: string;
   loc?: string;
   important?: boolean;
+  dischargeCriteria?: {
+    targetSessions?: number;
+    targetDate?: Date;
+    autoDischarge?: boolean;
+    dischargeReason?: string;
+    dischargeDate?: Date;
+  };
   createdAt?: Date;
   updatedAt?: Date;
 }

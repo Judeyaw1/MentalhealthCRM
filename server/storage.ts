@@ -7,6 +7,7 @@ import { TreatmentCompletionService } from "./treatmentCompletionService";
 import { Notification as NotificationModel } from "./models/Notification";
 import { Notification, NotificationType } from "./notificationService";
 import { TreatmentOutcome } from "./models/TreatmentOutcome";
+import { PatientNote } from "./models/PatientNote";
 
 // Simplified MongoDB-only storage for now
 export class DatabaseStorage {
@@ -104,6 +105,14 @@ export class DatabaseStorage {
     const p = await PatientModel.findById(id)
       .populate("assignedTherapistId", "firstName lastName email")
       .populate("createdBy", "firstName lastName email role")
+      .populate({
+        path: "dischargeRequests.requestedBy",
+        select: "firstName lastName"
+      })
+      .populate({
+        path: "dischargeRequests.reviewedBy",
+        select: "firstName lastName"
+      })
       .lean();
     if (!p) return undefined;
     const { _id, ...rest } = p;
@@ -238,11 +247,16 @@ export class DatabaseStorage {
 
     // Only include fields that are actually being updated
     const updateFields: any = { updatedAt: new Date() };
+    console.log("🔍 Storage: Input cleanedPatient:", JSON.stringify(cleanedPatient, null, 2));
     Object.keys(cleanedPatient).forEach(key => {
       if (cleanedPatient[key] !== undefined && cleanedPatient[key] !== null) {
         updateFields[key] = cleanedPatient[key];
+        console.log(`🔍 Storage: Including field ${key}:`, cleanedPatient[key]);
+      } else {
+        console.log(`🔍 Storage: Excluding field ${key}:`, cleanedPatient[key]);
       }
     });
+    console.log("🔍 Storage: Final updateFields:", JSON.stringify(updateFields, null, 2));
 
 
 
@@ -1778,6 +1792,42 @@ export class DatabaseStorage {
       };
     } catch (error) {
       console.error("Error getting patient treatment outcomes:", error);
+      throw error;
+    }
+  }
+
+  async getPatientTreatmentRecords(patientId: string) {
+    try {
+      const records = await TreatmentRecord.find({ patientId })
+        .populate('therapistId', 'firstName lastName')
+        .sort({ assessmentDate: -1 });
+      return records;
+    } catch (error) {
+      console.error("Error getting patient treatment records:", error);
+      throw error;
+    }
+  }
+
+  async getPatientDischargeRequests(patientId: string) {
+    try {
+      const requests = await DischargeRequest.find({ patientId })
+        .populate('requestedBy', 'firstName lastName')
+        .sort({ requestDate: -1 });
+      return requests;
+    } catch (error) {
+      console.error("Error getting patient discharge requests:", error);
+      throw error;
+    }
+  }
+
+  async getPatientNotes(patientId: string) {
+    try {
+      const notes = await PatientNote.find({ patientId })
+        .populate('createdBy', 'firstName lastName')
+        .sort({ createdAt: -1 });
+      return notes;
+    } catch (error) {
+      console.error("Error getting patient notes:", error);
       throw error;
     }
   }

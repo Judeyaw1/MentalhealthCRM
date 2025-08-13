@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Eye, Edit } from "lucide-react";
+import { Eye, Edit, FileText } from "lucide-react";
 import { Link } from "wouter";
 import type { PatientWithTherapist } from "@shared/types";
 
@@ -10,12 +10,16 @@ interface RecentPatientsProps {
   patients: PatientWithTherapist[];
   isLoading?: boolean;
   onViewAll?: () => void;
+  onPatientClick?: (patient: PatientWithTherapist) => void;
+  onGenerateReport?: (patient: PatientWithTherapist) => void;
 }
 
 export function RecentPatients({
   patients,
   isLoading,
   onViewAll,
+  onPatientClick,
+  onGenerateReport,
 }: RecentPatientsProps) {
   console.log("RecentPatients render:", {
     patients: patients.length,
@@ -171,6 +175,17 @@ export function RecentPatients({
                             <Edit className="h-4 w-4" />
                           </Button>
                         </Link>
+                        {onGenerateReport && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onGenerateReport(patient)}
+                            className="h-6 w-6 p-0"
+                            title="Generate Report"
+                          >
+                            <FileText className="h-3 w-3" />
+                          </Button>
+                        )}
                       </td>
                     </tr>
                   );

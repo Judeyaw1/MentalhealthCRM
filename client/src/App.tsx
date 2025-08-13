@@ -32,6 +32,7 @@ import Settings from "@/pages/Settings";
 import Notifications from "@/pages/Notifications";
 import DischargeRequests from "@/pages/DischargeRequests";
 import TreatmentOutcomes from "@/pages/TreatmentOutcomes";
+import PatientReports from "@/pages/PatientReports";
 
 function RouterComponent() {
   const { logout, isAuthenticated, user, forcePasswordChange } = useAuth();
@@ -79,6 +80,7 @@ function RouterComponent() {
         <Route path="/archive" component={Archive} />
             <Route path="/staff" component={Staff} />
             <Route path="/reports" component={Reports} />
+            <Route path="/patient-reports" component={PatientReports} />
             <Route path="/audit" component={AuditLogs} />
             <Route path="/settings" component={Settings} />
             <Route path="/notifications" component={Notifications} />
