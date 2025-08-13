@@ -410,7 +410,10 @@ export default function Dashboard() {
 
       <div className="flex">
         <Sidebar
-          patientCount={statsData.totalPatients}
+          patientCount={(() => {
+            const archivedCount = statsData.archivedPatients || 0;
+            return statsData.activeTreatments + (statsData.totalPatients - archivedCount);
+          })()} // Active + Inactive patients (excluding discharged)
           todayAppointments={statsData.todayAppointments}
           archivedCount={statsData.archivedPatients || 0}
         />

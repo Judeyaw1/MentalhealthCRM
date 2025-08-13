@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 
 interface SidebarProps {
-  patientCount?: number;
+  patientCount?: number; // Number of active + inactive patients (excluding discharged)
   todayAppointments?: number;
   archivedCount?: number;
   dischargeRequestsCount?: number;
@@ -59,6 +59,7 @@ export function Sidebar({
           icon: Users,
           current: location.startsWith("/patients"),
           badge: patientCount > 0 ? patientCount.toString() : undefined,
+          title: `Active + Inactive Patients: ${patientCount}`,
         },
         // Show Archive Patients for admin and supervisor users only
         ...((isAdmin || isSupervisor)
