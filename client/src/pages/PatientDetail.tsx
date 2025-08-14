@@ -70,16 +70,30 @@ export default function PatientDetail() {
 
   // Update active tab when URL changes (for navigation from notifications)
   useEffect(() => {
+    // Use both wouter location and browser URL for robust tab detection
     const currentUrlParams = new URLSearchParams(location.split('?')[1]);
-    const currentTab = currentUrlParams.get('tab') || 'overview';
+    const browserUrlParams = new URLSearchParams(window.location.search);
+    
+    const currentTab = currentUrlParams.get('tab') || browserUrlParams.get('tab') || 'overview';
     console.log("🔍 PatientDetail - URL changed, location:", location);
     console.log("🔍 PatientDetail - URL params:", location.split('?')[1]);
+    console.log("🔍 PatientDetail - Browser URL params:", window.location.search);
     console.log("🔍 PatientDetail - Current tab from URL:", currentTab, "active tab state:", activeTab);
     if (currentTab !== activeTab) {
       console.log("🔍 PatientDetail - Updating active tab from", activeTab, "to", currentTab);
       setActiveTab(currentTab);
     }
   }, [location, activeTab]);
+  
+  // Force tab update on mount if URL has tab parameter
+  useEffect(() => {
+    const urlParams = new URLSearchParams(location.split('?')[1]);
+    const tabFromUrl = urlParams.get('tab');
+    if (tabFromUrl && tabFromUrl !== activeTab) {
+      console.log("🔍 PatientDetail - Force updating tab on mount from", activeTab, "to", tabFromUrl);
+      setActiveTab(tabFromUrl);
+    }
+  }, []); // Empty dependency array - only run on mount
 
   // Smart back button logic
   const [previousPath, setPreviousPath] = useState<string>('/patients');
