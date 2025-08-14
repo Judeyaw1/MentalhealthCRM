@@ -62,9 +62,24 @@ export default function PatientDetail() {
   // Get tab from URL query parameter
   const urlParams = new URLSearchParams(location.split('?')[1]);
   const defaultTab = urlParams.get('tab') || 'overview';
+  console.log("🔍 PatientDetail - Initial URL params:", location.split('?')[1]);
+  console.log("🔍 PatientDetail - Initial default tab:", defaultTab);
   
   // State for active tab
   const [activeTab, setActiveTab] = useState(defaultTab);
+
+  // Update active tab when URL changes (for navigation from notifications)
+  useEffect(() => {
+    const currentUrlParams = new URLSearchParams(location.split('?')[1]);
+    const currentTab = currentUrlParams.get('tab') || 'overview';
+    console.log("🔍 PatientDetail - URL changed, location:", location);
+    console.log("🔍 PatientDetail - URL params:", location.split('?')[1]);
+    console.log("🔍 PatientDetail - Current tab from URL:", currentTab, "active tab state:", activeTab);
+    if (currentTab !== activeTab) {
+      console.log("🔍 PatientDetail - Updating active tab from", activeTab, "to", currentTab);
+      setActiveTab(currentTab);
+    }
+  }, [location, activeTab]);
 
   // Smart back button logic
   const [previousPath, setPreviousPath] = useState<string>('/patients');
