@@ -331,6 +331,9 @@ export default function PatientNotes({ patientId }: PatientNotesProps) {
             unreadMessages.forEach((note: PatientNote) => updated.delete(note._id));
             return updated;
           });
+
+          // Dispatch custom event to notify PatientDetail component
+          window.dispatchEvent(new CustomEvent('notes-read'));
         }
       }
     }
@@ -713,6 +716,10 @@ export default function PatientNotes({ patientId }: PatientNotesProps) {
           thread.notes.forEach((note: PatientNote) => updated.delete(note._id));
           return updated;
         });
+
+        // Dispatch custom event to notify PatientDetail component
+        window.dispatchEvent(new CustomEvent('notes-read'));
+
         toast({
           title: "All messages marked as read",
           description: "All messages in this conversation have been marked as read",
@@ -904,6 +911,9 @@ export default function PatientNotes({ patientId }: PatientNotesProps) {
                         thread.notes.forEach((note: PatientNote) => updated.delete(note._id));
                         return updated;
                       });
+
+                      // Dispatch custom event to notify PatientDetail component
+                      window.dispatchEvent(new CustomEvent('notes-read'));
                     }}
                   >
                     <div className="flex items-center space-x-3">

@@ -96,6 +96,61 @@ export default function PatientDetail() {
     enabled: !!patientId,
   });
 
+  // Get unread notes count for the badge
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Calculate unread notes count
+  useEffect(() => {
+    if (user?.id && patientId && notes.length > 0) {
+      try {
+        const saved = localStorage.getItem(`readMessages_${patientId}_${user.id}`);
+        if (saved) {
+          const readMessages = new Set(JSON.parse(saved) as string[]);
+          const unreadNotes = notes.filter((note: any) => 
+            note.authorId !== user?.id && !readMessages.has(note._id)
+          );
+          setUnreadCount(unreadNotes.length);
+        } else {
+          // If no read messages saved, all notes from other users are unread
+          const unreadNotes = notes.filter((note: any) => note.authorId !== user?.id);
+          setUnreadCount(unreadNotes.length);
+        }
+      } catch (error) {
+        console.error("❌ Error calculating unread count:", error);
+        setUnreadCount(0);
+      }
+    } else {
+      setUnreadCount(0);
+    }
+  }, [notes, user?.id, patientId]);
+
+  // Listen for custom events when notes are read to update unread count in real-time
+  useEffect(() => {
+    const handleNotesRead = () => {
+      // Recalculate unread count when notes are marked as read
+      if (user?.id && patientId && notes.length > 0) {
+        try {
+          const saved = localStorage.getItem(`readMessages_${patientId}_${user.id}`);
+          if (saved) {
+            const readMessages = new Set(JSON.parse(saved) as string[]);
+            const unreadNotes = notes.filter((note: any) => 
+              note.authorId !== user?.id && !readMessages.has(note._id)
+            );
+            setUnreadCount(unreadNotes.length);
+          } else {
+            const unreadNotes = notes.filter((note: any) => note.authorId !== user?.id);
+            setUnreadCount(unreadNotes.length);
+          }
+        } catch (error) {
+          console.error("❌ Error updating unread count from notes read event:", error);
+        }
+      }
+    };
+
+    window.addEventListener('notes-read', handleNotesRead);
+    return () => window.removeEventListener('notes-read', handleNotesRead);
+  }, [notes, user?.id, patientId]);
+
   // Update active tab when URL changes (for navigation from notifications)
   useEffect(() => {
     // Use both wouter location and browser URL for robust tab detection
@@ -713,12 +768,12 @@ export default function PatientDetail() {
                 {canUseChat && (
                   <TabsTrigger value="notes" className="relative">
                     Notes
-                    {notes.length > 0 && (
+                    {unreadCount > 0 && (
                       <Badge 
                         variant="destructive" 
                         className="ml-2 h-5 w-5 rounded-full p-0 text-xs font-bold flex items-center justify-center"
                       >
-                        {notes.length}
+                        {unreadCount}
                       </Badge>
                     )}
                   </TabsTrigger>
