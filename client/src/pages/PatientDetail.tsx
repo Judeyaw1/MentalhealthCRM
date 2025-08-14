@@ -74,6 +74,16 @@ export default function PatientDetail() {
   
   // State for active tab
   const [activeTab, setActiveTab] = useState(defaultTab);
+  
+  // Custom tab change handler that updates both state and URL
+  const handleTabChange = (newTab: string) => {
+    console.log("🔍 PatientDetail - Manual tab change from", activeTab, "to", newTab);
+    setActiveTab(newTab);
+    
+    // Update URL to reflect the new tab
+    const newUrl = `/patients/${patientId}?tab=${newTab}`;
+    window.history.replaceState(null, '', newUrl);
+  };
 
   // Update active tab when URL changes (for navigation from notifications)
   useEffect(() => {
@@ -89,9 +99,10 @@ export default function PatientDetail() {
     console.log("🔍 PatientDetail - Browser URL params:", window.location.search);
     console.log("🔍 PatientDetail - Current tab from URL:", currentTab, "active tab state:", activeTab);
     
-    // Always update if there's a tab parameter and it's different
-    if (currentTab && currentTab !== activeTab) {
-      console.log("🔍 PatientDetail - Updating active tab from", activeTab, "to", currentTab);
+    // Only update if this is a navigation from external source (not manual tab click)
+    // Check if the URL actually changed vs just the activeTab state
+    if (currentTab && currentTab !== activeTab && location.includes('?tab=')) {
+      console.log("🔍 PatientDetail - External navigation detected, updating tab from", activeTab, "to", currentTab);
       setActiveTab(currentTab);
     }
   }, [location, activeTab]);
@@ -126,14 +137,15 @@ export default function PatientDetail() {
       
       console.log("🔍 PatientDetail - Delayed URL check, tab:", delayedTab);
       
-      if (delayedTab && delayedTab !== activeTab) {
+      // Only update if this is initial navigation with tab parameter
+      if (delayedTab && delayedTab !== activeTab && location.includes('?tab=')) {
         console.log("🔍 PatientDetail - Delayed update: changing tab from", activeTab, "to", delayedTab);
         setActiveTab(delayedTab);
       }
     }, 100); // Small delay to ensure URL is fully updated
     
     return () => clearTimeout(timer);
-  }, [activeTab]);
+  }, [activeTab, location]);
 
   // Smart back button logic
   const [previousPath, setPreviousPath] = useState<string>('/patients');
@@ -676,7 +688,7 @@ export default function PatientDetail() {
               </div>
             </div>
 
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+            <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
               <TabsList>
                 <TabsTrigger value="overview">Overview</TabsTrigger>
                 <TabsTrigger value="appointments">Appointments</TabsTrigger>
