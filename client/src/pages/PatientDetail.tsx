@@ -104,15 +104,25 @@ export default function PatientDetail() {
     if (user?.id && patientId && notes.length > 0) {
       try {
         const saved = localStorage.getItem(`readMessages_${patientId}_${user.id}`);
+        console.log("🔍 Badge Debug - localStorage saved data:", saved);
+        
         if (saved) {
           const readMessages = new Set(JSON.parse(saved) as string[]);
+          console.log("🔍 Badge Debug - Read messages from localStorage:", Array.from(readMessages));
+          console.log("🔍 Badge Debug - Total notes:", notes.length);
+          console.log("🔍 Badge Debug - Notes from other users:", notes.filter((note: any) => note.authorId !== user?.id).length);
+          
           const unreadNotes = notes.filter((note: any) => 
             note.authorId !== user?.id && !readMessages.has(note._id)
           );
+          console.log("🔍 Badge Debug - Unread notes count:", unreadNotes.length);
+          console.log("🔍 Badge Debug - Unread note IDs:", unreadNotes.map((note: any) => note._id));
+          
           setUnreadCount(unreadNotes.length);
         } else {
           // If no read messages saved, all notes from other users are unread
           const unreadNotes = notes.filter((note: any) => note.authorId !== user?.id);
+          console.log("🔍 Badge Debug - No localStorage data, unread notes:", unreadNotes.length);
           setUnreadCount(unreadNotes.length);
         }
       } catch (error) {
@@ -120,8 +130,38 @@ export default function PatientDetail() {
         setUnreadCount(0);
       }
     } else {
+      console.log("🔍 Badge Debug - No user, patientId, or notes, setting unread count to 0");
       setUnreadCount(0);
     }
+  }, [notes, user?.id, patientId]);
+
+  // Recalculate unread count when page becomes visible (user returns to tab)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && user?.id && patientId && notes.length > 0) {
+        console.log("🔍 Badge Debug - Page became visible, recalculating unread count");
+        try {
+          const saved = localStorage.getItem(`readMessages_${patientId}_${user.id}`);
+          if (saved) {
+            const readMessages = new Set(JSON.parse(saved) as string[]);
+            const unreadNotes = notes.filter((note: any) => 
+              note.authorId !== user?.id && !readMessages.has(note._id)
+            );
+            console.log("🔍 Badge Debug - Visibility change - unread count:", unreadNotes.length);
+            setUnreadCount(unreadNotes.length);
+          }
+        } catch (error) {
+          console.error("❌ Error recalculating unread count on visibility change:", error);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleVisibilityChange);
+    };
   }, [notes, user?.id, patientId]);
 
   // Listen for custom events when notes are read to update unread count in real-time
