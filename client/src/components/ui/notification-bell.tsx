@@ -166,11 +166,16 @@ export function NotificationBell() {
           return;
         }
         
-        if (notification.type === "directed_note" && notification.data.noteId) {
+        // Handle all note-related notifications by navigating to the Notes tab
+        if (notification.type === "directed_note" || 
+            notification.type === "note_created" ||
+            notification.type === "note_updated" ||
+            (notification.type === "patient_update" && notification.message.toLowerCase().includes("note")) ||
+            (notification.type === "general" && notification.message.toLowerCase().includes("note"))) {
           // Navigate to patient detail page with notes tab
           toast({
-            title: "Opening directed note",
-            description: "Taking you to the patient's notes...",
+            title: "Opening patient notes",
+            description: "Taking you to the patient's notes tab...",
           });
           setLocation(`/patients/${notification.data.patientId}?tab=notes`);
           return;
