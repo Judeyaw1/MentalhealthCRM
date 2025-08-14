@@ -85,6 +85,17 @@ export default function PatientDetail() {
     window.history.replaceState(null, '', newUrl);
   };
 
+  // Fetch notes count for the Notes tab badge
+  const { data: notes = [] } = useQuery({
+    queryKey: ["patient-notes", patientId],
+    queryFn: async () => {
+      const response = await fetch(`/api/patients/${patientId}/notes`);
+      if (!response.ok) return [];
+      return response.json();
+    },
+    enabled: !!patientId,
+  });
+
   // Update active tab when URL changes (for navigation from notifications)
   useEffect(() => {
     // Use both wouter location and browser URL for robust tab detection
@@ -198,6 +209,12 @@ export default function PatientDetail() {
     onDischargeRequestUpdated: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/patients/${patientId}/discharge-requests`] });
       queryClient.invalidateQueries({ queryKey: ['/api/discharge-requests/pending'] });
+    },
+    onNoteCreated: () => {
+      queryClient.invalidateQueries({ queryKey: ['patient-notes', patientId] });
+    },
+    onNoteUpdated: () => {
+      queryClient.invalidateQueries({ queryKey: ['patient-notes', patientId] });
     },
   });
 
@@ -694,7 +711,17 @@ export default function PatientDetail() {
                 <TabsTrigger value="appointments">Appointments</TabsTrigger>
                 <TabsTrigger value="records">Treatment Records</TabsTrigger>
                 {canUseChat && (
-                  <TabsTrigger value="notes">Notes</TabsTrigger>
+                  <TabsTrigger value="notes" className="relative">
+                    Notes
+                    {notes.length > 0 && (
+                      <Badge 
+                        variant="destructive" 
+                        className="ml-2 h-5 w-5 rounded-full p-0 text-xs font-bold flex items-center justify-center"
+                      >
+                        {notes.length}
+                      </Badge>
+                    )}
+                  </TabsTrigger>
                 )}
                 {canPerformAssessments && (
                   <TabsTrigger value="assessment">Assessment</TabsTrigger>
