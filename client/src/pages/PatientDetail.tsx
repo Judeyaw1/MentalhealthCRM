@@ -59,10 +59,17 @@ export default function PatientDetail() {
   const canUseChat = ['admin', 'supervisor', 'therapist'].includes(user?.role || '');
   const isAdmin = user?.role === 'admin';
 
-  // Get tab from URL query parameter
-  const urlParams = new URLSearchParams(location.split('?')[1]);
-  const defaultTab = urlParams.get('tab') || 'overview';
-  console.log("🔍 PatientDetail - Initial URL params:", location.split('?')[1]);
+  // Get tab from URL query parameter - use both wouter and browser URL
+  const wouterParams = new URLSearchParams(location.split('?')[1]);
+  const browserParams = new URLSearchParams(window.location.search);
+  
+  // Prefer browser URL params as they're more reliable
+  const defaultTab = browserParams.get('tab') || wouterParams.get('tab') || 'overview';
+  
+  console.log("🔍 PatientDetail - Wouter location:", location);
+  console.log("🔍 PatientDetail - Wouter URL params:", location.split('?')[1]);
+  console.log("🔍 PatientDetail - Browser URL:", window.location.href);
+  console.log("🔍 PatientDetail - Browser URL params:", window.location.search);
   console.log("🔍 PatientDetail - Initial default tab:", defaultTab);
   
   // State for active tab
@@ -71,15 +78,19 @@ export default function PatientDetail() {
   // Update active tab when URL changes (for navigation from notifications)
   useEffect(() => {
     // Use both wouter location and browser URL for robust tab detection
-    const currentUrlParams = new URLSearchParams(location.split('?')[1]);
+    const wouterUrlParams = new URLSearchParams(location.split('?')[1]);
     const browserUrlParams = new URLSearchParams(window.location.search);
     
-    const currentTab = currentUrlParams.get('tab') || browserUrlParams.get('tab') || 'overview';
-    console.log("🔍 PatientDetail - URL changed, location:", location);
-    console.log("🔍 PatientDetail - URL params:", location.split('?')[1]);
+    // Prefer browser URL as it's more reliable
+    const currentTab = browserUrlParams.get('tab') || wouterUrlParams.get('tab') || 'overview';
+    
+    console.log("🔍 PatientDetail - URL changed, wouter location:", location);
+    console.log("🔍 PatientDetail - Wouter URL params:", location.split('?')[1]);
     console.log("🔍 PatientDetail - Browser URL params:", window.location.search);
     console.log("🔍 PatientDetail - Current tab from URL:", currentTab, "active tab state:", activeTab);
-    if (currentTab !== activeTab) {
+    
+    // Always update if there's a tab parameter and it's different
+    if (currentTab && currentTab !== activeTab) {
       console.log("🔍 PatientDetail - Updating active tab from", activeTab, "to", currentTab);
       setActiveTab(currentTab);
     }
@@ -87,13 +98,42 @@ export default function PatientDetail() {
   
   // Force tab update on mount if URL has tab parameter
   useEffect(() => {
-    const urlParams = new URLSearchParams(location.split('?')[1]);
-    const tabFromUrl = urlParams.get('tab');
+    // Check both wouter and browser URL on mount
+    const wouterParams = new URLSearchParams(location.split('?')[1]);
+    const browserParams = new URLSearchParams(window.location.search);
+    
+    const tabFromWouter = wouterParams.get('tab');
+    const tabFromBrowser = browserParams.get('tab');
+    const tabFromUrl = tabFromBrowser || tabFromWouter;
+    
+    console.log("🔍 PatientDetail - Force update on mount:");
+    console.log("  - Tab from wouter:", tabFromWouter);
+    console.log("  - Tab from browser:", tabFromBrowser);
+    console.log("  - Tab from URL:", tabFromUrl);
+    console.log("  - Current active tab:", activeTab);
+    
     if (tabFromUrl && tabFromUrl !== activeTab) {
       console.log("🔍 PatientDetail - Force updating tab on mount from", activeTab, "to", tabFromUrl);
       setActiveTab(tabFromUrl);
     }
   }, []); // Empty dependency array - only run on mount
+  
+  // Additional delayed check for URL parameters (handles timing issues)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const browserParams = new URLSearchParams(window.location.search);
+      const delayedTab = browserParams.get('tab');
+      
+      console.log("🔍 PatientDetail - Delayed URL check, tab:", delayedTab);
+      
+      if (delayedTab && delayedTab !== activeTab) {
+        console.log("🔍 PatientDetail - Delayed update: changing tab from", activeTab, "to", delayedTab);
+        setActiveTab(delayedTab);
+      }
+    }, 100); // Small delay to ensure URL is fully updated
+    
+    return () => clearTimeout(timer);
+  }, [activeTab]);
 
   // Smart back button logic
   const [previousPath, setPreviousPath] = useState<string>('/patients');
