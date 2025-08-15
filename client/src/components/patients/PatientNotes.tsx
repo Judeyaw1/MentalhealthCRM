@@ -104,7 +104,7 @@ export default function PatientNotes({ patientId }: PatientNotesProps) {
 
   // Save read messages to localStorage whenever they change
   useEffect(() => {
-    if (user?.id && patientId && readMessages.size > 0) {
+    if (user?.id && patientId) {
       try {
         localStorage.setItem(`readMessages_${patientId}_${user.id}`, JSON.stringify(Array.from(readMessages)));
         console.log("💾 Saved read messages to localStorage:", {
@@ -323,6 +323,12 @@ export default function PatientNotes({ patientId }: PatientNotesProps) {
         if (unreadMessages.length > 0) {
           const newReadMessages = new Set(readMessages);
           unreadMessages.forEach((note: PatientNote) => newReadMessages.add(note._id));
+          
+          console.log("📖 PatientNotes Debug - Marking notes as read:");
+          console.log("  - Current readMessages:", Array.from(readMessages));
+          console.log("  - New readMessages:", Array.from(newReadMessages));
+          console.log("  - Notes being marked as read:", unreadMessages.map((n: PatientNote) => ({ id: n._id, author: n.authorName })));
+          
           setReadMessages(newReadMessages);
           
           // Remove from new messages after marking as read
@@ -332,8 +338,11 @@ export default function PatientNotes({ patientId }: PatientNotesProps) {
             return updated;
           });
 
-          // Dispatch custom event to notify PatientDetail component
-          window.dispatchEvent(new CustomEvent('notes-read'));
+          // Dispatch custom event to notify PatientDetail component with a small delay to ensure localStorage is updated
+          setTimeout(() => {
+            console.log("📖 PatientNotes Debug - Dispatching 'notes-read' event after delay");
+            window.dispatchEvent(new CustomEvent('notes-read'));
+          }, 100);
         }
       }
     }
@@ -710,6 +719,12 @@ export default function PatientNotes({ patientId }: PatientNotesProps) {
             newReadMessages.add(note._id);
           }
         });
+        
+        console.log("📖 PatientNotes Debug - Mark all read in thread:");
+        console.log("  - Current readMessages:", Array.from(readMessages));
+        console.log("  - New readMessages:", Array.from(newReadMessages));
+        console.log("  - Thread notes:", thread.notes.map((n: PatientNote) => ({ id: n._id, author: n.authorName })));
+        
         setReadMessages(newReadMessages);
         setNewMessages(prev => {
           const updated = new Set(Array.from(prev));
@@ -717,8 +732,11 @@ export default function PatientNotes({ patientId }: PatientNotesProps) {
           return updated;
         });
 
-        // Dispatch custom event to notify PatientDetail component
-        window.dispatchEvent(new CustomEvent('notes-read'));
+        // Dispatch custom event to notify PatientDetail component with a small delay to ensure localStorage is updated
+        setTimeout(() => {
+          console.log("📖 PatientNotes Debug - Dispatching 'notes-read' event after delay (mark all read)");
+          window.dispatchEvent(new CustomEvent('notes-read'));
+        }, 100);
 
         toast({
           title: "All messages marked as read",
@@ -905,6 +923,12 @@ export default function PatientNotes({ patientId }: PatientNotesProps) {
                           newReadMessages.add(note._id);
                         }
                       });
+                      
+                      console.log("📖 PatientNotes Debug - Thread selected, marking as read:");
+                      console.log("  - Current readMessages:", Array.from(readMessages));
+                      console.log("  - New readMessages:", Array.from(newReadMessages));
+                      console.log("  - Thread notes:", thread.notes.map((n: PatientNote) => ({ id: n._id, author: n.authorName })));
+                      
                       setReadMessages(newReadMessages);
                       setNewMessages(prev => {
                         const updated = new Set(Array.from(prev));
@@ -912,8 +936,11 @@ export default function PatientNotes({ patientId }: PatientNotesProps) {
                         return updated;
                       });
 
-                      // Dispatch custom event to notify PatientDetail component
-                      window.dispatchEvent(new CustomEvent('notes-read'));
+                      // Dispatch custom event to notify PatientDetail component with a small delay to ensure localStorage is updated
+                      setTimeout(() => {
+                        console.log("📖 PatientNotes Debug - Dispatching 'notes-read' event after delay (thread selection)");
+                        window.dispatchEvent(new CustomEvent('notes-read'));
+                      }, 100);
                     }}
                   >
                     <div className="flex items-center space-x-3">

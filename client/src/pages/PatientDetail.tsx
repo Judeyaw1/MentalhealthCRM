@@ -80,10 +80,35 @@ export default function PatientDetail() {
     console.log("🔍 PatientDetail - Manual tab change from", activeTab, "to", newTab);
     setActiveTab(newTab);
     
+    // Clear the badge when Notes tab is selected
+    if (newTab === 'notes') {
+      console.log("🔍 Badge Debug - Notes tab selected, clearing badge");
+      setUnreadCount(0);
+      setBadgeCleared(true);
+      
+      // Save to localStorage so it persists across sessions
+      if (user?.id && patientId) {
+        localStorage.setItem(`badgeCleared_${patientId}_${user.id}`, 'true');
+        console.log("🔍 Badge Debug - Badge cleared status saved to localStorage");
+      }
+    }
+    
     // Update URL to reflect the new tab
     const newUrl = `/patients/${patientId}?tab=${newTab}`;
     window.history.replaceState(null, '', newUrl);
   };
+
+  // Listen for custom events when notes are read to update unread count in real-time
+  useEffect(() => {
+    const handleNotesRead = () => {
+      console.log("🔍 Badge Debug - 'notes-read' event received, clearing badge permanently");
+      // Clear the badge permanently when any note is viewed
+      setUnreadCount(0);
+    };
+
+    window.addEventListener('notes-read', handleNotesRead);
+    return () => window.removeEventListener('notes-read', handleNotesRead);
+  }, []);
 
   // Fetch notes count for the Notes tab badge
   const { data: notes = [] } = useQuery({
@@ -98,9 +123,28 @@ export default function PatientDetail() {
 
   // Get unread notes count for the badge
   const [unreadCount, setUnreadCount] = useState(0);
+  const [badgeCleared, setBadgeCleared] = useState(false);
+
+  // Load badge cleared status from localStorage on mount
+  useEffect(() => {
+    if (user?.id && patientId) {
+      const saved = localStorage.getItem(`badgeCleared_${patientId}_${user.id}`);
+      if (saved === 'true') {
+        console.log("🔍 Badge Debug - Loading badge cleared status from localStorage");
+        setBadgeCleared(true);
+        setUnreadCount(0);
+      }
+    }
+  }, [user?.id, patientId]);
 
   // Calculate unread notes count
   useEffect(() => {
+    // Don't recalculate if badge has been cleared
+    if (badgeCleared) {
+      console.log("🔍 Badge Debug - Badge already cleared, skipping calculation");
+      return;
+    }
+
     if (user?.id && patientId && notes.length > 0) {
       try {
         const saved = localStorage.getItem(`readMessages_${patientId}_${user.id}`);
@@ -133,11 +177,17 @@ export default function PatientDetail() {
       console.log("🔍 Badge Debug - No user, patientId, or notes, setting unread count to 0");
       setUnreadCount(0);
     }
-  }, [notes, user?.id, patientId]);
+  }, [notes, user?.id, patientId, badgeCleared]);
 
   // Recalculate unread count when page becomes visible (user returns to tab)
   useEffect(() => {
     const handleVisibilityChange = () => {
+      // Don't recalculate if badge has been cleared
+      if (badgeCleared) {
+        console.log("🔍 Badge Debug - Badge already cleared, skipping visibility recalculation");
+        return;
+      }
+
       if (!document.hidden && user?.id && patientId && notes.length > 0) {
         console.log("🔍 Badge Debug - Page became visible, recalculating unread count");
         try {
@@ -164,32 +214,24 @@ export default function PatientDetail() {
     };
   }, [notes, user?.id, patientId]);
 
-  // Listen for custom events when notes are read to update unread count in real-time
+  // Listen for custom events when notes are read to clear badge permanently
   useEffect(() => {
     const handleNotesRead = () => {
-      // Recalculate unread count when notes are marked as read
-      if (user?.id && patientId && notes.length > 0) {
-        try {
-          const saved = localStorage.getItem(`readMessages_${patientId}_${user.id}`);
-          if (saved) {
-            const readMessages = new Set(JSON.parse(saved) as string[]);
-            const unreadNotes = notes.filter((note: any) => 
-              note.authorId !== user?.id && !readMessages.has(note._id)
-            );
-            setUnreadCount(unreadNotes.length);
-          } else {
-            const unreadNotes = notes.filter((note: any) => note.authorId !== user?.id);
-            setUnreadCount(unreadNotes.length);
-          }
-        } catch (error) {
-          console.error("❌ Error updating unread count from notes read event:", error);
-        }
+      console.log("🔍 Badge Debug - 'notes-read' event received, clearing badge permanently");
+      // Clear the badge permanently when any note is viewed
+      setUnreadCount(0);
+      setBadgeCleared(true);
+      
+      // Save to localStorage so it persists across sessions
+      if (user?.id && patientId) {
+        localStorage.setItem(`badgeCleared_${patientId}_${user.id}`, 'true');
+        console.log("🔍 Badge Debug - Badge cleared status saved to localStorage via event");
       }
     };
 
     window.addEventListener('notes-read', handleNotesRead);
     return () => window.removeEventListener('notes-read', handleNotesRead);
-  }, [notes, user?.id, patientId]);
+  }, [user?.id, patientId]);
 
   // Update active tab when URL changes (for navigation from notifications)
   useEffect(() => {
