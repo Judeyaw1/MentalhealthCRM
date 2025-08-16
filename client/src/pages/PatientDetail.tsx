@@ -47,6 +47,7 @@ import PatientReport from "@/components/reports/PatientReport";
 import PatientNotes from "@/components/patients/PatientNotes";
 import { DischargeRequestForm } from "@/components/patients/DischargeRequestForm";
 import { DischargeRequestsList } from "@/components/patients/DischargeRequestsList";
+import PatientMiscellaneous from "@/components/patients/PatientMiscellaneous";
 
 export default function PatientDetail() {
   const params = useParams();
@@ -124,21 +125,45 @@ export default function PatientDetail() {
   // Get unread notes count for the badge
   const [unreadCount, setUnreadCount] = useState(0);
   const [badgeCleared, setBadgeCleared] = useState(false);
+  const [badgeStatusLoaded, setBadgeStatusLoaded] = useState(false);
+
+  // Debug badge state changes
+  useEffect(() => {
+    console.log("🔍 Badge Debug - State changed - unreadCount:", unreadCount, "badgeCleared:", badgeCleared, "badgeStatusLoaded:", badgeStatusLoaded);
+  }, [unreadCount, badgeCleared, badgeStatusLoaded]);
+
+  // Debug initial mount state
+  useEffect(() => {
+    console.log("🔍 Badge Debug - Component mounted - Initial state:", {
+      unreadCount,
+      badgeCleared,
+      badgeStatusLoaded,
+      user: user?.id,
+      patientId
+    });
+  }, []); // Only run on mount
 
   // Load badge cleared status from localStorage on mount
   useEffect(() => {
     if (user?.id && patientId) {
       const saved = localStorage.getItem(`badgeCleared_${patientId}_${user.id}`);
+      console.log("🔍 Badge Debug - Checking localStorage for badge cleared status:", saved);
       if (saved === 'true') {
-        console.log("🔍 Badge Debug - Loading badge cleared status from localStorage");
+        console.log("🔍 Badge Debug - Loading badge cleared status from localStorage - setting badgeCleared to true");
         setBadgeCleared(true);
         setUnreadCount(0);
+      } else {
+        console.log("🔍 Badge Debug - No badge cleared status found in localStorage - badgeCleared remains false");
       }
+      // Mark that we've loaded the badge status
+      setBadgeStatusLoaded(true);
+      console.log("🔍 Badge Debug - Badge status loaded from localStorage, badgeStatusLoaded set to true");
     }
   }, [user?.id, patientId]);
 
   // Calculate unread notes count
   useEffect(() => {
+    console.log("🔍 Badge Debug - Badge calculation effect triggered, badgeCleared:", badgeCleared, "badgeStatusLoaded:", badgeStatusLoaded);
     // Don't recalculate if badge has been cleared
     if (badgeCleared) {
       console.log("🔍 Badge Debug - Badge already cleared, skipping calculation");
@@ -177,9 +202,9 @@ export default function PatientDetail() {
       console.log("🔍 Badge Debug - No user, patientId, or notes, setting unread count to 0");
       setUnreadCount(0);
     }
-  }, [notes, user?.id, patientId, badgeCleared]);
+  }, [notes, user?.id, patientId, badgeStatusLoaded]);
 
-  // Recalculate unread count when page becomes visible (user returns to tab)
+  // Recalculate unread count when page becomes visible (user returns to tab) - VISIBILITY EFFECT
   useEffect(() => {
     const handleVisibilityChange = () => {
       // Don't recalculate if badge has been cleared
@@ -212,7 +237,7 @@ export default function PatientDetail() {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', handleVisibilityChange);
     };
-  }, [notes, user?.id, patientId]);
+  }, [notes, user?.id, patientId, badgeCleared, badgeStatusLoaded]);
 
   // Listen for custom events when notes are read to clear badge permanently
   useEffect(() => {
@@ -860,6 +885,7 @@ export default function PatientDetail() {
                     )}
                   </TabsTrigger>
                 )}
+                <TabsTrigger value="miscellaneous">Miscellaneous</TabsTrigger>
                 {canPerformAssessments && (
                   <TabsTrigger value="assessment">Assessment</TabsTrigger>
                 )}
@@ -1373,6 +1399,10 @@ export default function PatientDetail() {
                   <PatientNotes patientId={patientId} />
                 </TabsContent>
               )}
+
+              <TabsContent value="miscellaneous">
+                <PatientMiscellaneous patientId={patientId} patient={patient} />
+              </TabsContent>
 
               {canPerformAssessments && (
                 <TabsContent value="assessment">

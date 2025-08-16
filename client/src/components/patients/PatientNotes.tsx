@@ -101,6 +101,53 @@ export default function PatientNotes({ patientId }: PatientNotesProps) {
   const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
   const [readMessages, setReadMessages] = useState<Set<string>>(new Set());
   const [newMessages, setNewMessages] = useState<Set<string>>(new Set());
+  const [threadBadgeCleared, setThreadBadgeCleared] = useState<Set<string>>(new Set());
+  const [badgeStatusLoaded, setBadgeStatusLoaded] = useState(false);
+
+  // Debug thread badge state changes
+  useEffect(() => {
+    console.log("🔍 Thread Badge Debug - State changed - threadBadgeCleared:", Array.from(threadBadgeCleared), "badgeStatusLoaded:", badgeStatusLoaded);
+  }, [threadBadgeCleared, badgeStatusLoaded]);
+
+  // Debug initial mount state
+  useEffect(() => {
+    console.log("🔍 Thread Badge Debug - Component mounted - Initial state:", {
+      threadBadgeCleared: Array.from(threadBadgeCleared),
+      badgeStatusLoaded,
+      user: user?.id,
+      patientId
+    });
+  }, []); // Only run on mount
+
+  // Debug readMessages state changes
+  useEffect(() => {
+    console.log("🔍 Thread Badge Debug - readMessages state changed:", {
+      readMessagesSize: readMessages.size,
+      readMessages: Array.from(readMessages),
+      user: user?.id,
+      patientId
+    });
+  }, [readMessages, user?.id, patientId]);
+
+  // Load thread badge cleared status from localStorage on mount
+  useEffect(() => {
+    if (user?.id && patientId) {
+      try {
+        const saved = localStorage.getItem(`threadBadgeCleared_${patientId}_${user.id}`);
+        if (saved) {
+          const clearedThreads = new Set(JSON.parse(saved) as string[]);
+          setThreadBadgeCleared(clearedThreads);
+          console.log("🔍 Thread Badge Debug - Loaded cleared threads from localStorage:", Array.from(clearedThreads));
+        } else {
+          console.log("🔍 Thread Badge Debug - No cleared threads found in localStorage");
+        }
+        setBadgeStatusLoaded(true);
+      } catch (error) {
+        console.error("❌ Error loading thread badge cleared status:", error);
+        setBadgeStatusLoaded(true);
+      }
+    }
+  }, [user?.id, patientId]);
 
   // Save read messages to localStorage whenever they change
   useEffect(() => {
@@ -119,6 +166,18 @@ export default function PatientNotes({ patientId }: PatientNotesProps) {
     }
   }, [readMessages, patientId, user?.id]);
 
+  // Save thread badge cleared status to localStorage whenever it changes
+  useEffect(() => {
+    if (user?.id && patientId) {
+      try {
+        localStorage.setItem(`threadBadgeCleared_${patientId}_${user.id}`, JSON.stringify(Array.from(threadBadgeCleared)));
+        console.log("🔍 Thread Badge Debug - Saved cleared threads to localStorage:", Array.from(threadBadgeCleared));
+      } catch (error) {
+        console.error("❌ Error saving thread badge cleared status:", error);
+      }
+    }
+  }, [threadBadgeCleared, patientId, user?.id]);
+
   // WebSocket integration for real-time updates
   const { socket } = useSocket({
     onNoteCreated: (data) => {
@@ -131,6 +190,16 @@ export default function PatientNotes({ patientId }: PatientNotesProps) {
       if (data.patientId === patientId) {
         console.log('📝 Real-time note created:', data);
         queryClient.invalidateQueries({ queryKey: ['patient-notes', patientId] });
+        
+        // If this is the current user's own message, mark it as read immediately
+        if (data.authorId === user?.id && data.note?._id) {
+          console.log('📝 Marking own sent message as read immediately:', data.note._id);
+          setReadMessages(prev => {
+            const newReadMessages = new Set(prev);
+            newReadMessages.add(data.note._id);
+            return newReadMessages;
+          });
+        }
         
         // Mark as new message if from other user and not already read
         if (data.authorId !== user?.id && data.note?._id && !readMessages.has(data.note._id)) {
@@ -485,6 +554,13 @@ export default function PatientNotes({ patientId }: PatientNotesProps) {
   };
 
   const getUnreadCount = (thread: Thread) => {
+    // Don't calculate unread count if badge has been cleared for this thread
+    if (threadBadgeCleared.has(thread.threadId)) {
+      console.log("🔍 Thread Badge Debug - Badge cleared for thread:", thread.threadId, "returning 0");
+      return 0;
+    }
+    
+    // Calculate unread count for messages from other users that haven't been read
     const unreadNotes = thread.notes.filter((note: PatientNote) => 
       note.authorId !== user?.id && !readMessages.has(note._id)
     );
@@ -494,6 +570,8 @@ export default function PatientNotes({ patientId }: PatientNotesProps) {
       unreadCount: unreadNotes.length,
       readMessagesSize: readMessages.size,
       currentUserId: user?.id,
+      badgeCleared: threadBadgeCleared.has(thread.threadId),
+      badgeStatusLoaded,
       unreadNotes: unreadNotes.map(note => ({
         id: note._id,
         authorId: note.authorId,
@@ -916,6 +994,15 @@ export default function PatientNotes({ patientId }: PatientNotesProps) {
                     }`}
                     onClick={() => {
                       setSelectedThread(thread.threadId);
+                      
+                      // Mark thread badge as cleared when thread is selected
+                      if (!threadBadgeCleared.has(thread.threadId)) {
+                        const newClearedThreads = new Set(threadBadgeCleared);
+                        newClearedThreads.add(thread.threadId);
+                        setThreadBadgeCleared(newClearedThreads);
+                        console.log("🔍 Thread Badge Debug - Marking thread badge as cleared:", thread.threadId);
+                      }
+                      
                       // Automatically mark messages as read when thread is selected
                       const newReadMessages = new Set(readMessages);
                       thread.notes.forEach((note: PatientNote) => {

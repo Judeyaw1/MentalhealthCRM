@@ -89,6 +89,154 @@ export interface AuditLog {
   timestamp?: Date;
 }
 
+// Patient Miscellaneous Data Types
+export interface PatientMiscellaneous {
+  id?: string;
+  patientId: string;
+  
+  // Administrative Information
+  insurance?: {
+    provider: string;
+    policyNumber: string;
+    groupNumber?: string;
+    coverageLimits?: string;
+    notes?: string;
+  };
+  
+  emergencyContacts?: Array<{
+    name: string;
+    relationship: string;
+    phone: string;
+    email?: string;
+    isPrimary: boolean;
+  }>;
+  
+  legalDocuments?: Array<{
+    type: string;
+    name: string;
+    date: Date;
+    fileId?: string;
+    notes?: string;
+  }>;
+  
+  referralInfo?: {
+    referredBy: string;
+    referralDate: Date;
+    reason: string;
+    source: string;
+    notes?: string;
+  };
+  
+  billingNotes?: {
+    paymentPlan?: string;
+    outstandingBalance?: number;
+    specialArrangements?: string;
+    notes?: string;
+  };
+  
+  // Personal Preferences & Accommodations
+  communicationPreferences?: {
+    preferredLanguage: string;
+    interpreterNeeded: boolean;
+    communicationStyle: string;
+    notes?: string;
+  };
+  
+  culturalConsiderations?: {
+    culturalBackground?: string;
+    religiousPractices?: string;
+    dietaryRestrictions?: string;
+    notes?: string;
+  };
+  
+  accessibilityNeeds?: {
+    mobility?: string;
+    hearing?: string;
+    vision?: string;
+    cognitive?: string;
+    notes?: string;
+  };
+  
+  schedulingPreferences?: {
+    preferredTimeOfDay?: string;
+    preferredDays?: string[];
+    frequency?: string;
+    notes?: string;
+  };
+  
+  // External Resources
+  communityResources?: Array<{
+    name: string;
+    type: string;
+    contactInfo: string;
+    description: string;
+    notes?: string;
+  }>;
+  
+  healthcareProviders?: Array<{
+    name: string;
+    specialty: string;
+    contactInfo: string;
+    relationship: string;
+    notes?: string;
+  }>;
+  
+  socialServices?: Array<{
+    name: string;
+    type: string;
+    contactInfo: string;
+    description: string;
+    notes?: string;
+  }>;
+  
+  educationalResources?: Array<{
+    name: string;
+    type: string;
+    description: string;
+    url?: string;
+    notes?: string;
+  }>;
+  
+  // File Management
+  uploadedFiles?: Array<{
+    fileId: string;
+    originalName: string;
+    fileName: string;
+    category: string;
+    description?: string;
+    uploadedBy: string;
+    uploadedAt: Date;
+    fileSize: number;
+    mimeType: string;
+    notes?: string;
+  }>;
+  
+  // General Notes & Observations
+  generalNotes?: Array<{
+    title: string;
+    content: string;
+    category: string;
+    createdBy: string;
+    createdAt: Date;
+    updatedAt: Date;
+    isPrivate: boolean;
+  }>;
+  
+  // Follow-up & Reminders
+  followUpReminders?: Array<{
+    title: string;
+    description: string;
+    dueDate: Date;
+    priority: 'low' | 'medium' | 'high';
+    status: 'pending' | 'completed' | 'overdue';
+    assignedTo?: string;
+    notes?: string;
+  }>;
+  
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
 // Insert types for form submissions
 export interface InsertUser {
   email: string;

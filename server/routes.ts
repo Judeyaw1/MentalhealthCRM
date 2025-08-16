@@ -420,6 +420,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         createdBy: userId,
       };
       const patient = await storage.createPatient(patientWithCreator);
+      
+      // Sync emergency contact to miscellaneous if provided
+      if (patientData.emergencyContact && patientData.emergencyContact.name) {
+        try {
+          const { PatientMiscellaneous } = await import("./models/PatientMiscellaneous");
+          await PatientMiscellaneous.findOneAndUpdate(
+            { patientId: patient.id.toString() },
+            {
+              $set: {
+                emergencyContacts: [{
+                  name: patientData.emergencyContact.name,
+                  relationship: patientData.emergencyContact.relationship || "Emergency Contact",
+                  phone: patientData.emergencyContact.phone || "",
+                  email: "",
+                  isPrimary: true
+                }]
+              }
+            },
+            { upsert: true }
+          );
+        } catch (syncError) {
+          console.warn("Failed to sync emergency contact to miscellaneous:", syncError);
+        }
+      }
+      
       await logActivity(
         userId,
         "create",
@@ -427,8 +452,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         patient.id.toString(),
         parsed,
       );
-      
-
       
       res.status(201).json(patient);
     } catch (error) {
@@ -539,7 +562,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("🔍 About to call storage.updatePatient with:", JSON.stringify(cleanedUpdates, null, 2));
       
       const patient = await storage.updatePatient(patientId, cleanedUpdates);
-
+      
+      // Sync emergency contact to miscellaneous if it was updated
+      if (updates.emergencyContact) {
+        try {
+          const { PatientMiscellaneous } = await import("./models/PatientMiscellaneous");
+          const existingMisc = await PatientMiscellaneous.findOne({ patientId });
+          
+          if (existingMisc && existingMisc.emergencyContacts && existingMisc.emergencyContacts.length > 0) {
+            // Update the primary contact if it exists
+            const updatedContacts = existingMisc.emergencyContacts.map((contact, index) => 
+              index === 0 ? {
+                ...contact,
+                name: updates.emergencyContact.name || contact.name,
+                relationship: updates.emergencyContact.relationship || contact.relationship,
+                phone: updates.emergencyContact.phone || contact.phone
+              } : contact
+            );
+            
+            await PatientMiscellaneous.findOneAndUpdate(
+              { patientId },
+              { $set: { emergencyContacts: updatedContacts } }
+            );
+          } else if (updates.emergencyContact.name) {
+            // Create new emergency contact in miscellaneous
+            await PatientMiscellaneous.findOneAndUpdate(
+              { patientId },
+              {
+                $set: {
+                  emergencyContacts: [{
+                    name: updates.emergencyContact.name,
+                    relationship: updates.emergencyContact.relationship || "Emergency Contact",
+                    phone: updates.emergencyContact.phone || "",
+                    email: "",
+                    isPrimary: true
+                  }]
+                }
+              },
+              { upsert: true }
+            );
+          }
+        } catch (syncError) {
+          console.warn("Failed to sync emergency contact to miscellaneous:", syncError);
+        }
+      }
       
       await logActivity(
         userId,
@@ -548,8 +614,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         patientId.toString(),
         cleanedUpdates,
       );
-      
-
       
       res.json(patient);
     } catch (error) {
@@ -5041,6 +5105,303 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error getting treatment outcomes summary:", error);
       res.status(500).json({ error: "Failed to get treatment outcomes summary" });
+    }
+  });
+
+  // ===== PATIENT MISCELLANEOUS DATA ENDPOINTS =====
+  
+  // Get patient miscellaneous data
+  app.get("/api/patients/:patientId/miscellaneous", isAuthenticated, async (req: any, res) => {
+    try {
+      const { patientId } = req.params;
+      
+      // Import the model here to avoid circular dependencies
+      const { PatientMiscellaneous } = await import("./models/PatientMiscellaneous");
+      
+      let miscData = await PatientMiscellaneous.findOne({ patientId });
+      
+      if (!miscData) {
+        // Create empty miscellaneous data if none exists
+        miscData = new PatientMiscellaneous({ patientId });
+        await miscData.save();
+      }
+      
+      res.json(miscData);
+    } catch (error) {
+      console.error("Error getting patient miscellaneous data:", error);
+      res.status(500).json({ error: "Failed to get patient miscellaneous data" });
+    }
+  });
+
+  // Update patient miscellaneous data
+  app.patch("/api/patients/:patientId/miscellaneous", isAuthenticated, async (req: any, res) => {
+    try {
+      const { patientId } = req.params;
+      const userId = req.user.id;
+      const updateData = req.body;
+      
+      // Import the model here to avoid circular dependencies
+      const { PatientMiscellaneous } = await import("./models/PatientMiscellaneous");
+      
+      const miscData = await PatientMiscellaneous.findOneAndUpdate(
+        { patientId },
+        { $set: updateData },
+        { new: true, upsert: true }
+      );
+      
+      // Sync emergency contacts back to patient if they were updated
+      if (updateData.emergencyContacts) {
+        try {
+          const { Patient } = await import("./models/Patient");
+          const primaryContact = updateData.emergencyContacts.find((contact: any) => contact.isPrimary);
+          
+          if (primaryContact) {
+            await Patient.findOneAndUpdate(
+              { _id: patientId },
+              {
+                emergencyContact: {
+                  name: primaryContact.name,
+                  relationship: primaryContact.relationship,
+                  phone: primaryContact.phone
+                }
+              }
+            );
+          }
+        } catch (syncError) {
+          console.warn("Failed to sync emergency contact to patient:", syncError);
+        }
+      }
+      
+      // Log the activity
+      await logActivity(userId, "updated", "patient_miscellaneous", patientId, updateData);
+      
+      res.json(miscData);
+    } catch (error) {
+      console.error("Error updating patient miscellaneous data:", error);
+      res.status(500).json({ error: "Failed to update patient miscellaneous data" });
+    }
+  });
+
+  // ===== FILE MANAGEMENT ENDPOINTS =====
+  
+  // Upload file for a patient
+  app.post("/api/patients/:patientId/files", isAuthenticated, upload.single('file'), async (req: any, res) => {
+    try {
+      const { patientId } = req.params;
+      const userId = req.user.id;
+      const { category, description, notes } = req.body;
+      
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+      
+      const fileData = {
+        fileId: req.file.filename,
+        originalName: req.file.originalname,
+        fileName: req.file.filename,
+        category: category || 'general',
+        description: description || '',
+        uploadedBy: userId,
+        uploadedAt: new Date(),
+        fileSize: req.file.size,
+        mimeType: req.file.mimetype,
+        notes: notes || ''
+      };
+      
+      // Import the model here to avoid circular dependencies
+      const { PatientMiscellaneous } = await import("./models/PatientMiscellaneous");
+      
+      const miscData = await PatientMiscellaneous.findOneAndUpdate(
+        { patientId },
+        { $push: { uploadedFiles: fileData } },
+        { new: true, upsert: true }
+      );
+      
+      // Log the activity
+      await logActivity(userId, "uploaded", "patient_file", patientId, {
+        fileName: req.file.originalname,
+        category,
+        fileSize: req.file.size
+      });
+      
+      res.json({
+        message: "File uploaded successfully",
+        file: fileData,
+        miscData
+      });
+    } catch (error) {
+      console.error("Error uploading file:", error);
+      res.status(500).json({ error: "Failed to upload file" });
+    }
+  });
+
+  // Get all files for a patient
+  app.get("/api/patients/:patientId/files", isAuthenticated, async (req: any, res) => {
+    try {
+      const { patientId } = req.params;
+      const { category } = req.query;
+      
+      // Import the model here to avoid circular dependencies
+      const { PatientMiscellaneous } = await import("./models/PatientMiscellaneous");
+      
+      const miscData = await PatientMiscellaneous.findOne({ patientId });
+      
+      if (!miscData || !miscData.uploadedFiles) {
+        return res.json([]);
+      }
+      
+      let files = miscData.uploadedFiles;
+      
+      // Filter by category if specified
+      if (category) {
+        files = files.filter(file => file.category === category);
+      }
+      
+      res.json(files);
+    } catch (error) {
+      console.error("Error getting patient files:", error);
+      res.status(500).json({ error: "Failed to get patient files" });
+    }
+  });
+
+  // Download a specific file
+  app.get("/api/patients/:patientId/files/:fileId", isAuthenticated, async (req: any, res) => {
+    try {
+      const { patientId, fileId } = req.params;
+      
+      // Import the model here to avoid circular dependencies
+      const { PatientMiscellaneous } = await import("./models/PatientMiscellaneous");
+      
+      const miscData = await PatientMiscellaneous.findOne({ patientId });
+      
+      if (!miscData || !miscData.uploadedFiles) {
+        return res.status(404).json({ error: "File not found" });
+      }
+      
+      const fileData = miscData.uploadedFiles.find(file => file.fileId === fileId);
+      
+      if (!fileData) {
+        return res.status(404).json({ error: "File not found" });
+      }
+      
+      const filePath = path.join(uploadDir, fileData.fileName);
+      
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ error: "File not found on disk" });
+      }
+      
+      // Log the download activity
+      await logActivity(req.user.id, "downloaded", "patient_file", patientId, {
+        fileName: fileData.originalName,
+        fileId
+      });
+      
+      // Set headers for file download
+      res.setHeader('Content-Disposition', `attachment; filename="${fileData.originalName}"`);
+      res.setHeader('Content-Type', fileData.mimeType);
+      
+      // Stream the file
+      const fileStream = fs.createReadStream(filePath);
+      fileStream.pipe(res);
+    } catch (error) {
+      console.error("Error downloading file:", error);
+      res.status(500).json({ error: "Failed to download file" });
+    }
+  });
+
+  // Delete a file
+  app.delete("/api/patients/:patientId/files/:fileId", isAuthenticated, async (req: any, res) => {
+    try {
+      const { patientId, fileId } = req.params;
+      const userId = req.user.id;
+      
+      // Import the model here to avoid circular dependencies
+      const { PatientMiscellaneous } = await import("./models/PatientMiscellaneous");
+      
+      const miscData = await PatientMiscellaneous.findOne({ patientId });
+      
+      if (!miscData || !miscData.uploadedFiles) {
+        return res.status(404).json({ error: "File not found" });
+      }
+      
+      const fileData = miscData.uploadedFiles.find(file => file.fileId === fileId);
+      
+      if (!fileData) {
+        return res.status(404).json({ error: "File not found" });
+      }
+      
+      // Remove file from database
+      await PatientMiscellaneous.updateOne(
+        { patientId },
+        { $pull: { uploadedFiles: { fileId } } }
+      );
+      
+      // Delete file from disk
+      const filePath = path.join(uploadDir, fileData.fileName);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+      
+      // Log the activity
+      await logActivity(userId, "deleted", "patient_file", patientId, {
+        fileName: fileData.originalName,
+        fileId
+      });
+      
+      res.json({ message: "File deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting file:", error);
+      res.status(500).json({ error: "Failed to delete file" });
+    }
+  });
+
+  // Bulk download files by category
+  app.get("/api/patients/:patientId/files/download/category/:category", isAuthenticated, async (req: any, res) => {
+    try {
+      const { patientId, category } = req.params;
+      
+      // Import the model here to avoid circular dependencies
+      const { PatientMiscellaneous } = await import("./models/PatientMiscellaneous");
+      
+      const miscData = await PatientMiscellaneous.findOne({ patientId });
+      
+      if (!miscData || !miscData.uploadedFiles) {
+        return res.status(404).json({ error: "No files found" });
+      }
+      
+      const files = miscData.uploadedFiles.filter(file => file.category === category);
+      
+      if (files.length === 0) {
+        return res.status(404).json({ error: "No files found in category" });
+      }
+      
+      // Create a temporary ZIP file
+      const archiver = await import('archiver');
+      const zip = archiver('zip');
+      
+      res.setHeader('Content-Type', 'application/zip');
+      res.setHeader('Content-Disposition', `attachment; filename="${category}_files.zip"`);
+      
+      zip.pipe(res);
+      
+      // Add files to ZIP
+      for (const file of files) {
+        const filePath = path.join(uploadDir, file.fileName);
+        if (fs.existsSync(filePath)) {
+          zip.file(filePath, { name: file.originalName });
+        }
+      }
+      
+      await zip.finalize();
+      
+      // Log the bulk download activity
+      await logActivity(req.user.id, "bulk_downloaded", "patient_files", patientId, {
+        category,
+        fileCount: files.length
+      });
+    } catch (error) {
+      console.error("Error bulk downloading files:", error);
+      res.status(500).json({ error: "Failed to bulk download files" });
     }
   });
 
