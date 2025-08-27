@@ -2,7 +2,7 @@
 
 ## Overview
 
-NewLife CRM is a comprehensive mental health practice management system designed specifically for therapists, clinicians, and mental health practices. The application provides secure patient management, appointment scheduling, treatment documentation, and practice analytics while maintaining HIPAA compliance standards.
+NewLife CRM is a comprehensive mental health practice management system designed specifically for clinicals, clinicians, and mental health practices. The application provides secure patient management, appointment scheduling, treatment documentation, and practice analytics while maintaining HIPAA compliance standards.
 
 ## System Architecture
 
@@ -37,7 +37,7 @@ The application follows a full-stack TypeScript architecture with a modern web s
 
 - Replit OpenID Connect (OIDC) integration
 - Session management with PostgreSQL storage
-- Role-based access control (admin, therapist, staff)
+- Role-based access control (admin, clinical, staff)
 - Secure authentication middleware
 
 **Patient Management:**
@@ -45,13 +45,13 @@ The application follows a full-stack TypeScript architecture with a modern web s
 - Comprehensive patient profiles with personal and medical information
 - HIPAA consent tracking and emergency contact management
 - Patient status management (active, inactive, discharged)
-- Therapist assignment and caseload management
+- Clinical assignment and caseload management
 
 **Appointment System:**
 
 - Appointment scheduling with multiple duration options
 - Status tracking (scheduled, in-progress, completed, cancelled)
-- Integration with patient and therapist records
+- Integration with patient and clinical records
 - Calendar-based appointment management
 
 **Treatment Documentation:**
@@ -72,7 +72,7 @@ The application follows a full-stack TypeScript architecture with a modern web s
 
 1. **User Authentication:** Users authenticate through Replit OIDC, creating secure sessions stored in PostgreSQL
 2. **Patient Data Management:** Patient information flows through validated forms to the database via Drizzle ORM
-3. **Appointment Scheduling:** Appointments link patients with therapists through foreign key relationships
+3. **Appointment Scheduling:** Appointments link patients with clinicals through foreign key relationships
 4. **Treatment Records:** Clinical notes and treatment data are securely stored with audit logging
 5. **Dashboard Aggregation:** Statistical data is computed server-side and cached client-side using TanStack Query
 

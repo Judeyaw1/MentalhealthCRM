@@ -228,10 +228,10 @@ export default function TreatmentOutcomes() {
         
         <div className="flex items-center space-x-2">
           <Badge variant="outline">{patient?.status || 'Unknown'}</Badge>
-          {patient?.assignedTherapist && (
+          {patient?.assignedClinical && (
             <Badge variant="secondary">
               <User className="h-3 w-3 mr-1" />
-              {patient.assignedTherapist?.firstName || 'Unknown'} {patient.assignedTherapist?.lastName || 'Therapist'}
+              {patient.assignedClinical?.firstName || 'Unknown'} {patient.assignedClinical?.lastName || 'Clinical'}
             </Badge>
           )}
         </div>
@@ -423,7 +423,7 @@ export default function TreatmentOutcomes() {
           {showForm && user?.id ? (
             <TreatmentOutcomeForm
               patientId={patientId}
-              therapistId={user.id}
+              clinicalId={user.id}
               initialData={editingOutcome}
               onSuccess={handleFormSuccess}
               onCancel={handleFormCancel}
@@ -618,7 +618,7 @@ export default function TreatmentOutcomes() {
                 <div className="pt-4 border-t">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
                     <div>
-                      <span className="font-medium">Assessed by:</span> {viewingOutcome.therapistId?.firstName} {viewingOutcome.therapistId?.lastName}
+                      <span className="font-medium">Assessed by:</span> {viewingOutcome.clinicalId?.firstName} {viewingOutcome.clinicalId?.lastName}
                     </div>
                     <div>
                       <span className="font-medium">Created by:</span> {viewingOutcome.createdBy?.firstName} {viewingOutcome.createdBy?.lastName}

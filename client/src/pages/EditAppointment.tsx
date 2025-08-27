@@ -36,7 +36,7 @@ export default function EditAppointment() {
     status: "scheduled",
     notes: "",
     patientId: "",
-    therapistId: "",
+    clinicalId: "",
   });
 
   // Extract appointment ID from URL
@@ -100,13 +100,13 @@ export default function EditAppointment() {
     },
   });
 
-  // Fetch therapists for dropdown
-  const { data: therapistsData } = useQuery({
-    queryKey: ["/api/therapists"],
+  // Fetch clinicals for dropdown
+  const { data: clinicalsData } = useQuery({
+    queryKey: ["/api/clinicals"],
     queryFn: async () => {
-      const response = await fetch("/api/therapists");
+      const response = await fetch("/api/clinicals");
       if (!response.ok) {
-        throw new Error("Failed to fetch therapists");
+        throw new Error("Failed to fetch clinicals");
       }
       return response.json();
     },
@@ -125,7 +125,7 @@ export default function EditAppointment() {
         status: appointment.status,
         notes: appointment.notes || "",
         patientId: appointment.patient?.id || "",
-        therapistId: appointment.therapist?.id || "",
+        clinicalId: appointment.clinical?.id || "",
       });
     }
   }, [appointment]);
@@ -182,7 +182,7 @@ export default function EditAppointment() {
       status: formData.status,
       notes: formData.notes,
       patientId: formData.patientId,
-      therapistId: formData.therapistId,
+              clinicalId: formData.clinicalId,
     };
 
     updateMutation.mutate(updateData);
@@ -286,27 +286,27 @@ export default function EditAppointment() {
                       </Select>
                     </div>
 
-                    {/* Therapist Selection */}
-                    <div className="space-y-2">
-                      <Label htmlFor="therapistId">Therapist</Label>
-                      <Select
-                        value={formData.therapistId}
-                        onValueChange={(value) =>
-                          handleInputChange("therapistId", value)
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a therapist" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {therapistsData?.map((therapist: any) => (
-                            <SelectItem key={therapist.id} value={therapist.id}>
-                              {therapist.firstName} {therapist.lastName}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                            {/* Clinical Selection */}
+        <div className="space-y-2">
+          <Label htmlFor="clinicalId">Clinical</Label>
+          <Select
+            value={formData.clinicalId}
+            onValueChange={(value) =>
+              handleInputChange("clinicalId", value)
+            }
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select a clinical" />
+            </SelectTrigger>
+            <SelectContent>
+              {clinicalsData?.map((clinical: any) => (
+                <SelectItem key={clinical.id} value={clinical.id}>
+                  {clinical.firstName} {clinical.lastName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
                     {/* Date and Time */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

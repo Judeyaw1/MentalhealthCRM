@@ -15,7 +15,7 @@ interface AppointmentAnalyticsData {
   monthlyTrends: { [key: string]: number };
   dayOfWeekDistribution: { [key: string]: number };
   topTimeSlots: { time: string; count: number }[];
-  topTherapists: { therapistId: string; count: number }[];
+  topClinicals: { clinicalId: string; count: number }[];
   sessionTypeDistribution: { [key: string]: number };
   sessionDurations: {
     average: number;

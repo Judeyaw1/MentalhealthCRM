@@ -264,26 +264,26 @@ export default function Appointments() {
       ),
     },
     {
-      key: "therapist",
-      label: "Therapist",
+      key: "clinical",
+      label: "Clinical",
       render: (_, row: AppointmentWithDetails) => (
         <div className="flex items-center">
           <Avatar className="h-6 w-6">
             <AvatarFallback className="bg-blue-100 text-blue-600 text-xs">
               {getInitials(
-                row.therapist?.firstName || "",
-                row.therapist?.lastName || "",
+                        row.clinical?.firstName || "",
+        row.clinical?.lastName || "",
               )}
             </AvatarFallback>
           </Avatar>
           <div className="ml-2">
             <div className="text-sm font-medium text-gray-900">
-              {row.therapist?.firstName || "Unknown"}{" "}
-              {row.therapist?.lastName || "Therapist"}
+                          {row.clinical?.firstName || "Unknown"}{" "}
+            {row.clinical?.lastName || "Clinical"}
             </div>
             <div className="text-xs text-gray-500 flex items-center gap-1">
               <Stethoscope className="h-3 w-3" />
-              {row.therapist?.role || "Therapist"}
+                              {row.clinical?.role || "Clinical"}
             </div>
           </div>
         </div>
@@ -651,7 +651,7 @@ export default function Appointments() {
     // Navigate to new record page with pre-filled data from appointment
     const recordData = {
       patientId: appointment.patient?.id,
-      therapistId: appointment.therapist?.id,
+              clinicalId: appointment.clinical?.id,
       sessionDate: new Date(appointment.appointmentDate).getTime(),
       sessionType: appointment.type,
       notes: `Treatment record for appointment on ${formatDateTime(appointment.appointmentDate)}`,
@@ -691,7 +691,7 @@ export default function Appointments() {
       "Patient Name": `${apt.patient?.firstName || ""} ${apt.patient?.lastName || ""}`.trim(),
       "Patient Email": apt.patient?.email || "",
       "Patient Phone": apt.patient?.phone || "",
-      "Therapist": `${apt.therapist?.firstName || ""} ${apt.therapist?.lastName || ""}`.trim(),
+              "Clinical": `${apt.clinical?.firstName || ""} ${apt.clinical?.lastName || ""}`.trim(),
       "Type": apt.type,
       "Status": apt.status,
       "Date": new Date(apt.appointmentDate).toLocaleDateString(),
@@ -849,7 +849,7 @@ export default function Appointments() {
                 onPageChange={setCurrentPage}
                 searchQuery={searchQuery}
                 onSearch={setSearchQuery}
-                searchPlaceholder="Search by patient name, email, phone, therapist, or session type..."
+                searchPlaceholder="Search by patient name, email, phone, clinical, or session type..."
                 onFilter={handleFilter}
                 filters={filters}
                 isLoading={isLoading}

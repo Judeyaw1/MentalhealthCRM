@@ -336,7 +336,7 @@ export class NotificationService {
 
   // Send patient assignment notification
   async sendPatientAssignmentNotification(
-    therapistId: string,
+    clinicalId: string,
     patientData: {
       patientName: string;
       patientId: string;
@@ -349,7 +349,7 @@ export class NotificationService {
     const message = `You have been assigned a new patient: ${patientData.patientName}`;
     
     await this.createNotification(
-      therapistId,
+      clinicalId,
       'patient_assigned',
       title,
       message,
@@ -365,7 +365,7 @@ export class NotificationService {
     appointmentData: {
       appointmentId: string;
       patientName: string;
-      therapistName: string;
+      clinicalName: string;
       appointmentDate: Date;
       oldStatus: string;
       newStatus: string;
@@ -376,17 +376,17 @@ export class NotificationService {
     const title = 'Appointment Status Changed';
     const message = `Appointment for ${appointmentData.patientName} has been ${appointmentData.newStatus} by ${appointmentData.changedByName}`;
     
-    // Get the appointment to find the assigned therapist and creator
+    // Get the appointment to find the assigned clinical and creator
     const appointment = await storage.getAppointment(appointmentData.appointmentId);
     if (!appointment) return;
 
     const notificationsToSend: Array<{ userId: string; role: string }> = [];
 
-    // Add assigned therapist if different from the person who made the change
-    if (appointment.therapistId && appointment.therapistId.toString() !== appointmentData.changedBy) {
+    // Add assigned clinical if different from the person who made the change
+    if (appointment.clinicalId && appointment.clinicalId.toString() !== appointmentData.changedBy) {
       notificationsToSend.push({ 
-        userId: appointment.therapistId.toString(), 
-        role: 'assigned_therapist' 
+        userId: appointment.clinicalId.toString(), 
+        role: 'assigned_clinical' 
       });
     }
 
@@ -408,7 +408,7 @@ export class NotificationService {
         {
           appointmentId: appointmentData.appointmentId,
           patientName: appointmentData.patientName,
-          therapistName: appointmentData.therapistName,
+          clinicalName: appointmentData.clinicalName,
           appointmentDate: appointmentData.appointmentDate,
           oldStatus: appointmentData.oldStatus,
           newStatus: appointmentData.newStatus,

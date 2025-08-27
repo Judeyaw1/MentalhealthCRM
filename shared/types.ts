@@ -6,7 +6,7 @@ export interface User {
   email: string;
   firstName: string;
   lastName: string;
-  role: 'admin' | 'supervisor' | 'therapist' | 'staff' | 'frontdesk';
+  role: 'admin' | 'supervisor' | 'clinical' | 'staff' | 'frontdesk';
   password?: string;
   forcePasswordChange?: boolean;
   profileImageUrl?: string;
@@ -36,7 +36,7 @@ export interface Patient {
   reasonForVisit?: string;
   status: 'active' | 'inactive' | 'discharged';
   hipaaConsent?: boolean;
-  assignedTherapistId?: string;
+  assignedClinicalId?: string;
   loc?: string;
   important?: boolean;
   dischargeCriteria?: {
@@ -53,7 +53,7 @@ export interface Patient {
 export interface Appointment {
   id: string;
   patientId: string;
-  therapistId: string;
+  clinicalId: string;
   appointmentDate: Date;
   duration: number;
   type: string;
@@ -66,7 +66,7 @@ export interface Appointment {
 export interface TreatmentRecord {
   id: string;
   patientId: string;
-  therapistId: string;
+  clinicalId: string;
   appointmentId?: string;
   sessionDate: Date;
   sessionType: string;
@@ -242,7 +242,7 @@ export interface InsertUser {
   email: string;
   firstName: string;
   lastName: string;
-  role: 'admin' | 'supervisor' | 'therapist' | 'staff' | 'frontdesk';
+  role: 'admin' | 'supervisor' | 'clinical' | 'staff' | 'frontdesk';
   password?: string;
   forcePasswordChange?: boolean;
 }
@@ -267,7 +267,7 @@ export interface InsertPatient {
   reasonForVisit?: string;
   status?: 'active' | 'inactive' | 'discharged';
   hipaaConsent?: boolean;
-  assignedTherapistId?: string;
+  assignedClinicalId?: string;
   loc?: string;
   important?: boolean;
   authNumber?: string;
@@ -275,7 +275,7 @@ export interface InsertPatient {
 
 export interface InsertAppointment {
   patientId: string;
-  therapistId: string;
+  clinicalId: string;
   appointmentDate: Date;
   duration?: number;
   type: string;
@@ -285,7 +285,7 @@ export interface InsertAppointment {
 
 export interface InsertTreatmentRecord {
   patientId: string;
-  therapistId: string;
+  clinicalId: string;
   appointmentId?: string;
   sessionDate: Date;
   sessionType: string;
@@ -305,18 +305,18 @@ export interface InsertAuditLog {
 }
 
 // Extended types with relationships
-export interface PatientWithTherapist extends Patient {
-  assignedTherapist?: User;
+export interface PatientWithClinical extends Patient {
+  assignedClinical?: User;
   createdBy?: User;
 }
 
 export interface AppointmentWithDetails extends Appointment {
   patient: Patient;
-  therapist: User;
+  clinical: User;
 }
 
 export interface TreatmentRecordWithDetails extends TreatmentRecord {
   patient: Patient;
-  therapist: User;
+  clinical: User;
   appointment?: Appointment;
 } 

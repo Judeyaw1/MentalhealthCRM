@@ -121,7 +121,7 @@ const patientSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
-  assignedTherapistId: {
+  assignedClinicalId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
   },

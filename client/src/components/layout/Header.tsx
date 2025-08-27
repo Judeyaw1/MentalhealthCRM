@@ -89,8 +89,8 @@ export function Header({ onSearch }: HeaderProps) {
         return "Administrator";
       case "supervisor":
         return "Supervisor";
-      case "therapist":
-        return "Licensed Therapist";
+              case "clinical":
+          return "Licensed Clinical";
       case "staff":
         return "Staff Member";
       case "frontdesk":

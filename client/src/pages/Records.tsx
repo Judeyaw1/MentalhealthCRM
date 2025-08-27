@@ -79,7 +79,7 @@ export default function Records() {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPatient, setSelectedPatient] = useState("all");
-  const [selectedTherapist, setSelectedTherapist] = useState("all");
+  const [selectedClinical, setSelectedClinical] = useState("all");
   const [selectedSessionType, setSelectedSessionType] = useState("all");
   const [dateRange, setDateRange] = useState("all");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
@@ -158,9 +158,9 @@ export default function Records() {
             : (selectedPatient && selectedPatient !== "all"
                 ? selectedPatient
                 : undefined),
-        therapistId:
-          selectedTherapist && selectedTherapist !== "all"
-            ? selectedTherapist
+        clinicalId:
+          selectedClinical && selectedClinical !== "all"
+            ? selectedClinical
             : undefined,
         sessionType:
           selectedSessionType && selectedSessionType !== "all"
@@ -186,7 +186,7 @@ export default function Records() {
         if (params.offset) searchParams.set("offset", params.offset);
         if (params.search) searchParams.set("search", params.search);
         if (params.patientId) searchParams.set("patientId", params.patientId);
-        if (params.therapistId) searchParams.set("therapistId", params.therapistId);
+        if (params.clinicalId) searchParams.set("clinicalId", params.clinicalId);
         if (params.sessionType) searchParams.set("sessionType", params.sessionType);
         if (params.startDate) searchParams.set("startDate", new Date(params.startDate).toISOString());
         if (params.endDate) searchParams.set("endDate", new Date(params.endDate).toISOString());
@@ -236,11 +236,11 @@ export default function Records() {
     retry: false,
   });
 
-  // Fetch therapists for filter
-  const { data: therapists } = useQuery<
+  // Fetch clinicals for filter
+  const { data: clinicals } = useQuery<
     { id: string; firstName: string; lastName: string }[]
   >({
-    queryKey: ["/api/therapists"],
+    queryKey: ["/api/clinicals"],
     retry: false,
   });
 
@@ -341,7 +341,7 @@ export default function Records() {
     try {
       const recordData = {
         patient: `${record.patient.firstName} ${record.patient.lastName}`,
-        therapist: record.therapist ? `${record.therapist.firstName} ${record.therapist.lastName}` : "Unknown",
+        clinical: record.clinical ? `${record.clinical.firstName} ${record.clinical.lastName}` : "Unknown",
         sessionDate: formatDateTime(record.sessionDate),
         sessionType: record.sessionType,
         goals: record.goals || "N/A",
@@ -416,8 +416,8 @@ export default function Records() {
             <div class="label">Patient Name:</div>
             <div class="value">${record.patient.firstName} ${record.patient.lastName}</div>
             
-            <div class="label">Therapist:</div>
-            <div class="value">${record.therapist ? `${record.therapist.firstName} ${record.therapist.lastName}` : "Unknown"}</div>
+                            <div class="label">Clinical:</div>
+                <div class="value">${record.clinical ? `${record.clinical.firstName} ${record.clinical.lastName}` : "Unknown"}</div>
             
             <div class="label">Session Date:</div>
             <div class="value">${formatDateTime(record.sessionDate)}</div>
@@ -799,17 +799,17 @@ export default function Records() {
                   </Select>
 
                   <Select
-                    value={selectedTherapist}
-                    onValueChange={setSelectedTherapist}
+                    value={selectedClinical}
+                    onValueChange={setSelectedClinical}
                   >
                     <SelectTrigger className="w-full lg:w-[200px]">
-                      <SelectValue placeholder="Filter by therapist" />
+                      <SelectValue placeholder="Filter by clinical" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Therapists</SelectItem>
-                      {therapists?.map((therapist) => (
-                        <SelectItem key={therapist.id} value={therapist.id}>
-                          {therapist.firstName} {therapist.lastName}
+                      <SelectItem value="all">All Clinical</SelectItem>
+                      {clinicals?.map((clinical) => (
+                        <SelectItem key={clinical.id} value={clinical.id}>
+                          {clinical.firstName} {clinical.lastName}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -930,7 +930,7 @@ export default function Records() {
                                             )}
                                           </div>
                                           <Badge variant="outline" className="h-5 px-2 py-0 text-[10px] whitespace-nowrap max-w-[160px] overflow-hidden text-ellipsis">
-                                            {record.therapist ? `${record.therapist.firstName} ${record.therapist.lastName}` : 'Unknown'}
+                                            {record.clinical ? `${record.clinical.firstName} ${record.clinical.lastName}` : 'Unknown'}
                                           </Badge>
                                         </div>
                                       </CardContent>
@@ -980,8 +980,8 @@ export default function Records() {
                                 </div>
                                 <div className="flex items-center space-x-2">
                                   <Badge variant="outline" className="h-5 px-2 py-0 text-[10px] whitespace-nowrap max-w-[160px] overflow-hidden text-ellipsis">
-                                    {record.therapist
-                                      ? `${record.therapist.firstName} ${record.therapist.lastName}`
+                                    {record.clinical
+                                      ? `${record.clinical.firstName} ${record.clinical.lastName}`
                                       : "Unknown"}
                                   </Badge>
 
@@ -1173,7 +1173,7 @@ export default function Records() {
                     <p className="text-gray-600 mb-4">
                       {searchQuery ||
                       selectedPatient ||
-                      selectedTherapist ||
+                      selectedClinical ||
                       selectedSessionType
                         ? "No records match your current filters."
                         : "Start documenting patient sessions by creating your first treatment record."}
@@ -1224,7 +1224,7 @@ export default function Records() {
                   <div className="font-medium">{detailRecord.patient.firstName} {detailRecord.patient.lastName}</div>
                 </div>
                 <Badge variant="outline" className="h-5 px-2 py-0 text-[10px] whitespace-nowrap max-w-[160px] overflow-hidden text-ellipsis">
-                  {detailRecord.therapist ? `${detailRecord.therapist.firstName} ${detailRecord.therapist.lastName}` : 'Unknown'}
+                  {detailRecord.clinical ? `${detailRecord.clinical.firstName} ${detailRecord.clinical.lastName}` : 'Unknown'}
                 </Badge>
               </div>
               <div className="grid grid-cols-2 gap-3">

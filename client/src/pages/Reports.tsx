@@ -177,10 +177,10 @@ export default function Reports() {
   const handleExport = () => {
     if (!patients.length) return;
     const csvRows = [
-      ["Name", "Therapist", "Status"],
+              ["Name", "Clinical", "Status"],
       ...patients.map((p) => [
         `${p.firstName} ${p.lastName}`,
-        p.assignedTherapist ? `${p.assignedTherapist.firstName} ${p.assignedTherapist.lastName}` : "-",
+                  p.assignedClinical ? `${p.assignedClinical.firstName} ${p.assignedClinical.lastName}` : "-",
         p.status
       ])
     ];
@@ -313,7 +313,7 @@ export default function Reports() {
     {
       title: "Staff Performance",
       description:
-        "Therapist productivity, caseload distribution, and efficiency metrics",
+        "Clinical productivity, caseload distribution, and efficiency metrics",
       icon: Activity,
       color: "bg-indigo-50 text-indigo-700 hover:bg-indigo-100",
       metric: `${staffData?.length || 0} staff`,
@@ -474,7 +474,7 @@ export default function Reports() {
                         <thead>
                           <tr className="bg-gray-100">
                             <th className="px-4 py-2 text-left">Name</th>
-                            <th className="px-4 py-2 text-left">Therapist</th>
+                            <th className="px-4 py-2 text-left">Clinical</th>
                             <th className="px-4 py-2 text-left">Status</th>
                             <th className="px-4 py-2 text-left">Actions</th>
                           </tr>
@@ -487,7 +487,7 @@ export default function Reports() {
                                   {p.firstName} {p.lastName}
                                 </Link>
                               </td>
-                              <td className="px-4 py-2">{p.assignedTherapist ? `${p.assignedTherapist.firstName} ${p.assignedTherapist.lastName}` : "-"}</td>
+                              <td className="px-4 py-2">{p.assignedClinical ? `${p.assignedClinical.firstName} ${p.assignedClinical.lastName}` : "-"}</td>
                               <td className="px-4 py-2 capitalize">{p.status}</td>
                               <td className="px-4 py-2">
                                 <Button

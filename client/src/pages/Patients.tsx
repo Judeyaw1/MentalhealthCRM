@@ -56,7 +56,7 @@ import {
 import { Link } from "wouter";
 import { isUnauthorizedError, canSeeCreatedBy } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
-import type { PatientWithTherapist } from "@shared/types";
+import type { PatientWithClinical } from "@shared/types";
 import { RecentPatients } from "@/components/dashboard/RecentPatients";
 import { Input } from "@/components/ui/input";
 import { useDebounce } from "@/hooks/use-mobile";
@@ -71,11 +71,11 @@ export default function Patients() {
   const queryClient = useQueryClient();
   const { isAuthenticated, isLoading: authLoading, user } = useAuth();
   const isFrontDesk = user?.role === "frontdesk";
-  const canPerformAssessments = ['admin', 'supervisor', 'therapist'].includes(user?.role || '');
+  const canPerformAssessments = ['admin', 'supervisor', 'clinical'].includes(user?.role || '');
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-  const [therapistFilter, setTherapistFilter] = useState("");
+  const [clinicalFilter, setClinicalFilter] = useState("");
   const [createdByFilter, setCreatedByFilter] = useState("");
 
   const [viewMode, setViewMode] = useState<"dashboard" | "list" | "grid">(
@@ -87,11 +87,11 @@ export default function Patients() {
   const [showRecentPatients, setShowRecentPatients] = useState(false);
   const [showAssessment, setShowAssessment] = useState(false);
   const [assessmentPatient, setAssessmentPatient] = useState<any>(null);
-  const [showAssignTherapistDialog, setShowAssignTherapistDialog] = useState(false);
+  const [showAssignClinicalDialog, setShowAssignClinicalDialog] = useState(false);
   const [showFollowupDialog, setShowFollowupDialog] = useState(false);
   const [assigning, setAssigning] = useState(false);
   const [scheduling, setScheduling] = useState(false);
-  const [selectedTherapistId, setSelectedTherapistId] = useState<string>("");
+  const [selectedClinicalId, setSelectedClinicalId] = useState<string>("");
   const [followupDate, setFollowupDate] = useState<string>("");
   const pageSize = 10;
   const debouncedSearch = useDebounce(searchQuery, 300);
@@ -101,7 +101,7 @@ export default function Patients() {
   const [importLoading, setImportLoading] = useState(false);
   const [importResult, setImportResult] = useState<any>(null);
   const [showReportDialog, setShowReportDialog] = useState(false);
-  const [selectedPatientForReport, setSelectedPatientForReport] = useState<PatientWithTherapist | null>(null);
+  const [selectedPatientForReport, setSelectedPatientForReport] = useState<PatientWithClinical | null>(null);
 
   // Redirect to home if not authenticated
   useEffect(() => {
@@ -123,7 +123,7 @@ export default function Patients() {
     data: patientsData,
     isLoading,
     refetch,
-  } = useQuery<{ patients: PatientWithTherapist[]; total: number }>({
+  } = useQuery<{ patients: PatientWithClinical[]; total: number }>({
     queryKey: [
       "/api/patients",
       {
@@ -131,7 +131,7 @@ export default function Patients() {
         offset: (currentPage - 1) * pageSize,
         search: debouncedSearch || undefined,
         status: statusFilter || undefined,
-        therapist: therapistFilter || undefined,
+        clinical: clinicalFilter || undefined,
         createdBy: createdByFilter || undefined,
       },
     ],
@@ -157,13 +157,13 @@ export default function Patients() {
     data: gridPatientsData,
     isLoading: gridIsLoading,
     refetch: gridRefetch,
-  } = useQuery<{ patients: PatientWithTherapist[]; total: number }>({
+  } = useQuery<{ patients: PatientWithClinical[]; total: number }>({
     queryKey: [
       "/api/patients",
       {
         search: debouncedSearch || undefined,
         status: statusFilter || undefined,
-        therapist: therapistFilter || undefined,
+        clinical: clinicalFilter || undefined,
         createdBy: createdByFilter || undefined,
         // No pagination for grid view - fetch all patients
       },
@@ -195,10 +195,10 @@ export default function Patients() {
     refetchIntervalInBackground: true, // Continue polling even when tab is not active
   });
 
-  const { data: therapists } = useQuery<
+  const { data: clinicals } = useQuery<
     { id: string; firstName: string; lastName: string }[]
   >({
-    queryKey: ["/api/therapists"],
+    queryKey: ["/api/clinicals"],
     retry: false,
     refetchInterval: 10000, // Refetch every 10 seconds for real-time updates
     refetchIntervalInBackground: true, // Continue polling even when tab is not active
@@ -365,7 +365,7 @@ export default function Patients() {
         handleExport("pdf", selectedPatients);
         break;
       case "assign":
-        setShowAssignTherapistDialog(true);
+        setShowAssignClinicalDialog(true);
         break;
       case "important":
         handleMarkImportant();
@@ -401,22 +401,22 @@ export default function Patients() {
     }
   };
 
-  const handleAssignTherapist = async () => {
+  const handleAssignClinical = async () => {
     setAssigning(true);
     try {
       const response = await fetch("/api/patients/bulk-update", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ patientIds: selectedPatients, updates: { assignedTherapistId: selectedTherapistId } }),
+                  body: JSON.stringify({ patientIds: selectedPatients, updates: { assignedClinicalId: selectedClinicalId } }),
       });
-      if (!response.ok) throw new Error("Failed to assign therapist");
-      toast({ title: "Therapist Assigned", description: `Assigned therapist to ${selectedPatients.length} patient(s).` });
-      setShowAssignTherapistDialog(false);
-      setSelectedTherapistId("");
+              if (!response.ok) throw new Error("Failed to assign clinical");
+              toast({ title: "Clinical Assigned", description: `Assigned clinical to ${selectedPatients.length} patient(s).` });
+              setShowAssignClinicalDialog(false);
+              setSelectedClinicalId("");
       refetch();
     } catch (error) {
-      toast({ title: "Error", description: "Failed to assign therapist.", variant: "destructive" });
+              toast({ title: "Error", description: "Failed to assign clinical.", variant: "destructive" });
     } finally {
       setAssigning(false);
     }
@@ -556,11 +556,18 @@ export default function Patients() {
         emergencyContactPhone: "555-999-8888",
         address: "123 Main Street, Anytown, ST 12345",
         insurance: "Blue Cross Blue Shield",
+        ssn: "111-22-3333",
+        authNumber: "12345",
+        insuranceCardUrl: "",
+        photoUrl: "",
         reasonForVisit: "Anxiety and stress management",
         status: "active",
         hipaaConsent: "true",
         loc: "3.3",
-        authNumber: "12345"
+        important: "false",
+        assignedClinicalId: "",
+        treatmentGoals: "Reduce anxiety, Manage stress",
+        dischargeCriteria: "12 sessions, 6 months"
       },
       {
         firstName: "Jane",
@@ -574,11 +581,18 @@ export default function Patients() {
         emergencyContactPhone: "555-888-7777",
         address: "456 Oak Avenue, Somewhere, ST 12345",
         insurance: "Aetna",
+        ssn: "444-55-6666",
+        authNumber: "67890",
+        insuranceCardUrl: "",
+        photoUrl: "",
         reasonForVisit: "Depression treatment",
         status: "active",
         hipaaConsent: "true",
         loc: "3.3",
-        authNumber: "67890"
+        important: "false",
+        assignedClinicalId: "",
+        treatmentGoals: "Improve mood, Reduce depression",
+        dischargeCriteria: "12 sessions, 6 months"
       },
       {
         firstName: "Mike",
@@ -592,19 +606,28 @@ export default function Patients() {
         emergencyContactPhone: "555-777-6666",
         address: "789 Pine Road, Elsewhere, ST 12345",
         insurance: "Medicare",
+        ssn: "123-45-6789",
+        authNumber: "11111",
+        insuranceCardUrl: "",
+        photoUrl: "",
         reasonForVisit: "Stress management and coping skills",
         status: "active",
         hipaaConsent: "true",
         loc: "3.3",
-        authNumber: "11111"
+        important: "false",
+        assignedClinicalId: "",
+        treatmentGoals: "Reduce stress, Improve coping skills",
+        dischargeCriteria: "12 sessions, 6 months"
       }
     ];
 
-    // Create CSV content
+    // Create CSV content with comprehensive fields
     const headers = [
       "firstName", "lastName", "dateOfBirth", "gender", "email", "phone", 
-      "emergencyContactName", "emergencyContactRelationship", "emergencyContactPhone", "address", "insurance", "reasonForVisit", 
-      "status", "hipaaConsent", "loc", "authNumber"
+      "emergencyContactName", "emergencyContactRelationship", "emergencyContactPhone", 
+      "address", "insurance", "ssn", "authNumber", "insuranceCardUrl", "photoUrl",
+      "reasonForVisit", "status", "hipaaConsent", "loc", "important",
+      "assignedClinicalId", "treatmentGoals", "dischargeCriteria"
     ];
     
     const csvContent = [
@@ -729,7 +752,7 @@ export default function Patients() {
     }
   };
 
-  const handleGenerateReport = (patient: PatientWithTherapist) => {
+  const handleGenerateReport = (patient: PatientWithClinical) => {
     setSelectedPatientForReport(patient);
     setShowReportDialog(true);
   };
@@ -738,7 +761,7 @@ export default function Patients() {
     {
       key: "select",
       label: "",
-      render: (_: any, row: PatientWithTherapist) => (
+      render: (_: any, row: PatientWithClinical) => (
         <Checkbox
           checked={selectedPatients.includes(row.id as any)}
           onCheckedChange={(checked) =>
@@ -750,7 +773,7 @@ export default function Patients() {
     {
       key: "patient",
       label: "Patient",
-      render: (_: any, row: PatientWithTherapist) => (
+      render: (_: any, row: PatientWithClinical) => (
         <div className="flex items-center">
           <Avatar className="h-10 w-10">
             <AvatarFallback className="bg-primary-100 text-primary-600">
@@ -771,7 +794,7 @@ export default function Patients() {
     {
       key: "contact",
       label: "Contact",
-      render: (_: any, row: PatientWithTherapist) => (
+      render: (_: any, row: PatientWithClinical) => (
         <div className="space-y-1">
           <div className="flex items-center text-sm">
             <Mail className="h-3 w-3 text-gray-400 mr-2" />
@@ -779,20 +802,20 @@ export default function Patients() {
           </div>
           <div className="flex items-center text-sm">
             <Phone className="h-3 w-3 text-gray-400 mr-2" />
-            <span className="text-gray-600">{row.phone || "No phone"}</span>
+            <div className="text-gray-600">{row.phone || "No phone"}</div>
           </div>
         </div>
       ),
     },
     {
-      key: "assignedTherapist",
-      label: "Therapist",
-      render: (_: any, row: PatientWithTherapist) => (
+      key: "assignedClinical",
+      label: "Clinical",
+      render: (_: any, row: PatientWithClinical) => (
         <div className="flex items-center">
           <User className="h-4 w-4 text-gray-400 mr-2" />
           <span className="text-sm">
-            {row.assignedTherapist
-              ? `${row.assignedTherapist.firstName} ${row.assignedTherapist.lastName}`
+            {row.assignedClinical
+              ? `${row.assignedClinical.firstName} ${row.assignedClinical.lastName}`
               : "Unassigned"}
           </span>
         </div>
@@ -821,7 +844,7 @@ export default function Patients() {
           {
             key: "createdBy",
             label: "Created By",
-            render: (_: any, row: PatientWithTherapist) => (
+            render: (_: any, row: PatientWithClinical) => (
               <div className="flex items-center">
                 <User className="h-4 w-4 text-gray-400 mr-2" />
                 <span className="text-sm">
@@ -837,7 +860,7 @@ export default function Patients() {
     {
       key: "actions",
       label: "Actions",
-      render: (_: any, row: PatientWithTherapist) => (
+      render: (_: any, row: PatientWithClinical) => (
         <div className="flex items-center space-x-1">
           <TooltipProvider>
             <Tooltip>
@@ -928,13 +951,13 @@ export default function Patients() {
       ],
     },
     {
-      key: "therapist",
-      label: "Therapist",
+              key: "clinical",
+      label: "Clinical",
       options: [
-        { value: "all", label: "All Therapists" },
-        ...(therapists?.map((t) => ({
-          value: t.id,
-          label: `${t.firstName} ${t.lastName}`,
+        { value: "all", label: "All Clinical" },
+        ...(clinicals?.map((c) => ({
+          value: c.id,
+          label: `${c.firstName} ${c.lastName}`,
         })) || []),
       ],
     },
@@ -966,8 +989,8 @@ export default function Patients() {
     if (filter.key === "status") {
       setStatusFilter(filter.value === "all" ? "" : filter.value);
       setCurrentPage(1);
-    } else if (filter.key === "therapist") {
-      setTherapistFilter(filter.value === "all" ? "" : filter.value);
+    } else if (filter.key === "clinical") {
+      setClinicalFilter(filter.value === "all" ? "" : filter.value);
       setCurrentPage(1);
     } else if (filter.key === "createdBy") {
       setCreatedByFilter(filter.value === "all" ? "" : filter.value);
@@ -1199,7 +1222,7 @@ export default function Patients() {
                         className="flex items-center space-x-2"
                       >
                         <User className="h-4 w-4" />
-                        <span>Assign Therapist</span>
+                        <span>Assign Clinical</span>
                       </Button>
                       <Button
                         variant="outline"
@@ -1390,39 +1413,39 @@ export default function Patients() {
           )}
         </DialogContent>
       </Dialog>
-      <Dialog open={showAssignTherapistDialog} onOpenChange={setShowAssignTherapistDialog}>
+      <Dialog open={showAssignClinicalDialog} onOpenChange={setShowAssignClinicalDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Assign Therapist to Selected Patients</DialogTitle>
+            <DialogTitle>Assign Clinical to Selected Patients</DialogTitle>
             <DialogDescription>
-              Select a therapist to assign to the selected patients. This will update their primary therapist assignment.
+              Select a clinical to assign to the selected patients. This will update their primary clinical assignment.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label className="block font-medium">Select Therapist</label>
+              <label className="block font-medium">Select Clinical</label>
               <select
                 className="w-full p-2 border border-gray-300 rounded-md"
-                value={selectedTherapistId}
-                onChange={(e) => setSelectedTherapistId(e.target.value)}
+                                  value={selectedClinicalId}
+                  onChange={(e) => setSelectedClinicalId(e.target.value)}
               >
-                <option value="">Select a therapist</option>
-                {therapists?.map((therapist) => (
-                  <option key={therapist.id} value={therapist.id}>
-                    {therapist.firstName} {therapist.lastName}
-                  </option>
-                ))}
+                <option value="">Select a clinical</option>
+                                  {clinicals?.map((clinical) => (
+                    <option key={clinical.id} value={clinical.id}>
+                      {clinical.firstName} {clinical.lastName}
+                    </option>
+                  ))}
               </select>
             </div>
             <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={() => setShowAssignTherapistDialog(false)}>
+              <Button variant="outline" onClick={() => setShowAssignClinicalDialog(false)}>
                 Cancel
               </Button>
               <Button
-                onClick={handleAssignTherapist}
-                disabled={!selectedTherapistId || assigning}
+                                  onClick={handleAssignClinical}
+                disabled={!selectedClinicalId || assigning}
               >
-                {assigning ? "Assigning..." : "Assign Therapist"}
+                {assigning ? "Assigning..." : "Assign Clinical"}
               </Button>
             </div>
           </div>
@@ -1463,10 +1486,10 @@ export default function Patients() {
       <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Import Patients (CSV or Excel)</DialogTitle>
-            <DialogDescription>
-              Import multiple patients from a CSV or Excel file. Download the sample template to see the required format.
-            </DialogDescription>
+                    <DialogTitle>Import Patients (CSV or Excel)</DialogTitle>
+        <DialogDescription>
+          Import multiple patients from a CSV or Excel file. The template now includes comprehensive fields including emergency contacts, SSN, insurance details, and treatment information. Download the sample template to see the required format.
+        </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             {/* Sample Template Download */}

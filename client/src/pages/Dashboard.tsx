@@ -173,7 +173,7 @@ export default function Dashboard() {
 
     const patientsSection = [
       ["Recent Patients", "", "", "", "", "", ""],
-      ["ID", "Name", "Email", "Status", "Join Date", "Age", "Therapist", "Last Activity"],
+              ["ID", "Name", "Email", "Status", "Join Date", "Age", "Clinical", "Last Activity"],
       ...(Array.isArray(recentPatients)
         ? recentPatients.map((p: any) => [
             p.id,
@@ -182,7 +182,7 @@ export default function Dashboard() {
             p.status,
             p.createdAt ? new Date(p.createdAt).toLocaleDateString() : "N/A",
             p.dateOfBirth ? calculateAge(p.dateOfBirth) : "N/A",
-            p.assignedTherapist ? `${p.assignedTherapist.firstName} ${p.assignedTherapist.lastName}` : "Unassigned",
+            p.assignedClinical ? `${p.assignedClinical.firstName} ${p.assignedClinical.lastName}` : "Unassigned",
             p.updatedAt ? new Date(p.updatedAt).toLocaleDateString() : "N/A"
           ])
         : []),
@@ -190,12 +190,12 @@ export default function Dashboard() {
 
     const appointmentsSection = [
       ["Today's Appointments", "", "", "", "", "", ""],
-      ["ID", "Patient", "Therapist", "Date & Time", "Type", "Status", "Duration", "Notes"],
+              ["ID", "Patient", "Clinical", "Date & Time", "Type", "Status", "Duration", "Notes"],
       ...(Array.isArray(todayAppointments)
         ? todayAppointments.map((a: any) => [
             a.id,
             a.patientName || "N/A",
-            a.therapistName || "N/A",
+            a.clinicalName || "N/A",
             a.appointmentDate ? new Date(a.appointmentDate).toLocaleString() : "N/A",
             a.type || "Session",
             a.status,

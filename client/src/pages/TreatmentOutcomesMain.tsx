@@ -45,7 +45,7 @@ export default function TreatmentOutcomesMain() {
   
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [therapistFilter, setTherapistFilter] = useState('all');
+  const [clinicalFilter, setClinicalFilter] = useState('all');
   const [sortBy, setSortBy] = useState('assessmentDate');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [currentPage, setCurrentPage] = useState(1);
@@ -55,14 +55,14 @@ export default function TreatmentOutcomesMain() {
 
   // Fetch all treatment outcomes
   const { data: outcomesData, isLoading, error } = useQuery({
-    queryKey: ['/api/treatment-outcomes', currentPage, pageSize, searchTerm, statusFilter, therapistFilter],
+    queryKey: ['/api/treatment-outcomes', currentPage, pageSize, searchTerm, statusFilter, clinicalFilter],
     queryFn: async () => {
       const params = new URLSearchParams();
       params.append('limit', pageSize.toString());
       params.append('offset', ((currentPage - 1) * pageSize).toString());
       if (searchTerm) params.append('search', searchTerm);
       if (statusFilter !== 'all') params.append('goalProgress', statusFilter);
-      if (therapistFilter !== 'all') params.append('therapistId', therapistFilter);
+      if (clinicalFilter !== 'all') params.append('clinicalId', clinicalFilter);
       
       const response = await apiRequest('GET', `/api/treatment-outcomes?${params.toString()}`);
       const data = await response.json();
@@ -73,13 +73,13 @@ export default function TreatmentOutcomesMain() {
     refetchIntervalInBackground: true,
   });
 
-  // Fetch therapists for filter
-  const { data: therapists } = useQuery({
+  // Fetch clinicals for filter
+  const { data: clinicals } = useQuery({
     queryKey: ['/api/staff/list'],
     queryFn: async () => {
       const response = await apiRequest('GET', '/api/staff/list');
       const data = await response.json();
-      return data.filter((staff: any) => staff.role === 'therapist');
+      return data.filter((staff: any) => staff.role === 'clinical');
     },
     retry: false,
     refetchInterval: 30000,
@@ -273,19 +273,19 @@ export default function TreatmentOutcomesMain() {
               </SelectContent>
             </Select>
             
-            <Select value={therapistFilter} onValueChange={setTherapistFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Filter by therapist" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Therapists</SelectItem>
-                {therapists?.map((therapist: any) => (
-                  <SelectItem key={therapist.id} value={therapist.id}>
-                    {therapist.firstName} {therapist.lastName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                            <Select value={clinicalFilter} onValueChange={setClinicalFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Filter by clinical" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Clinical</SelectItem>
+                    {clinicals?.map((clinical: any) => (
+                      <SelectItem key={clinical.id} value={clinical.id}>
+                        {clinical.firstName} {clinical.lastName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
             
             <Select value={sortBy} onValueChange={setSortBy}>
               <SelectTrigger>
@@ -333,7 +333,7 @@ export default function TreatmentOutcomesMain() {
                       )}
                     </TableHead>
                     <TableHead>Patient</TableHead>
-                    <TableHead>Therapist</TableHead>
+                    <TableHead>Clinical</TableHead>
                     <TableHead>Symptom Scores</TableHead>
                     <TableHead>Goals</TableHead>
                     <TableHead>Mood & Risk</TableHead>
@@ -371,7 +371,7 @@ export default function TreatmentOutcomesMain() {
                       
                       <TableCell>
                         <div className="text-sm">
-                          {outcome.therapistId?.firstName} {outcome.therapistId?.lastName}
+                          {outcome.clinicalId?.firstName} {outcome.clinicalId?.lastName}
                         </div>
                       </TableCell>
                       

@@ -4,14 +4,14 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Eye, Edit, FileText } from "lucide-react";
 import { Link } from "wouter";
-import type { PatientWithTherapist } from "@shared/types";
+import type { PatientWithClinical } from "@shared/types";
 
 interface RecentPatientsProps {
-  patients: PatientWithTherapist[];
+  patients: PatientWithClinical[];
   isLoading?: boolean;
   onViewAll?: () => void;
-  onPatientClick?: (patient: PatientWithTherapist) => void;
-  onGenerateReport?: (patient: PatientWithTherapist) => void;
+  onPatientClick?: (patient: PatientWithClinical) => void;
+  onGenerateReport?: (patient: PatientWithClinical) => void;
 }
 
 export function RecentPatients({

@@ -12,14 +12,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { FileText, Search, Filter, Download, Calendar, User, TrendingUp } from 'lucide-react';
 import { format } from 'date-fns';
 import PatientReport from '@/components/reports/PatientReport';
-import type { PatientWithTherapist } from '@shared/types';
+import type { PatientWithClinical } from '@shared/types';
 
 const PatientReports: React.FC = () => {
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [showReportDialog, setShowReportDialog] = useState(false);
-  const [selectedPatient, setSelectedPatient] = useState<PatientWithTherapist | null>(null);
+  const [selectedPatient, setSelectedPatient] = useState<PatientWithClinical | null>(null);
 
   // Fetch all patients
   const { data: patientsData, isLoading, error } = useQuery({
@@ -34,7 +34,7 @@ const PatientReports: React.FC = () => {
   const patients = patientsData?.patients || [];
 
   // Filter patients based on search and status
-  const filteredPatients = patients.filter((patient: PatientWithTherapist) => {
+  const filteredPatients = patients.filter((patient: PatientWithClinical) => {
     const matchesSearch = 
       patient.firstName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       patient.lastName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -45,7 +45,7 @@ const PatientReports: React.FC = () => {
     return matchesSearch && matchesStatus;
   });
 
-  const handleGenerateReport = (patient: PatientWithTherapist) => {
+  const handleGenerateReport = (patient: PatientWithClinical) => {
     setSelectedPatient(patient);
     setShowReportDialog(true);
   };
@@ -130,7 +130,7 @@ const PatientReports: React.FC = () => {
                   <div>
                     <p className="text-sm font-medium text-gray-600">Active Patients</p>
                     <p className="text-2xl font-bold">
-                      {patients.filter((p: PatientWithTherapist) => p.status === 'active').length}
+                      {patients.filter((p: PatientWithClinical) => p.status === 'active').length}
                     </p>
                   </div>
                   <TrendingUp className="h-8 w-8 text-green-600" />
@@ -143,7 +143,7 @@ const PatientReports: React.FC = () => {
                   <div>
                     <p className="text-sm font-medium text-gray-600">Discharged</p>
                     <p className="text-2xl font-bold">
-                      {patients.filter((p: PatientWithTherapist) => p.status === 'discharged').length}
+                      {patients.filter((p: PatientWithClinical) => p.status === 'discharged').length}
                     </p>
                   </div>
                   <Calendar className="h-8 w-8 text-purple-600" />
@@ -228,7 +228,7 @@ const PatientReports: React.FC = () => {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {filteredPatients.map((patient: PatientWithTherapist) => (
+                  {filteredPatients.map((patient: PatientWithClinical) => (
                     <div
                       key={patient.id}
                       className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
@@ -248,9 +248,9 @@ const PatientReports: React.FC = () => {
                             <Badge className={getStatusColor(patient.status)}>
                               {patient.status}
                             </Badge>
-                            {patient.assignedTherapist && (
+                            {patient.assignedClinical && (
                               <span className="text-xs text-gray-500">
-                                Therapist: {patient.assignedTherapist.firstName} {patient.assignedTherapist.lastName}
+                                Clinical: {patient.assignedClinical.firstName} {patient.assignedClinical.lastName}
                               </span>
                             )}
                           </div>

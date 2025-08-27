@@ -4,7 +4,7 @@ const UserSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
   firstName: { type: String, required: true },
   lastName: { type: String, required: true },
-  role: { type: String, required: true }, // e.g., 'staff', 'therapist', 'admin'
+  role: { type: String, required: true }, // e.g., 'staff', 'clinical', 'admin'
   password: { type: String },
   forcePasswordChange: { type: Boolean, default: false },
   settings: {

@@ -15,7 +15,7 @@ import { apiRequest } from "@/lib/queryClient";
 // Type for MongoDB treatment records
 type InsertTreatmentRecord = {
   patientId: string;
-  therapistId: string;
+  clinicalId: string;
   sessionDate: Date;
   sessionType: string;
   notes?: string;
@@ -80,10 +80,10 @@ export default function NewRecord() {
     retry: false,
   });
 
-  const { data: therapists } = useQuery<
+  const { data: clinicals } = useQuery<
     { id: string; firstName: string; lastName: string }[]
   >({
-    queryKey: ["/api/therapists"],
+    queryKey: ["/api/clinicals"],
     retry: false,
   });
 
@@ -188,7 +188,7 @@ export default function NewRecord() {
               <TreatmentRecordForm
                 initialData={{
                   patientId: prefilledData?.patientId || preselectedPatientId || "",
-                  therapistId: prefilledData?.therapistId || "",
+                  clinicalId: prefilledData?.clinicalId || "",
                   sessionDate: prefilledData?.sessionDate ? new Date(prefilledData.sessionDate) : new Date(),
                   sessionType: prefilledData?.sessionType || "therapy",
                   notes: prefilledData?.notes || "",
@@ -200,7 +200,7 @@ export default function NewRecord() {
                 onSubmit={(data) => createRecordMutation.mutate(data)}
                 isLoading={createRecordMutation.isPending}
                 patients={patients?.patients || []}
-                therapists={therapists || []}
+                clinicals={clinicals || []}
               />
             </div>
           </div>

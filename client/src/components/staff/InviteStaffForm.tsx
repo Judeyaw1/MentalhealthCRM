@@ -63,8 +63,8 @@ export function InviteStaffForm({ onSuccess }: InviteStaffFormProps) {
   // Dynamic role options based on current user's role
   const roleOptions = [
     {
-      value: "therapist",
-      label: "Therapist",
+      value: "clinical",
+      label: "Clinical",
       description: "Licensed mental health professional",
       icon: UserCheck,
     },

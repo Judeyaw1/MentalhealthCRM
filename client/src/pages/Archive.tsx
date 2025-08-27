@@ -61,7 +61,7 @@ interface ArchivedPatient {
   status: "discharged";
   createdAt: string;
   updatedAt: string;
-  assignedTherapist?: {
+  assignedClinical?: {
     firstName: string;
     lastName: string;
   };
@@ -344,7 +344,7 @@ export default function Archive() {
                               <TableHead className="bg-white">Patient</TableHead>
                               <TableHead className="bg-white">Contact</TableHead>
                               <TableHead className="bg-white">Status</TableHead>
-                              <TableHead className="bg-white">Assigned Therapist</TableHead>
+                              <TableHead className="bg-white">Assigned Clinical</TableHead>
                               <TableHead className="bg-white">Archived Date</TableHead>
                               <TableHead className="bg-white">Actions</TableHead>
                             </TableRow>
@@ -383,9 +383,9 @@ export default function Archive() {
                                   {getStatusBadge(patient.status)}
                                 </TableCell>
                                 <TableCell>
-                                  {patient.assignedTherapist ? (
+                                  {patient.assignedClinical ? (
                                     <div className="text-sm">
-                                      {patient.assignedTherapist.firstName} {patient.assignedTherapist.lastName}
+                                      {patient.assignedClinical.firstName} {patient.assignedClinical.lastName}
                                     </div>
                                   ) : (
                                     <span className="text-sm text-gray-400">Not assigned</span>

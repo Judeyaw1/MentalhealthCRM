@@ -158,11 +158,11 @@ export function AppointmentForm({
                 name="therapistId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Therapist *</FormLabel>
+                    <FormLabel>Clinical *</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select therapist" />
+                          <SelectValue placeholder="Select clinical" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>

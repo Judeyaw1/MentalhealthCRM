@@ -35,7 +35,7 @@ interface PatientReportData {
       dischargeReason?: string;
       dischargeDate?: string;
     };
-    assignedTherapist?: {
+    assignedClinical?: {
       firstName: string;
       lastName: string;
       email: string;
@@ -47,7 +47,7 @@ interface PatientReportData {
     time: string;
     status: string;
     notes?: string;
-    therapist: {
+    clinical: {
       firstName: string;
       lastName: string;
     };
@@ -62,7 +62,7 @@ interface PatientReportData {
     functionalScore: number;
     riskLevel: string;
     notes: string;
-    therapist: {
+    clinical: {
       firstName: string;
       lastName: string;
     };
@@ -306,12 +306,12 @@ const PatientReport: React.FC<PatientReportProps> = ({ patientId, onClose }) => 
               </div>
             </div>
           </div>
-          {patient.assignedTherapist && (
+          {patient.assignedClinical && (
             <div className="mt-4 pt-4 border-t">
-              <h4 className="font-semibold text-gray-700 mb-2">Assigned Therapist</h4>
+              <h4 className="font-semibold text-gray-700 mb-2">Assigned Clinical</h4>
               <p className="text-sm">
-                {patient.assignedTherapist.firstName} {patient.assignedTherapist.lastName} 
-                ({patient.assignedTherapist.email})
+                {patient.assignedClinical.firstName} {patient.assignedClinical.lastName} 
+                ({patient.assignedClinical.email})
               </p>
             </div>
           )}
@@ -426,7 +426,7 @@ const PatientReport: React.FC<PatientReportProps> = ({ patientId, onClose }) => 
                           {format(new Date(appointment.date), 'MMM dd, yyyy')} at {appointment.time}
                         </p>
                         <p className="text-sm text-gray-600">
-                          {appointment.therapist.firstName} {appointment.therapist.lastName}
+                          {appointment.clinical.firstName} {appointment.clinical.lastName}
                         </p>
                       </div>
                     </div>
@@ -527,7 +527,7 @@ const PatientReport: React.FC<PatientReportProps> = ({ patientId, onClose }) => 
                           <span className="text-gray-500">at {appointment.time}</span>
                         </div>
                         <p className="text-sm text-gray-600 mb-2">
-                          Therapist: {appointment.therapist.firstName} {appointment.therapist.lastName}
+                          Clinical: {appointment.clinical.firstName} {appointment.clinical.lastName}
                         </p>
                         {appointment.notes && (
                           <p className="text-sm text-gray-700 bg-gray-50 p-2 rounded">
@@ -596,9 +596,9 @@ const PatientReport: React.FC<PatientReportProps> = ({ patientId, onClose }) => 
                             </Badge>
                           </div>
                           <div>
-                            <span className="font-medium">Therapist:</span>
+                                                          <span className="font-medium">Clinical:</span>
                             <p className="text-gray-600">
-                              {record.therapist.firstName} {record.therapist.lastName}
+                              {record.clinical.firstName} {record.clinical.lastName}
                             </p>
                           </div>
                         </div>

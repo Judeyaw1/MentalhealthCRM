@@ -87,8 +87,8 @@ export default function Staff() {
         return (
           <Badge className="bg-orange-100 text-orange-800">Supervisor</Badge>
         );
-      case "therapist":
-        return <Badge className="bg-blue-100 text-blue-800">Therapist</Badge>;
+      case "clinical":
+        return <Badge className="bg-blue-100 text-blue-800">Clinical</Badge>;
       case "staff":
         return <Badge variant="secondary">Staff</Badge>;
       default:
@@ -161,8 +161,8 @@ export default function Staff() {
 
   const staffStats = {
     total: staff?.length || 0,
-    therapists:
-      staff?.filter((member: User) => member.role === "therapist").length || 0,
+          clinicals:
+        staff?.filter((member: User) => member.role === "clinical").length || 0,
     admins:
       staff?.filter((member: User) => member.role === "admin").length || 0,
     supervisors:
@@ -245,11 +245,11 @@ export default function Staff() {
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Therapists</CardTitle>
+                  <CardTitle className="text-sm font-medium">Clinical</CardTitle>
                   <UserCheck className="h-4 w-4 text-gray-600" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{staffStats.therapists}</div>
+                  <div className="text-2xl font-bold">{staffStats.clinicals}</div>
                   <p className="text-xs text-gray-600">Licensed professionals</p>
                 </CardContent>
               </Card>

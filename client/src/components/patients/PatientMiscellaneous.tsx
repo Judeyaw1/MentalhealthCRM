@@ -970,7 +970,7 @@ export default function PatientMiscellaneous({ patientId, patient }: PatientMisc
                           <SelectItem value="psychiatrist">Psychiatrist</SelectItem>
                           <SelectItem value="psychologist">Psychologist</SelectItem>
                           <SelectItem value="specialist">Specialist</SelectItem>
-                          <SelectItem value="therapist">Therapist</SelectItem>
+                          <SelectItem value="clinical">Clinical</SelectItem>
                           <SelectItem value="nurse">Nurse</SelectItem>
                           <SelectItem value="social_worker">Social Worker</SelectItem>
                           <SelectItem value="other">Other</SelectItem>

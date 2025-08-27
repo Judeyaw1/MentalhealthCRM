@@ -297,8 +297,8 @@ export default function Settings() {
         return "Administrator";
       case "supervisor":
         return "Supervisor";
-      case "therapist":
-        return "Therapist";
+              case "clinical":
+          return "Clinical";
       case "staff":
         return "Staff Member";
       case "frontdesk":
@@ -314,7 +314,7 @@ export default function Settings() {
         return "destructive" as const;
       case "supervisor":
         return "default" as const;
-      case "therapist":
+      case "clinical":
         return "default" as const;
       case "staff":
         return "secondary" as const;

@@ -75,8 +75,8 @@ export function EditStaffForm({ staffMember, onSuccess }: EditStaffFormProps) {
   // Dynamic role options based on current user's role and staff member being edited
   const roleOptions = [
     {
-      value: "therapist",
-      label: "Therapist",
+      value: "clinical",
+      label: "Clinical",
       description: "Licensed mental health professional",
       icon: UserCheck,
     },

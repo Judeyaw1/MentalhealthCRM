@@ -16,7 +16,7 @@ import { apiRequest } from "@/lib/queryClient";
 // Type for MongoDB appointments
 type InsertAppointment = {
   patientId: string;
-  therapistId: string;
+  clinicalId: string;
   appointmentDate: Date;
   duration: number;
   type: string;
@@ -54,8 +54,8 @@ export default function NewAppointment() {
     retry: false,
   });
 
-  const { data: therapists } = useQuery({
-    queryKey: ["/api/therapists"],
+  const { data: clinicals } = useQuery({
+    queryKey: ["/api/clinicals"],
     retry: false,
   });
 
@@ -148,7 +148,7 @@ export default function NewAppointment() {
     );
   }
 
-  const defaultTherapistId = user?.role === "therapist" ? user.id : "";
+  const defaultClinicalId = user?.role === "clinical" ? user.id : "";
 
   // Create patient history object
   const patientHistory: { [patientId: number]: boolean } = {};
@@ -200,7 +200,7 @@ export default function NewAppointment() {
               <AppointmentForm
                 initialData={{
                   patientId: preselectedPatientId || "",
-                  therapistId: defaultTherapistId,
+                  clinicalId: defaultClinicalId,
                   appointmentDate: new Date(),
                   duration: 60,
                   type: "therapy",
@@ -211,7 +211,7 @@ export default function NewAppointment() {
                 isLoading={createAppointmentMutation.isPending}
                 submitLabel="Schedule Appointment"
                 patients={patients?.patients || []}
-                therapists={therapists || []}
+                clinicals={clinicals || []}
                 isNewAppointment={true}
                 patientHistory={patientHistory}
               />

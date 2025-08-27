@@ -36,7 +36,7 @@ import { Link } from "wouter";
 import { isUnauthorizedError, canSeeCreatedBy } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
 import type {
-  PatientWithTherapist,
+  PatientWithClinical,
   AppointmentWithDetails,
   TreatmentRecordWithDetails,
 } from "@shared/types";
@@ -56,8 +56,8 @@ export default function PatientDetail() {
   const { toast } = useToast();
   const { isAuthenticated, isLoading: authLoading, user } = useAuth();
   const queryClient = useQueryClient();
-  const canPerformAssessments = ['admin', 'supervisor', 'therapist'].includes(user?.role || '');
-  const canUseChat = ['admin', 'supervisor', 'therapist'].includes(user?.role || '');
+  const canPerformAssessments = ['admin', 'supervisor', 'clinical'].includes(user?.role || '');
+  const canUseChat = ['admin', 'supervisor', 'clinical'].includes(user?.role || '');
   const isAdmin = user?.role === 'admin';
 
   // Get tab from URL query parameter - use both wouter and browser URL
@@ -753,10 +753,10 @@ export default function PatientDetail() {
                       <span className="text-sm text-gray-500">
                         Age: {calculateAge(patient.dateOfBirth)}
                       </span>
-                      {patient.assignedTherapist && (
+                      {patient.assignedClinical && (
                         <span className="text-sm text-gray-500">
-                          Therapist: {patient.assignedTherapist.firstName}{" "}
-                          {patient.assignedTherapist.lastName}
+                          Clinical: {patient.assignedClinical.firstName}{" "}
+                          {patient.assignedClinical.lastName}
                         </span>
                       )}
                     </div>
@@ -1100,10 +1100,10 @@ export default function PatientDetail() {
                         </div>
                         <div>
                           <label className="text-sm font-medium text-gray-500">
-                            Assigned Therapist
+                            Assigned Clinical
                           </label>
                           <p className="text-sm text-gray-900">
-                            {patient.assignedTherapist ? `${patient.assignedTherapist.firstName} ${patient.assignedTherapist.lastName}` : "Not assigned"}
+                            {patient.assignedClinical ? `${patient.assignedClinical.firstName} ${patient.assignedClinical.lastName}` : "Not assigned"}
                           </p>
                         </div>
                       </div>
@@ -1251,10 +1251,10 @@ export default function PatientDetail() {
                                   • {appointment.duration} minutes
                                 </p>
                                 <p className="text-sm text-gray-500">
-                                  {appointment.therapist ? (
-                                    <>with {appointment.therapist.firstName} {appointment.therapist.lastName}</>
+                                  {appointment.clinical ? (
+                                    <>with {appointment.clinical.firstName} {appointment.clinical.lastName}</>
                                   ) : (
-                                    <>No therapist assigned</>
+                                    <>No clinical assigned</>
                                   )}
                                 </p>
                               </div>
@@ -1353,9 +1353,9 @@ export default function PatientDetail() {
                                 </h4>
                                 <p className="text-sm text-gray-600">
                                   {formatDateTime(record.sessionDate)} • by{" "}
-                                  {record.therapist
-                                    ? `${record.therapist.firstName} ${record.therapist.lastName}`
-                                    : "Unknown Therapist"}
+                                  {record.clinical
+                                    ? `${record.clinical.firstName} ${record.clinical.lastName}`
+                                    : "Unknown Clinical"}
                                 </p>
                               </div>
                               <Clock className="h-4 w-4 text-gray-400" />
@@ -1507,14 +1507,14 @@ export default function PatientDetail() {
 
 function AssessmentsSection({ patientId, patient }: { patientId: string, patient: any }) {
   const { user } = useAuth();
-  const canPerformAssessments = ['admin', 'supervisor', 'therapist'].includes(user?.role || '');
+  const canPerformAssessments = ['admin', 'supervisor', 'clinical'].includes(user?.role || '');
   const isAdmin = user?.role === 'admin';
   
   // If user cannot perform assessments, show access denied message
   if (!canPerformAssessments) {
     return (
       <div className="text-center py-8 text-gray-500">
-        <p>Access denied. Only admin, supervisor, and therapist roles can perform assessments.</p>
+        <p>Access denied. Only admin, supervisor, and clinical roles can perform assessments.</p>
       </div>
     );
   }

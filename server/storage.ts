@@ -18,7 +18,7 @@ export class DatabaseStorage {
   }
   
   // Patient operations
-  async getPatients(limit = 50, offset = 0, search?: string, status?: string, createdBy?: string, therapist?: string, loc?: string, includeArchived = false, unassignedOnly = false) {
+  async getPatients(limit = 50, offset = 0, search?: string, status?: string, createdBy?: string, clinical?: string, loc?: string, includeArchived = false, unassignedOnly = false) {
     let query: any = {};
 
     if (search) {
@@ -38,8 +38,8 @@ export class DatabaseStorage {
       query.createdBy = createdBy;
     }
 
-    if (therapist) {
-      query.assignedTherapistId = therapist;
+    if (clinical) {
+      query.assignedClinicalId = clinical;
     }
 
     if (loc) {
@@ -49,9 +49,9 @@ export class DatabaseStorage {
     // Filter for unassigned patients only
     if (unassignedOnly) {
       query.$or = [
-        { assignedTherapistId: { $exists: false } },
-        { assignedTherapistId: null },
-        { assignedTherapistId: "" }
+        { assignedClinicalId: { $exists: false } },
+        { assignedClinicalId: null },
+        { assignedClinicalId: "" }
       ];
     }
 
@@ -62,7 +62,7 @@ export class DatabaseStorage {
 
     const total = await PatientModel.countDocuments(query);
     const patients = await PatientModel.find(query)
-      .populate("assignedTherapistId", "firstName lastName email")
+              .populate("assignedClinicalId", "firstName lastName email")
       .populate("createdBy", "firstName lastName email role")
       .limit(limit)
       .skip(offset)
@@ -72,7 +72,7 @@ export class DatabaseStorage {
         console.error("Error fetching patients with population:", error);
         // If population fails, try without createdBy population
         return PatientModel.find(query)
-          .populate("assignedTherapistId", "firstName lastName email")
+          .populate("assignedClinicalId", "firstName lastName email")
           .limit(limit)
           .skip(offset)
           .sort({ createdAt: -1 })
@@ -86,7 +86,7 @@ export class DatabaseStorage {
       const transformed = {
         ...rest,
         id: _id.toString(),
-        assignedTherapist: rest.assignedTherapistId || undefined,
+        assignedClinical: rest.assignedClinicalId || undefined,
         createdBy: rest.createdBy
           ? {
               ...rest.createdBy,
@@ -103,7 +103,7 @@ export class DatabaseStorage {
 
   async getPatient(id: string) {
     const p = await PatientModel.findById(id)
-      .populate("assignedTherapistId", "firstName lastName email")
+      .populate("assignedClinicalId", "firstName lastName email")
       .populate("createdBy", "firstName lastName email role")
       .populate({
         path: "dischargeRequests.requestedBy",
@@ -119,10 +119,10 @@ export class DatabaseStorage {
     return {
       ...rest,
       id: _id.toString(),
-      assignedTherapist: rest.assignedTherapistId
+      assignedClinical: rest.assignedClinicalId
         ? {
-            ...rest.assignedTherapistId,
-            id: rest.assignedTherapistId._id.toString(),
+            ...rest.assignedClinicalId,
+            id: rest.assignedClinicalId._id.toString(),
           }
         : undefined,
       createdBy: rest.createdBy
@@ -141,10 +141,10 @@ export class DatabaseStorage {
       // Clean up ObjectId fields - convert empty strings to null
       const cleanedPatient = {
         ...patient,
-        assignedTherapistId:
-          patient.assignedTherapistId === ""
+        assignedClinicalId:
+          patient.assignedClinicalId === ""
             ? null
-            : patient.assignedTherapistId,
+            : patient.assignedClinicalId,
       };
 
 
@@ -159,7 +159,7 @@ export class DatabaseStorage {
 
       // Fetch the patient with populated fields
       const populatedPatient = await PatientModel.findById(newPatient._id)
-        .populate("assignedTherapistId", "firstName lastName email")
+        .populate("assignedClinicalId", "firstName lastName email")
         .populate("createdBy", "firstName lastName email role")
         .lean();
 
@@ -172,21 +172,21 @@ export class DatabaseStorage {
         hasCreatedBy: !!populatedPatient.createdBy,
       });
 
-      // Send notification if a therapist is assigned during creation
-      console.log("🔍 Checking for therapist assignment:", {
-        hasAssignedTherapist: !!populatedPatient.assignedTherapistId,
-        therapistId: populatedPatient.assignedTherapistId?._id?.toString(),
+      // Send notification if a clinical is assigned during creation
+      console.log("🔍 Checking for clinical assignment:", {
+        hasAssignedClinical: !!populatedPatient.assignedClinicalId,
+        clinicalId: populatedPatient.assignedClinicalId?._id?.toString(),
         patientName: `${populatedPatient.firstName} ${populatedPatient.lastName}`
       });
       
-      if (populatedPatient.assignedTherapistId) {
+      if (populatedPatient.assignedClinicalId) {
         try {
-          console.log("📞 Attempting to send notification to therapist:", populatedPatient.assignedTherapistId._id.toString());
+          console.log("📞 Attempting to send notification to clinical:", populatedPatient.assignedClinicalId._id.toString());
           const { notificationService } = await import("./notificationService");
           const patientName = `${populatedPatient.firstName} ${populatedPatient.lastName}`;
           
           await notificationService.sendPatientAssignmentNotification(
-            populatedPatient.assignedTherapistId._id.toString(),
+            populatedPatient.assignedClinicalId._id.toString(),
             {
               patientName,
               patientId: populatedPatient._id.toString(),
@@ -211,7 +211,7 @@ export class DatabaseStorage {
       return {
         ...rest,
         id: _id.toString(),
-        assignedTherapist: undefined,
+        assignedClinical: undefined,
         createdBy: rest.createdBy
           ? {
               ...rest.createdBy,
@@ -233,15 +233,15 @@ export class DatabaseStorage {
     // Clean up ObjectId fields - convert empty strings to null
     const cleanedPatient = {
       ...patient,
-      assignedTherapistId:
-        patient.assignedTherapistId === "" || !patient.assignedTherapistId
+      assignedClinicalId:
+        patient.assignedClinicalId === "" || !patient.assignedClinicalId
           ? null
-          : patient.assignedTherapistId,
+          : patient.assignedClinicalId,
     };
 
-    // Check if therapist assignment changed
-    const prevTherapistId = currentPatient.assignedTherapistId?.toString();
-    const newTherapistId = cleanedPatient.assignedTherapistId?.toString();
+          // Check if clinical assignment changed
+      const prevClinicalId = currentPatient.assignedClinicalId?.toString();
+      const newClinicalId = cleanedPatient.assignedClinicalId?.toString();
 
 
 
@@ -266,14 +266,14 @@ export class DatabaseStorage {
     }).lean();
     if (!updatedPatient) return undefined;
 
-    // Send notification if therapist assignment changed
-    if (newTherapistId && newTherapistId !== prevTherapistId) {
+    // Send notification if clinical assignment changed
+    if (newClinicalId && newClinicalId !== prevClinicalId) {
       try {
         const { notificationService } = await import("./notificationService");
         const patientName = `${updatedPatient.firstName} ${updatedPatient.lastName}`;
         
         await notificationService.sendPatientAssignmentNotification(
-          newTherapistId,
+          newClinicalId,
           {
             patientName,
             patientId: updatedPatient._id.toString(),
@@ -296,7 +296,7 @@ export class DatabaseStorage {
     return {
       ...rest,
       id: _id.toString(),
-      assignedTherapist: undefined,
+      assignedClinical: undefined,
     };
   }
 
@@ -420,13 +420,13 @@ export class DatabaseStorage {
 
   // Removed upsertUser as it's no longer needed
 
-  async getPatientsByTherapist(therapistId: string) {
+  async getPatientsByClinical(clinicalId: string) {
     return [];
   }
 
   // Appointments
   async getAppointments(
-    therapistId?: string,
+    clinicalId?: string,
     patientId?: string,
     startDate?: Date,
     endDate?: Date,
@@ -434,8 +434,8 @@ export class DatabaseStorage {
   ) {
     const query: any = {};
 
-    if (therapistId && typeof therapistId === 'string') {
-      query.therapistId = new mongoose.Types.ObjectId(therapistId);
+    if (clinicalId && typeof clinicalId === 'string') {
+      query.clinicalId = new mongoose.Types.ObjectId(clinicalId);
     }
 
     if (patientId && typeof patientId === 'string') {
@@ -448,7 +448,7 @@ export class DatabaseStorage {
 
     let appointments = await Appointment.find(query)
       .populate("patientId", "firstName lastName")
-      .populate("therapistId", "firstName lastName")
+      .populate("clinicalId", "firstName lastName")
       .sort({ createdAt: -1 })
       .lean();
 
@@ -481,9 +481,9 @@ export class DatabaseStorage {
         ...apt.patientId,
         id: apt.patientId._id.toString(),
       } : null,
-      therapist: apt.therapistId ? {
-        ...apt.therapistId,
-        id: apt.therapistId._id.toString(),
+      clinical: apt.clinicalId ? {
+        ...apt.clinicalId,
+        id: apt.clinicalId._id.toString(),
       } : null,
     }));
   }
@@ -491,7 +491,7 @@ export class DatabaseStorage {
   async getAppointment(id: string) {
     const appointment = await Appointment.findById(id)
       .populate("patientId", "firstName lastName")
-      .populate("therapistId", "firstName lastName")
+      .populate("clinicalId", "firstName lastName")
       .lean();
 
     if (!appointment) return null;
@@ -503,9 +503,9 @@ export class DatabaseStorage {
         ...appointment.patientId,
         id: appointment.patientId._id.toString(),
       } : null,
-      therapist: appointment.therapistId ? {
-        ...appointment.therapistId,
-        id: appointment.therapistId._id.toString(),
+      clinical: appointment.clinicalId ? {
+        ...appointment.clinicalId,
+        id: appointment.clinicalId._id.toString(),
       } : null,
     };
   }
@@ -527,14 +527,14 @@ export class DatabaseStorage {
     // Fetch the appointment with populated data
     const populatedAppointment = await Appointment.findById(appointment._id)
       .populate("patientId", "firstName lastName")
-      .populate("therapistId", "firstName lastName")
+      .populate("clinicalId", "firstName lastName")
       .lean();
 
     if (!populatedAppointment) {
       throw new Error("Failed to create appointment");
     }
 
-    // Send notification to the assigned therapist
+    // Send notification to the assigned clinical
     try {
       const { notificationService } = await import("./notificationService");
       // Type-safe access to populated patient data
@@ -555,7 +555,7 @@ export class DatabaseStorage {
       };
 
       await notificationService.createNotification(
-        populatedAppointment.therapistId._id.toString(),
+        populatedAppointment.clinicalId._id.toString(),
         "general",
         notificationTitle,
         notificationMessage,
@@ -572,9 +572,9 @@ export class DatabaseStorage {
         ...populatedAppointment.patientId,
         id: populatedAppointment.patientId._id.toString(),
       },
-      therapist: {
-        ...populatedAppointment.therapistId,
-        id: populatedAppointment.therapistId._id.toString(),
+      clinical: {
+        ...populatedAppointment.clinicalId,
+        id: populatedAppointment.clinicalId._id.toString(),
       },
     };
   }
@@ -582,15 +582,15 @@ export class DatabaseStorage {
   async updateAppointment(id: string, updates: any) {
     console.log("🔍 updateAppointment called with:", { id, updates });
     
-    // Fetch the current appointment to check for therapist reassignment
+    // Fetch the current appointment to check for clinical reassignment
     const currentAppointment = await Appointment.findById(id).lean();
     if (!currentAppointment) {
       console.log("❌ Current appointment not found");
       return null;
     }
 
-    const prevTherapistId = currentAppointment.therapistId?.toString();
-    const newTherapistId = updates.therapistId?.toString();
+    const prevClinicalId = currentAppointment.clinicalId?.toString();
+    const newClinicalId = updates.clinicalId?.toString();
     
 
 
@@ -598,13 +598,13 @@ export class DatabaseStorage {
       new: true,
     })
       .populate("patientId", "firstName lastName")
-      .populate("therapistId", "firstName lastName")
+      .populate("clinicalId", "firstName lastName")
       .lean();
 
     if (!appointment) return null;
 
-    // Send notification if therapist assignment changed
-    if (newTherapistId && newTherapistId !== prevTherapistId) {
+    // Send notification if clinical assignment changed
+    if (newClinicalId && newClinicalId !== prevClinicalId) {
 
       try {
         const { notificationService } = await import("./notificationService");
@@ -628,7 +628,7 @@ export class DatabaseStorage {
 
 
         await notificationService.createNotification(
-          newTherapistId,
+          newClinicalId,
           "general",
           notificationTitle,
           notificationMessage,
@@ -649,9 +649,9 @@ export class DatabaseStorage {
         ...appointment.patientId,
         id: appointment.patientId && appointment.patientId._id ? appointment.patientId._id.toString() : appointment.patientId?.toString?.() || "",
       },
-      therapist: {
-        ...appointment.therapistId,
-        id: appointment.therapistId && appointment.therapistId._id ? appointment.therapistId._id.toString() : appointment.therapistId?.toString?.() || "",
+      clinical: {
+        ...appointment.clinicalId,
+        id: appointment.clinicalId && appointment.clinicalId._id ? appointment.clinicalId._id.toString() : appointment.clinicalId?.toString?.() || "",
       },
     };
   }
@@ -666,7 +666,7 @@ export class DatabaseStorage {
         },
         { new: true }
       ).populate("patientId", "firstName lastName")
-       .populate("therapistId", "firstName lastName")
+       .populate("clinicalId", "firstName lastName")
        .lean();
 
       if (!appointment) {
@@ -680,9 +680,9 @@ export class DatabaseStorage {
           ...appointment.patientId,
           id: appointment.patientId._id.toString(),
         } : null,
-        therapist: appointment.therapistId ? {
-          ...appointment.therapistId,
-          id: appointment.therapistId._id.toString(),
+        clinical: appointment.clinicalId ? {
+          ...appointment.clinicalId,
+          id: appointment.clinicalId._id.toString(),
         } : null,
       };
     } catch (error) {
@@ -707,7 +707,7 @@ export class DatabaseStorage {
     try {
       const appointments = await Appointment.find({})
         .populate("patientId", "firstName lastName")
-        .populate("therapistId", "firstName lastName")
+        .populate("clinicalId", "firstName lastName")
         .sort({ createdAt: -1 })
         .lean();
 
@@ -718,9 +718,9 @@ export class DatabaseStorage {
           ...apt.patientId,
           id: apt.patientId._id.toString(),
         } : null,
-        therapist: apt.therapistId ? {
-          ...apt.therapistId,
-          id: apt.therapistId._id.toString(),
+        clinical: apt.clinicalId ? {
+          ...apt.clinicalId,
+          id: apt.clinicalId._id.toString(),
         } : null,
       }));
     } catch (error) {
@@ -729,7 +729,7 @@ export class DatabaseStorage {
     }
   }
 
-  async getTodayAppointments(therapistId?: string) {
+  async getTodayAppointments(clinicalId?: string) {
     const today = new Date();
     const startOfDay = new Date(
       today.getFullYear(),
@@ -745,13 +745,13 @@ export class DatabaseStorage {
     const query: any = {
       appointmentDate: { $gte: startOfDay, $lt: endOfDay },
     };
-    if (therapistId) {
-      query.therapistId = therapistId;
+    if (clinicalId) {
+      query.clinicalId = clinicalId;
     }
 
     const appointments = await Appointment.find(query)
       .populate("patientId", "firstName lastName")
-      .populate("therapistId", "firstName lastName")
+      .populate("clinicalId", "firstName lastName")
       .sort({ createdAt: -1 })
       .lean();
 
@@ -762,9 +762,9 @@ export class DatabaseStorage {
         ...apt.patientId,
         id: apt.patientId._id.toString(),
       } : null,
-      therapist: apt.therapistId ? {
-        ...apt.therapistId,
-        id: apt.therapistId._id.toString(),
+      clinical: apt.clinicalId ? {
+        ...apt.clinicalId,
+        id: apt.clinicalId._id.toString(),
       } : null,
     }));
   }
@@ -1265,6 +1265,17 @@ export class DatabaseStorage {
   async getStaff() {
     const staff = await User.find().lean();
     return staff.map((user) => {
+      const { _id, ...rest } = user;
+      return {
+        ...rest,
+        id: _id.toString(),
+      };
+    });
+  }
+
+  async getClinicals() {
+    const clinicals = await User.find({ role: "clinical" }).lean();
+    return clinicals.map((user) => {
       const { _id, ...rest } = user;
       return {
         ...rest,

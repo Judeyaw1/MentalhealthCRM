@@ -174,7 +174,7 @@ export default function NewPatient() {
       reasonForVisit: "Quick add - details to be completed",
       status: "active",
       hipaaConsent: true, // Default to true for quick add
-      assignedTherapistId: "",
+              assignedClinicalId: "",
     };
 
     quickAddMutation.mutate(patientData);
@@ -384,7 +384,7 @@ export default function NewPatient() {
                     <div className="flex items-start gap-2">
                       <div className="w-2 h-2 bg-primary rounded-full mt-2 flex-shrink-0"></div>
                       <p className="text-sm text-gray-600">
-                        Assign a therapist to automatically schedule follow-ups
+                        Assign a clinical to automatically schedule follow-ups
                       </p>
                     </div>
                     <div className="flex items-start gap-2">

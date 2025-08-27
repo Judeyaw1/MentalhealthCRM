@@ -37,6 +37,10 @@ export const getQueryFn: <T>(options: {
       return null;
     }
 
+    if (unauthorizedBehavior === "returnNull" && res.status === 401) {
+      return null;
+    }
+
     await throwIfResNotOk(res);
     return await res.json();
   };

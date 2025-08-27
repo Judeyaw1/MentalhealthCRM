@@ -11,7 +11,7 @@ export class TreatmentCompletionService {
     reason: string;
     criteria: string[];
   }> {
-    const patient = await Patient.findById(patientId).populate('assignedTherapistId');
+    const patient = await Patient.findById(patientId).populate('assignedClinicalId');
     if (!patient) {
       throw new Error('Patient not found');
     }

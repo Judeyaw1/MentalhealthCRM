@@ -55,7 +55,7 @@ interface DischargeRequest {
   reviewNotes?: string;
   patientId: string;
   patientName: string;
-  assignedTherapist?: {
+  assignedClinical?: {
     firstName: string;
     lastName: string;
   };
@@ -299,9 +299,9 @@ export default function DischargeRequests() {
                           </div>
                         </div>
 
-                        {request.assignedTherapist && (
+                        {request.assignedClinical && (
                           <div className="text-sm text-gray-500">
-                            <span className="font-medium">Assigned Therapist:</span> {request.assignedTherapist.firstName} {request.assignedTherapist.lastName}
+                            <span className="font-medium">Assigned Clinical:</span> {request.assignedClinical.firstName} {request.assignedClinical.lastName}
                           </div>
                         )}
                       </div>

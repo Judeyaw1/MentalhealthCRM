@@ -15,7 +15,7 @@ import { apiRequest } from "@/lib/queryClient";
 // Type for MongoDB treatment records
 type UpdateTreatmentRecord = {
   patientId: string;
-  therapistId: string;
+  clinicalId: string;
   sessionDate: Date;
   sessionType: string;
   notes?: string;
@@ -84,10 +84,10 @@ export default function EditRecord() {
     retry: false,
   });
 
-  const { data: therapists } = useQuery<
+  const { data: clinicals } = useQuery<
     { id: string; firstName: string; lastName: string }[]
   >({
-    queryKey: ["/api/therapists"],
+    queryKey: ["/api/clinicals"],
     retry: false,
   });
 
@@ -210,10 +210,10 @@ export default function EditRecord() {
                 onSubmit={handleSubmit}
                 isLoading={updateRecordMutation.isPending}
                 patients={patients?.patients || []}
-                therapists={therapists || []}
+                clinicals={clinicals || []}
                 initialData={{
                   patientId: record.patientId?._id || record.patientId?.toString() || record.patientId,
-                  therapistId: record.therapistId?._id || record.therapistId?.toString() || record.therapistId,
+                  clinicalId: record.clinicalId?._id || record.clinicalId?.toString() || record.clinicalId,
                   sessionDate: new Date(record.sessionDate),
                   sessionType: record.sessionType,
                   notes: record.notes || "",

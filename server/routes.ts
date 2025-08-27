@@ -21,7 +21,7 @@ import { TreatmentOutcome } from "./models/TreatmentOutcome";
 // Custom schema for MongoDB treatment records
 const insertTreatmentRecordSchema = z.object({
   patientId: z.string().min(1, "Patient ID is required"),
-  therapistId: z.string().min(1, "Therapist ID is required"),
+  clinicalId: z.string().min(1, "Clinical ID is required"),
   sessionDate: z
     .union([z.date(), z.string(), z.number()])
     .transform((val) => {
@@ -40,7 +40,7 @@ const insertTreatmentRecordSchema = z.object({
 // Custom schema for MongoDB appointments
 const insertAppointmentSchema = z.object({
   patientId: z.string().min(1, "Patient ID is required"),
-  therapistId: z.string().min(1, "Therapist ID is required"),
+  clinicalId: z.string().min(1, "Clinical ID is required"),
   appointmentDate: z
     .union([z.date(), z.string()])
     .transform((val) => (typeof val === "string" ? new Date(val) : val)),
@@ -158,7 +158,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.id;
       const user = await storage.getUser(userId);
-      const therapistId = user?.role === "therapist" ? userId : undefined;
+      const clinicalId = user?.role === "clinical" ? userId : undefined;
 
       const stats = await storage.getDashboardStats();
       res.json(stats);
@@ -175,11 +175,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const userId = req.user.id;
         const user = await storage.getUser(userId);
-        const therapistId = user?.role === "therapist" ? userId : undefined;
+        const clinicalId = user?.role === "clinical" ? userId : undefined;
 
         let patients;
-        if (therapistId) {
-          patients = await storage.getPatientsByTherapist(therapistId);
+        if (clinicalId) {
+          patients = await storage.getPatientsByClinical(clinicalId);
         } else {
           const result = await storage.getPatients(5, 0);
           patients = result.patients;
@@ -208,10 +208,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const userId = req.user.id;
         const user = await storage.getUser(userId);
-        let therapistId: string | undefined = undefined;
+        let clinicalId: string | undefined = undefined;
         let allowAll = false;
-        if (user?.role === "therapist") {
-          therapistId = userId;
+        if (user?.role === "clinical") {
+          clinicalId = userId;
         } else if (user?.role === "admin" || user?.role === "supervisor") {
           allowAll = true;
         } else if (user?.role === "staff" || user?.role === "frontdesk") {
@@ -219,7 +219,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.json([]);
         }
 
-        const appointments = await storage.getTodayAppointments(allowAll ? undefined : therapistId);
+        const appointments = await storage.getTodayAppointments(allowAll ? undefined : clinicalId);
         res.json(appointments);
       } catch (error) {
         console.error("Error fetching today's appointments:", error);
@@ -310,7 +310,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/patients", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const { limit = 50, offset = 0, search, status, createdBy, therapist, loc, unassignedOnly } = req.query;
+      const { limit = 50, offset = 0, search, status, createdBy, clinical, loc, unassignedOnly } = req.query;
 
       const result = await storage.getPatients(
         parseInt(limit as string),
@@ -318,7 +318,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         search as string,
         status as string,
         createdBy as string,
-        therapist as string,
+                  clinical as string,
         loc as string,
         false, // Don't include archived patients in main list
         unassignedOnly === "true"
@@ -361,10 +361,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
 
-      let therapistId: string | undefined = undefined;
+      let clinicalId: string | undefined = undefined;
       let allowAll = false;
-      if (user?.role === "therapist") {
-        therapistId = userId;
+      if (user?.role === "clinical") {
+        clinicalId = userId;
       } else if (user?.role === "admin") {
         allowAll = true;
       } else if (user?.role === "staff") {
@@ -374,7 +374,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get appointments specifically for this patient
       const appointments = await storage.getAppointments(
-        allowAll ? undefined : therapistId,
+        allowAll ? undefined : clinicalId,
         patientId,
         undefined, // startDate
         undefined, // endDate
@@ -502,21 +502,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // General permission check for patient updates
-      // Allow: admin, supervisor, and therapists for their assigned patients
+      // Allow: admin, supervisor, and clinicals for their assigned patients
       let canUpdate = 
         user.role === "admin" || 
         user.role === "supervisor";
 
-      // Check if therapist is assigned to this patient
-      if (user.role === "therapist") {
+      // Check if clinical is assigned to this patient
+      if (user.role === "clinical") {
         const currentPatient = await Patient.findById(patientId as any);
         if (!currentPatient) {
           return res.status(404).json({ message: "Patient not found" });
         }
 
-        // Check if therapist is assigned to this patient
-        const isAssigned = currentPatient.assignedTherapistId && 
-          currentPatient.assignedTherapistId.toString() === user.id.toString();
+        // Check if clinical is assigned to this patient
+        const isAssigned = currentPatient.assignedClinicalId && 
+          currentPatient.assignedClinicalId.toString() === user.id.toString();
         
         if (isAssigned) {
           canUpdate = true;
@@ -533,17 +533,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
 
         return res.status(403).json({ 
-          message: "NEW PERMISSION CHECK: You don't have permission to update patient information. Only administrators, supervisors, front desk staff, and assigned therapists can update patients." 
+          message: "NEW PERMISSION CHECK: You don't have permission to update patient information. Only administrators, supervisors, front desk staff, and assigned clinicals can update patients." 
         });
       }
 
       // Clean up ObjectId fields - convert empty strings to null
       const cleanedUpdates = {
         ...updates,
-        assignedTherapistId:
-          updates.assignedTherapistId === "" || !updates.assignedTherapistId
+        assignedClinicalId:
+          updates.assignedClinicalId === "" || !updates.assignedClinicalId
             ? null
-            : updates.assignedTherapistId,
+            : updates.assignedClinicalId,
       };
 
       // Automatically set discharge date when status is changed to "discharged"
@@ -817,6 +817,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             status: data.status === "active" || data.status === "inactive" || data.status === "discharged" ? data.status : "active",
             hipaaConsent: data.hipaaConsent === "true" || data.hipaaConsent === true || data.hipaaConsent === "1",
             loc: data.loc || "3.3",
+            important: data.important === "true" || data.important === true || data.important === "1",
             // Clean phone numbers (remove extensions and format)
             phone: data.phone ? data.phone.replace(/x\d+$/, '').replace(/[^\d-]/g, '').substring(0, 15) : undefined,
             // Clean email
@@ -827,7 +828,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
             insurance: data.insurance ? data.insurance.trim() : undefined,
             // Clean reasonForVisit
             reasonForVisit: data.reasonForVisit ? data.reasonForVisit.trim() : undefined,
+            // Clean SSN (remove non-alphanumeric characters)
+            ssn: data.ssn ? data.ssn.replace(/[^\w-]/g, '') : undefined,
+            // Clean authNumber
+            authNumber: data.authNumber ? data.authNumber.trim() : undefined,
+            // Clean URLs
+            insuranceCardUrl: data.insuranceCardUrl ? data.insuranceCardUrl.trim() : undefined,
+            photoUrl: data.photoUrl ? data.photoUrl.trim() : undefined,
+            // Clean treatment goals and discharge criteria
+            treatmentGoals: data.treatmentGoals ? data.treatmentGoals.trim() : undefined,
+            dischargeCriteria: data.dischargeCriteria ? data.dischargeCriteria.trim() : undefined,
+            // Map emergency contact fields from flat structure to nested structure
+            emergencyContact: {
+              name: data.emergencyContactName ? data.emergencyContactName.trim() : undefined,
+              relationship: data.emergencyContactRelationship ? data.emergencyContactRelationship.trim() : undefined,
+              phone: data.emergencyContactPhone ? data.emergencyContactPhone.replace(/x\d+$/, '').replace(/[^\d-]/g, '').substring(0, 15) : undefined,
+            },
+            // Map assignedTherapistId to assignedClinicalId for backward compatibility
+            assignedClinicalId: data.assignedClinicalId || data.assignedTherapistId,
           };
+
+          // Remove the old flat emergency contact fields to avoid conflicts
+          delete (cleanedData as any).emergencyContactName;
+          delete (cleanedData as any).emergencyContactRelationship;
+          delete (cleanedData as any).emergencyContactPhone;
+          delete (cleanedData as any).assignedTherapistId;
           
           // Validate that status is a valid enum value
           if (cleanedData.status && !["active", "inactive", "discharged"].includes(cleanedData.status)) {
@@ -853,7 +878,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json({ successCount, errors, message: `${successCount} patients imported. ${errors.length ? errors.length + ' errors.' : ''}` });
     } catch (error) {
-
+      console.error("Bulk import error:", error);
       res.status(500).json({ message: "Failed to import patients" });
     }
   });
@@ -894,7 +919,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         Phone: patient.phone || "",
         Address: patient.address || "",
         Status: patient.status,
-        "Assigned Therapist": patient.assignedTherapist ? `${patient.assignedTherapist.firstName} ${patient.assignedTherapist.lastName}` : "",
+        "Assigned Clinical": patient.assignedClinical ? `${patient.assignedClinical.firstName} ${patient.assignedClinical.lastName}` : "",
         "Emergency Contact": patient.emergencyContact ? `${patient.emergencyContact.name} (${patient.emergencyContact.phone})` : "",
         "Created Date": new Date(patient.createdAt).toLocaleDateString(),
         "Last Updated": new Date(patient.updatedAt).toLocaleDateString(),
@@ -925,7 +950,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           'Phone',
           'Address',
           'Status',
-          'Assigned Therapist',
+          'Assigned Clinical',
           'Emergency Contact',
           'Created Date',
           'Last Updated'
@@ -942,7 +967,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           `"${row.Phone}"`,
           `"${row.Address}"`,
           `"${row.Status}"`,
-          `"${row['Assigned Therapist']}"`,
+          `"${row['Assigned Clinical']}"`,
           `"${row['Emergency Contact']}"`,
           `"${row['Created Date']}"`,
           `"${row['Last Updated']}"`
@@ -1010,8 +1035,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         endDate,
       } = req.query;
 
-      // If therapist, only show their records
-      const therapistFilter = user?.role === "therapist" ? userId : therapistId;
+              // If clinical, only show their records
+        const clinicalFilter = user?.role === "clinical" ? userId : clinicalId;
 
       // Build query object
       const query: any = {};
@@ -1033,7 +1058,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           query: query
         });
       }
-      if (therapistFilter) query.therapistId = String(Array.isArray(therapistFilter) ? therapistFilter[0] : therapistFilter);
+              if (clinicalFilter) query.clinicalId = String(Array.isArray(clinicalFilter) ? clinicalFilter[0] : clinicalFilter);
       if (sessionType) query.sessionType = sessionType;
       if (startDate || endDate) {
         query.sessionDate = {};
@@ -1279,10 +1304,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUser(userId);
       const { patientId, startDate, endDate, status, search } = req.query;
 
-      let therapistId: string | undefined = undefined;
+      let clinicalId: string | undefined = undefined;
       let allowAll = false;
-      if (user?.role === "therapist") {
-        therapistId = userId;
+      if (user?.role === "clinical") {
+        clinicalId = userId;
       } else if (user?.role === "admin") {
         allowAll = true;
       } else if (user?.role === "staff") {
@@ -1291,7 +1316,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       let appointments = await storage.getAppointments(
-        allowAll ? undefined : therapistId,
+        allowAll ? undefined : clinicalId,
         patientId ? String(patientId) : undefined,
         startDate ? new Date(startDate as string) : undefined,
         endDate ? new Date(endDate as string) : undefined,
@@ -1465,9 +1490,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           patientName: appointment.patient?.firstName && appointment.patient?.lastName 
             ? `${appointment.patient.firstName} ${appointment.patient.lastName}` 
             : "Unknown Patient",
-          therapistName: appointment.therapist?.firstName && appointment.therapist?.lastName 
-            ? `${appointment.therapist.firstName} ${appointment.therapist.lastName}` 
-            : "Unknown Therapist",
+                  clinicalName: appointment.clinical?.firstName && appointment.clinical?.lastName
+          ? `${appointment.clinical.firstName} ${appointment.clinical.lastName}`
+          : "Unknown Clinical",
           appointmentDate: appointment.appointmentDate,
           oldStatus: currentAppointment.status,
           newStatus: updates.status,
@@ -1610,12 +1635,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Validate role
-      const validRoles = ["admin", "supervisor", "therapist", "staff", "frontdesk"];
+      const validRoles = ["admin", "supervisor", "clinical", "staff", "frontdesk"];
       if (!validRoles.includes(role)) {
 
         return res.status(400).json({
           message:
-            "Invalid role. Must be one of: admin, supervisor, therapist, staff, frontdesk",
+            "Invalid role. Must be one of: admin, supervisor, clinical, staff, frontdesk",
         });
       }
 
@@ -1787,17 +1812,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get therapists endpoint
-  app.get("/api/therapists", isAuthenticated, async (req: any, res) => {
+  // Get clinicals endpoint
+  app.get("/api/clinicals", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const therapists = await storage.getTherapists();
+      const clinicals = await storage.getClinicals();
       
-      await logActivity(userId, "view", "therapists", "list");
-      res.json(therapists);
+      await logActivity(userId, "view", "clinicals", "list");
+      res.json(clinicals);
     } catch (error) {
-      console.error("Error fetching therapists:", error);
-      res.status(500).json({ message: "Failed to fetch therapists" });
+      console.error("Error fetching clinicals:", error);
+      res.status(500).json({ message: "Failed to fetch clinicals" });
     }
   });
 
@@ -2403,10 +2428,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Treatment record not found" });
       }
 
-      // Only allow access if user is admin, the record's therapist, or the record's patient's assigned therapist
+      // Only allow access if user is admin, the record's clinical, or the record's patient's assigned clinical
       const canAccess = user?.role === "admin" || 
-                       record.therapist?.id === userId ||
-                       (record.patient && record.patient.assignedTherapistId?.toString() === userId);
+                       record.clinical?.id === userId ||
+                       (record.patient && record.patient.assignedClinicalId?.toString() === userId);
 
       if (!canAccess) {
         return res.status(403).json({ message: "Access denied. You don't have permission to view this record's history." });
@@ -2824,10 +2849,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!user) { return res.status(404).json({ message: "User not found" }); }
       
       // Role-based access control for chat functionality
-      const allowedRoles = ['admin', 'supervisor', 'therapist'];
+      const allowedRoles = ['admin', 'supervisor', 'clinical'];
       if (!allowedRoles.includes(user.role)) {
         return res.status(403).json({ 
-          message: "Access denied. Only admin, supervisor, and therapist roles can access chat functionality." 
+          message: "Access denied. Only admin, supervisor, and clinical roles can access chat functionality." 
         });
       }
 
@@ -2916,10 +2941,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!user) { return res.status(404).json({ message: "User not found" }); }
       
       // Role-based access control for chat functionality
-      const allowedRoles = ['admin', 'supervisor', 'therapist'];
+      const allowedRoles = ['admin', 'supervisor', 'clinical'];
       if (!allowedRoles.includes(user.role)) {
         return res.status(403).json({ 
-          message: "Access denied. Only admin, supervisor, and therapist roles can use chat functionality." 
+          message: "Access denied. Only admin, supervisor, and clinical roles can use chat functionality." 
         });
       }
       if (!content || content.trim().length === 0) { return res.status(400).json({ message: "Note content is required" }); }
@@ -3041,10 +3066,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Role-based access control for chat functionality
-      const allowedRoles = ['admin', 'supervisor', 'therapist'];
+      const allowedRoles = ['admin', 'supervisor', 'clinical'];
       if (!allowedRoles.includes(user.role)) {
         return res.status(403).json({ 
-          message: "Access denied. Only admin, supervisor, and therapist roles can use chat functionality." 
+          message: "Access denied. Only admin, supervisor, and clinical roles can use chat functionality." 
         });
       }
 
@@ -3099,10 +3124,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Role-based access control for chat functionality
-      const allowedRoles = ['admin', 'supervisor', 'therapist'];
+      const allowedRoles = ['admin', 'supervisor', 'clinical'];
       if (!allowedRoles.includes(user.role)) {
         return res.status(403).json({ 
-          message: "Access denied. Only admin, supervisor, and therapist roles can use chat functionality." 
+          message: "Access denied. Only admin, supervisor, and clinical roles can use chat functionality." 
         });
       }
 
@@ -3139,14 +3164,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Staff list endpoint for directed notes (accessible by admins, supervisors, and therapists)
+        // Staff list endpoint for directed notes (accessible by admins, supervisors, and clinicals)
   app.get("/api/staff/list", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
       const user = await storage.getUser(userId);
 
-      // Only admins, supervisors, and therapists can view staff list
-      if (user?.role !== "admin" && user?.role !== "supervisor" && user?.role !== "therapist") {
+      // Only admins, supervisors, and clinicals can view staff list
+      if (user?.role !== "admin" && user?.role !== "supervisor" && user?.role !== "clinical") {
         return res.status(403).json({ message: "Access denied" });
       }
 
@@ -3264,7 +3289,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Close/Archive all threads for a patient (admin and therapists only)
+        // Close/Archive all threads for a patient (admin and clinicals only)
   app.post("/api/patients/:patientId/notes/close-all", isAuthenticated, async (req: any, res) => {
     try {
       const { patientId } = req.params;
@@ -3274,8 +3299,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
 
-      // Only admins, supervisors, and therapists can close all threads
-      if (user.role !== "admin" && user.role !== "supervisor" && user.role !== "therapist") {
+      // Only admins, supervisors, and clinicals can close all threads
+      if (user.role !== "admin" && user.role !== "supervisor" && user.role !== "clinical") {
         return res.status(403).json({ message: "Access denied" });
       }
 
@@ -3329,8 +3354,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
 
-      // Only admins, supervisors, and therapists can clear archived notes
-      if (user.role !== "admin" && user.role !== "supervisor" && user.role !== "therapist") {
+      // Only admins, supervisors, and clinicals can clear archived notes
+      if (user.role !== "admin" && user.role !== "supervisor" && user.role !== "clinical") {
         return res.status(403).json({ message: "Access denied" });
       }
 
@@ -3422,11 +3447,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updatedAt: { $gte: startDate, $lte: endDate },
         $or: [
           { status: { $exists: true } },
-          { assignedTherapistId: { $exists: true } },
+          { assignedClinicalId: { $exists: true } },
           { important: { $exists: true } }
         ]
       }).populate("createdBy", "firstName lastName")
-        .populate("assignedTherapistId", "firstName lastName");
+        .populate("assignedClinicalId", "firstName lastName");
 
       // Get audit logs for patient-related actions
       const patientActions = await storage.db.collection("auditlogs").find({
@@ -3435,7 +3460,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         $or: [
           { action: "create" },
           { action: "update" },
-          { action: "assign_therapist" },
+          { action: "assign_clinical" },
           { action: "mark_important" }
         ]
       }).toArray();
@@ -3448,7 +3473,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           createdBy: patient.createdBy ? `${patient.createdBy.firstName} ${patient.createdBy.lastName}` : "Unknown",
           createdAt: patient.createdAt,
           status: patient.status,
-          assignedTherapist: patient.assignedTherapistId ? `${(patient.assignedTherapistId as any).firstName} ${(patient.assignedTherapistId as any).lastName}` : null
+          assignedClinical: patient.assignedClinicalId ? `${(patient.assignedClinicalId as any).firstName} ${(patient.assignedClinicalId as any).lastName}` : null
         })),
         statusChanges: await Promise.all(statusChanges.filter(patient => {
           // Include patients that were updated within the time range (regardless of when they were created)
@@ -3489,24 +3514,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
             id: patient._id,
             name: `${patient.firstName} ${patient.lastName}`,
             status: patient.status,
-            assignedTherapist: patient.assignedTherapistId ? `${(patient.assignedTherapistId as any).firstName} ${(patient.assignedTherapistId as any).lastName}` : null,
+            assignedClinical: patient.assignedClinicalId ? `${(patient.assignedClinicalId as any).firstName} ${(patient.assignedClinicalId as any).lastName}` : null,
             important: patient.important,
             updatedAt: patient.updatedAt,
             updatedBy: updatedBy
           };
         })),
-         therapistAssignments: await Promise.all(statusChanges.filter(patient => {
-           const hasTherapist = !!patient.assignedTherapistId;
-           return hasTherapist;
+         clinicalAssignments: await Promise.all(statusChanges.filter(patient => {
+           const hasClinical = !!patient.assignedClinicalId;
+           return hasClinical;
          }).map(async (patient) => {
-           // Find who assigned the therapist
+           // Find who assigned the clinical
            const assignmentAction = patientActions.find(log => 
              log.resourceId === patient._id.toString() && 
-             log.action === "assign_therapist" &&
+             log.action === "assign_clinical" &&
              new Date(log.createdAt) >= startDate
            );
            
-           // Get the user who assigned the therapist
+           // Get the user who assigned the clinical
            let assignedBy = "Unknown";
            if (assignmentAction && assignmentAction.userId) {
              try {
@@ -3532,7 +3557,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
            return {
              id: patient._id,
              name: `${patient.firstName} ${patient.lastName}`,
-             therapist: patient.assignedTherapistId ? `${(patient.assignedTherapistId as any).firstName} ${(patient.assignedTherapistId as any).lastName}` : null,
+             clinical: patient.assignedClinicalId ? `${(patient.assignedClinicalId as any).firstName} ${(patient.assignedClinicalId as any).lastName}` : null,
              updatedAt: patient.updatedAt,
              assignedBy: assignedBy
            };
@@ -3561,9 +3586,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         summary: {
           newPatientsCount: changes.newPatients.length,
           statusChangesCount: changes.statusChanges.length,
-          therapistAssignmentsCount: changes.therapistAssignments.length,
+          clinicalAssignmentsCount: changes.clinicalAssignments.length,
           importantUpdatesCount: changes.importantUpdates.length,
-          totalChanges: changes.newPatients.length + changes.statusChanges.length + changes.therapistAssignments.length + changes.importantUpdates.length
+          totalChanges: changes.newPatients.length + changes.statusChanges.length + changes.clinicalAssignments.length + changes.importantUpdates.length
         },
         dateRange: {
           start: startDate,
@@ -3609,10 +3634,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Validate role
-      const validRoles = ["admin", "supervisor", "therapist", "staff", "frontdesk"];
+      const validRoles = ["admin", "supervisor", "clinical", "staff", "frontdesk"];
       if (!validRoles.includes(role)) {
         return res.status(400).json({
-          message: "Invalid role. Must be one of: admin, supervisor, therapist, staff, frontdesk",
+          message: "Invalid role. Must be one of: admin, supervisor, clinical, staff, frontdesk",
         });
       }
 
@@ -3659,11 +3684,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Assessment role check middleware
   const canPerformAssessment = (req: any, res: any, next: any) => {
     const userRole = req.user?.role;
-    const allowedRoles = ['admin', 'supervisor', 'therapist'];
+    const allowedRoles = ['admin', 'supervisor', 'clinical'];
     
     if (!allowedRoles.includes(userRole)) {
       return res.status(403).json({ 
-        message: "Access denied. Only admin, supervisor, and therapist roles can perform assessments." 
+        message: "Access denied. Only admin, supervisor, and clinical roles can perform assessments." 
       });
     }
     
@@ -4070,8 +4095,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Calculate time slot preferences
       const timeSlotDistribution: { [key: string]: number } = {};
 
-      // Calculate therapist utilization
-      const therapistUtilization: { [key: string]: number } = {};
+      // Calculate clinical utilization
+      const clinicalUtilization: { [key: string]: number } = {};
 
       // Calculate session duration analysis
       const sessionDurations: number[] = [];
@@ -4105,10 +4130,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const timeSlot = `${hour}:00`;
         timeSlotDistribution[timeSlot] = (timeSlotDistribution[timeSlot] || 0) + 1;
 
-        // Therapist utilization
-        if (appointment.therapistId) {
-          const therapistId = appointment.therapistId.toString();
-          therapistUtilization[therapistId] = (therapistUtilization[therapistId] || 0) + 1;
+        // Clinical utilization
+        if (appointment.clinicalId) {
+          const clinicalId = appointment.clinicalId.toString();
+          clinicalUtilization[clinicalId] = (clinicalUtilization[clinicalId] || 0) + 1;
         }
 
         // Session duration
@@ -4152,11 +4177,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .slice(0, 5)
         .map(([time, count]) => ({ time, count }));
 
-      // Get top therapists
-      const topTherapists = Object.entries(therapistUtilization)
+      // Get top clinicals
+      const topClinicals = Object.entries(clinicalUtilization)
         .sort(([,a], [,b]) => b - a)
         .slice(0, 5)
-        .map(([therapistId, count]) => ({ therapistId, count }));
+        .map(([clinicalId, count]) => ({ clinicalId, count }));
 
       // Calculate session type distribution
       const sessionTypeDistribution: { [key: string]: number } = {};
@@ -4176,7 +4201,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         monthlyTrends,
         dayOfWeekDistribution,
         topTimeSlots,
-        topTherapists,
+        topClinicals,
         sessionTypeDistribution,
         sessionDurations: {
           average: averageSessionDuration,
@@ -4323,26 +4348,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Calculate staff performance metrics
       const staffPerformance = staffMembers.map(staff => {
-        // Get appointments for this staff member (only if therapistId exists and matches)
+                // Get appointments for this staff member (only if clinicalId exists and matches)
         const staffAppointments = appointments.filter(apt => {
-          return apt.therapistId && 
-                 apt.therapistId.toString() === (staff as any)._id?.toString();
+          return apt.clinicalId &&
+            apt.clinicalId.toString() === (staff as any)._id?.toString();
         });
         const completedAppointments = staffAppointments.filter(apt => apt.status === 'completed');
         const cancelledAppointments = staffAppointments.filter(apt => apt.status === 'cancelled');
         const noShowAppointments = staffAppointments.filter(apt => apt.status === 'no-show');
         
-        // Get treatment records for this staff member (only if therapistId exists and matches)
+                // Get treatment records for this staff member (only if clinicalId exists and matches)
         const staffRecords = treatmentRecords.filter(record => {
-          return record.therapistId && 
-                 record.therapistId.toString() === (staff as any)._id?.toString();
+          return record.clinicalId &&
+            record.clinicalId.toString() === (staff as any)._id?.toString();
         });
         const completedRecords = staffRecords.filter(record => record.status === 'completed');
         
-        // Get patients assigned to this staff member (only if assignedTherapistId exists and matches)
+        // Get patients assigned to this staff member (only if assignedClinicalId exists and matches)
         const assignedPatients = (patients as any[]).filter(patient => {
-          return patient.assignedTherapistId && 
-                 patient.assignedTherapistId.toString() === (staff as any)._id?.toString();
+          return patient.assignedClinicalId && 
+                 patient.assignedClinicalId.toString() === (staff as any)._id?.toString();
         });
         const dischargedPatients = assignedPatients.filter(patient => patient.status === 'discharged');
         
@@ -4471,7 +4496,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { user } = req;
 
       // Check if user has access to this patient - use direct DB query for fresh data
-      const patient = await Patient.findById(id).populate('assignedTherapistId');
+      const patient = await Patient.findById(id).populate('assignedClinicalId');
       if (!patient) {
         return res.status(404).json({ error: "Patient not found" });
       }
@@ -4552,10 +4577,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             autoDischarge: false,
             dischargeDate: patient.dischargeCriteria?.dischargeDate
           },
-          assignedTherapist: patient.assignedTherapistId && typeof patient.assignedTherapistId === 'object' && 'firstName' in patient.assignedTherapistId && 'lastName' in patient.assignedTherapistId && 'email' in patient.assignedTherapistId ? {
-            firstName: patient.assignedTherapistId.firstName,
-            lastName: patient.assignedTherapistId.lastName,
-            email: patient.assignedTherapistId.email
+          assignedClinical: patient.assignedClinicalId && typeof patient.assignedClinicalId === 'object' && 'firstName' in patient.assignedClinicalId && 'lastName' in patient.assignedClinicalId && 'email' in patient.assignedClinicalId ? {
+            firstName: patient.assignedClinicalId.firstName,
+            lastName: patient.assignedClinicalId.lastName,
+            email: patient.assignedClinicalId.email
           } : undefined
         },
         appointments: appointments.map(apt => ({
@@ -4564,9 +4589,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           time: apt.time,
           status: apt.status,
           notes: apt.notes,
-          therapist: {
-            firstName: apt.therapist?.firstName || 'Unknown',
-            lastName: apt.therapist?.lastName || 'Therapist'
+          clinical: {
+            firstName: apt.clinical?.firstName || 'Unknown',
+            lastName: apt.clinical?.lastName || 'Clinical'
           }
         })),
         treatmentRecords: treatmentRecords.map(record => ({
@@ -4579,9 +4604,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           functionalScore: 0, // Not available in current model
           riskLevel: 'Unknown', // Not available in current model
           notes: record.notes || '',
-          therapist: {
-            firstName: record.therapistId && typeof record.therapistId === 'object' && 'firstName' in record.therapistId ? record.therapistId.firstName : 'Unknown',
-            lastName: record.therapistId && typeof record.therapistId === 'object' && 'lastName' in record.therapistId ? record.therapistId.lastName : 'Therapist'
+          clinical: {
+            firstName: record.clinicalId && typeof record.clinicalId === 'object' && 'firstName' in record.clinicalId ? record.clinicalId.firstName : 'Unknown',
+            lastName: record.clinicalId && typeof record.clinicalId === 'object' && 'lastName' in record.clinicalId ? record.clinicalId.lastName : 'Clinical'
           }
         })),
         treatmentOutcomes: treatmentOutcomes.map(outcome => ({
@@ -4903,7 +4928,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "dischargeRequests.status": "pending"
       }).populate([
         { path: "dischargeRequests.requestedBy", select: "firstName lastName role" },
-        { path: "assignedTherapistId", select: "firstName lastName" }
+        { path: "assignedClinicalId", select: "firstName lastName" }
       ]);
 
       const pendingRequests = patients.flatMap(patient => 
@@ -4913,7 +4938,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ...req.toObject(),
             patientId: patient._id,
             patientName: `${patient.firstName} ${patient.lastName}`,
-            assignedTherapist: patient.assignedTherapistId
+            assignedClinical: patient.assignedClinicalId
           }))
       );
 
@@ -4951,14 +4976,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Summary route must come BEFORE the generic :id route to avoid conflicts
   app.get("/api/treatment-outcomes/summary", isAuthenticated, async (req: any, res) => {
     try {
-      const { patientId, therapistId, startDate, endDate } = req.query;
+      const { patientId, clinicalId, startDate, endDate } = req.query;
       
       const start = startDate ? new Date(startDate as string) : undefined;
       const end = endDate ? new Date(endDate as string) : undefined;
       
       const summary = await storage.getTreatmentOutcomesSummary(
         patientId as string,
-        therapistId as string,
+        clinicalId as string,
         start,
         end
       );
@@ -5005,7 +5030,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/treatment-outcomes", isAuthenticated, async (req: any, res) => {
     try {
-      const { limit, offset, patientId, therapistId, startDate, endDate } = req.query;
+      const { limit, offset, patientId, clinicalId, startDate, endDate } = req.query;
       
       const start = startDate ? new Date(startDate as string) : undefined;
       const end = endDate ? new Date(endDate as string) : undefined;
@@ -5015,7 +5040,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         parseInt(offset as string) || 0,
         undefined,
         patientId as string,
-        therapistId as string,
+        clinicalId as string,
         start,
         end
       );
@@ -5045,21 +5070,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/therapists/:therapistId/treatment-outcomes", isAuthenticated, async (req: any, res) => {
+  app.get("/api/clinicals/:clinicalId/treatment-outcomes", isAuthenticated, async (req: any, res) => {
     try {
-      const { therapistId } = req.params;
+      const { clinicalId } = req.params;
       const { limit, offset } = req.query;
       
-      const result = await storage.getTherapistTreatmentOutcomes(
-        therapistId,
+      const result = await storage.getClinicalTreatmentOutcomes(
+        clinicalId,
         parseInt(limit as string) || 50,
         parseInt(offset as string) || 0
       );
 
       res.json(result);
     } catch (error) {
-      console.error("Error getting therapist treatment outcomes:", error);
-      res.status(500).json({ error: "Failed to get therapist treatment outcomes" });
+      console.error("Error getting clinical treatment outcomes:", error);
+      res.status(500).json({ error: "Failed to get clinical treatment outcomes" });
     }
   });
 

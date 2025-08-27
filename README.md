@@ -6,7 +6,7 @@ A comprehensive mental health practice management system built with React, TypeS
 
 ### Authentication & User Management
 
-- **Role-based access control** (Admin, Therapist, Staff)
+- **Role-based access control** (Admin, Clinical, Staff)
 - **Secure login/logout** with session management
 - **Password reset functionality** with default password display
 - **Force password change** for new users
@@ -25,7 +25,7 @@ A comprehensive mental health practice management system built with React, TypeS
 - **Flexible appointment booking** with multiple types (therapy, consultation, group, intake, follow-up)
 - **Duration tracking** (15-240 minutes)
 - **Status management** (scheduled, completed, cancelled, no-show)
-- **Therapist assignment**
+- **Clinical assignment**
 - **Today's appointments view**
 
 ### Treatment Records

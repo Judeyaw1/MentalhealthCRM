@@ -41,7 +41,7 @@ import { useToast } from "@/hooks/use-toast";
 // Custom schema for MongoDB treatment records (matches backend)
 const insertTreatmentRecordSchema = z.object({
   patientId: z.string().min(1, "Patient ID is required"),
-  therapistId: z.string().min(1, "Therapist ID is required"),
+  clinicalId: z.string().min(1, "Clinical ID is required"),
   sessionDate: z
     .union([z.date(), z.string()])
     .transform((val) => (typeof val === "string" ? new Date(val) : val)),
@@ -65,7 +65,7 @@ interface TreatmentRecordFormProps {
   onSubmit: (data: TreatmentRecordFormData) => void;
   isLoading?: boolean;
   patients?: { id: number; firstName: string; lastName: string }[];
-  therapists?: { id: string; firstName: string; lastName: string }[];
+  clinicals?: { id: string; firstName: string; lastName: string }[];
 }
 
 // Session templates removed per requirement
@@ -75,7 +75,7 @@ export function TreatmentRecordForm({
   onSubmit,
   isLoading = false,
   patients = [],
-  therapists = [],
+  clinicals = [],
 }: TreatmentRecordFormProps) {
   const { toast } = useToast();
   const [autoSaveStatus, setAutoSaveStatus] = useState<
@@ -87,7 +87,7 @@ export function TreatmentRecordForm({
     resolver: zodResolver(insertTreatmentRecordSchema),
     defaultValues: {
       patientId: initialData?.patientId || undefined,
-      therapistId: initialData?.therapistId || undefined,
+      clinicalId: initialData?.clinicalId || undefined,
       sessionDate: initialData?.sessionDate || new Date(),
       sessionType: initialData?.sessionType || "therapy",
       notes: initialData?.notes || "",
@@ -106,7 +106,7 @@ export function TreatmentRecordForm({
     if (initialData) {
       form.reset({
         patientId: initialData.patientId || undefined,
-        therapistId: initialData.therapistId || undefined,
+        clinicalId: initialData.clinicalId || undefined,
         sessionDate: initialData.sessionDate || new Date(),
         sessionType: initialData.sessionType || "therapy",
         notes: initialData.notes || "",
@@ -256,12 +256,12 @@ export function TreatmentRecordForm({
   };
 
   const getFormCompletionPercentage = () => {
-    // Stricter checks: therapistId and patientId must be non-empty strings
+    // Stricter checks: clinicalId and patientId must be non-empty strings
     // sessionDate must be a valid date; notes must be non-empty
     const values = form.getValues();
     const requiredChecks = [
       typeof values.patientId === 'string' && values.patientId.trim().length > 0,
-      typeof values.therapistId === 'string' && values.therapistId.trim().length > 0,
+      typeof values.clinicalId === 'string' && values.clinicalId.trim().length > 0,
       !!values.sessionDate && !isNaN(new Date(values.sessionDate as any).getTime()),
       typeof values.sessionType === 'string' && values.sessionType.trim().length > 0,
       typeof values.notes === 'string' && values.notes.trim().length > 0,
@@ -350,12 +350,12 @@ export function TreatmentRecordForm({
 
               <FormField
                 control={form.control}
-                name="therapistId"
+                name="clinicalId"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="flex items-center space-x-1">
                       <User className="h-4 w-4" />
-                      <span>Therapist *</span>
+                      <span>Clinical *</span>
                     </FormLabel>
                     <Select
                       onValueChange={field.onChange}
@@ -363,16 +363,16 @@ export function TreatmentRecordForm({
                     >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select therapist" />
+                          <SelectValue placeholder="Select clinical" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {Array.isArray(therapists) && therapists.map((therapist) => (
+                        {Array.isArray(clinicals) && clinicals.map((clinical) => (
                           <SelectItem
-                            key={therapist.id}
-                            value={therapist.id.toString()}
+                            key={clinical.id}
+                            value={clinical.id.toString()}
                           >
-                            {therapist.firstName} {therapist.lastName}
+                            {clinical.firstName} {clinical.lastName}
                           </SelectItem>
                         ))}
                       </SelectContent>

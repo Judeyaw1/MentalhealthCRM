@@ -57,7 +57,7 @@ const patientFormSchema = z.object({
   reasonForVisit: z.string().optional(),
   status: z.enum(["active", "inactive", "discharged"]).default("active"),
   hipaaConsent: z.boolean().refine((val) => val === true, "HIPAA consent is required"),
-  assignedTherapistId: z.string().optional(),
+  assignedClinicalId: z.string().optional(),
   loc: z.string().optional(),
   authNumber: z.string().optional(),
 });
@@ -80,7 +80,7 @@ type PatientFormValues = {
   reasonForVisit?: string;
   status: string;
   hipaaConsent: boolean;
-  assignedTherapistId?: string;
+  assignedClinicalId?: string;
   loc?: string;
   authNumber?: string;
 };
@@ -114,7 +114,7 @@ export function PatientForm({
     authNumber: useRef<HTMLInputElement>(null),
     loc: useRef<HTMLButtonElement>(null),
     status: useRef<HTMLButtonElement>(null),
-    assignedTherapistId: useRef<HTMLButtonElement>(null),
+    assignedClinicalId: useRef<HTMLButtonElement>(null),
     hipaaConsent: useRef<HTMLButtonElement>(null),
   };
 
@@ -162,7 +162,7 @@ export function PatientForm({
       reasonForVisit: initialData?.reasonForVisit || "",
       status: initialData?.status || "active",
       hipaaConsent: initialData?.hipaaConsent || false,
-      assignedTherapistId: (typeof initialData?.assignedTherapistId === 'object' && (initialData?.assignedTherapistId as any)?._id) || initialData?.assignedTherapistId || "",
+      assignedClinicalId: (typeof initialData?.assignedClinicalId === 'object' && (initialData?.assignedClinicalId as any)?._id) || initialData?.assignedClinicalId || "",
       loc: initialData?.loc || "",
       authNumber: initialData?.authNumber || "",
     },
@@ -746,7 +746,7 @@ export function PatientForm({
                   >
                     <FormControl>
                       <SelectTrigger ref={fieldRefs.assignedTherapistId}>
-                        <SelectValue placeholder="Select therapist" />
+                        <SelectValue placeholder="Select clinical" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>

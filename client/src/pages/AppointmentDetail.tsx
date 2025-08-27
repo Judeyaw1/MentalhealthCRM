@@ -458,11 +458,11 @@ export default function AppointmentDetail() {
 
               {/* Sidebar */}
               <div className="space-y-6">
-                {/* Therapist Information */}
+                {/* Clinical Information */}
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-lg">
-                      Assigned Therapist
+                      Assigned Clinical
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -470,17 +470,17 @@ export default function AppointmentDetail() {
                       <Avatar className="h-12 w-12">
                         <AvatarFallback className="bg-blue-100 text-blue-600">
                           {getInitials(
-                            appointment.therapist?.firstName || "",
-                            appointment.therapist?.lastName || "",
+                            appointment.clinical?.firstName || "",
+                            appointment.clinical?.lastName || "",
                           )}
                         </AvatarFallback>
                       </Avatar>
                       <div>
                         <h4 className="font-medium text-gray-900">
-                          {appointment.therapist?.firstName || "Unknown"}{" "}
-                          {appointment.therapist?.lastName || "Therapist"}
+                          {appointment.clinical?.firstName || "Unknown"}{" "}
+                          {appointment.clinical?.lastName || "Clinical"}
                         </h4>
-                        <p className="text-sm text-gray-500">Therapist</p>
+                        <p className="text-sm text-gray-500">Clinical</p>
                       </div>
                     </div>
                   </CardContent>
