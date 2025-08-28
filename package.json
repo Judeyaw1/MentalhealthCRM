@@ -13,8 +13,6 @@
     "build:server": "esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "start": "cross-env NODE_ENV=production node dist/index.js",
     "start:prod": "npm run build && npm run start",
-    "start:test": "cross-env NODE_ENV=production node dist/test-server.js",
-    "build:test": "esbuild server/test-server.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "check": "tsc"
   },
   "dependencies": {
@@ -62,6 +60,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
+    "connect-mongo": "^5.1.0",
     "connect-pg-simple": "^10.0.0",
     "cors": "^2.8.5",
     "csv-writer": "^1.6.0",
