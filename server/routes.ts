@@ -55,16 +55,10 @@ let uploadDir: string;
 let storageEngine: multer.StorageEngine;
 let upload: multer.Multer;
 
-// Initialize multer storage dynamically
+// Initialize multer storage
 function initializeMulter() {
   try {
-    // Get working directory safely
-    const cwd = process.cwd();
-    if (!cwd || typeof cwd !== 'string') {
-      throw new Error(`Invalid working directory: ${cwd}`);
-    }
-    
-    uploadDir = path.join(cwd, "uploads");
+    uploadDir = path.join(process.cwd(), "uploads");
     console.log("Upload directory:", uploadDir);
     
     if (!fs.existsSync(uploadDir)) {

@@ -5,7 +5,7 @@ dotenv.config();
 console.log('=== SERVER STARTUP ===');
 console.log('NODE_ENV:', process.env.NODE_ENV);
 console.log('PORT:', process.env.PORT);
-console.log('RAILWAY_ENVIRONMENT:', process.env.RAILWAY_ENVIRONMENT);
+
 console.log('MONGODB_URI:', process.env.MONGODB_URI ? '***set***' : '***missing***');
 console.log('Current working directory:', process.cwd());
 

@@ -79,52 +79,19 @@ export async function setupVite(app: Express, server: Server) {
 }
 
 export function serveStatic(app: Express) {
-  // Completely safe production static serving
+  // Standard production static serving
   try {
     console.log("Setting up static serving for production...");
     console.log("Current working directory:", process.cwd());
     
-    // Get the current working directory safely
-    const cwd = process.cwd();
-    if (!cwd || typeof cwd !== 'string') {
-      throw new Error(`Invalid working directory: ${cwd}`);
+    // Standard dist path for production builds
+    const distPath = path.join(process.cwd(), "dist", "public");
+    console.log("Looking for static files in:", distPath);
+    
+    // Check if dist directory exists
+    if (!fs.existsSync(distPath)) {
+      throw new Error(`Build directory not found at: ${distPath}`);
     }
-    
-    console.log("Working directory is valid:", cwd);
-    
-    // For Railway, try to find the build output
-    let distPath: string | null = null;
-    
-    // Try multiple possible paths
-    const possiblePaths = [
-      cwd, // Current directory (Railway)
-      path.join(cwd, "dist", "public"), // Local build
-      "/app", // Railway alternative
-      "/app/dist/public" // Railway build
-    ];
-    
-    for (const testPath of possiblePaths) {
-      try {
-        if (fs.existsSync(testPath)) {
-          // Check if it contains index.html
-          const indexPath = path.join(testPath, "index.html");
-          if (fs.existsSync(indexPath)) {
-            distPath = testPath;
-            console.log("Found valid dist path:", distPath);
-            break;
-          }
-        }
-      } catch (e) {
-        console.log(`Could not check path ${testPath}:`, e);
-      }
-    }
-    
-    if (!distPath) {
-      console.error("Could not find valid dist directory. Available paths:", possiblePaths);
-      throw new Error("Build directory not found");
-    }
-    
-    console.log("Serving static files from:", distPath);
     
     // List directory contents for debugging
     try {
@@ -146,7 +113,7 @@ export function serveStatic(app: Express) {
       }
       
       try {
-        const indexPath = path.join(distPath!, "index.html");
+        const indexPath = path.join(distPath, "index.html");
         console.log("Looking for index.html at:", indexPath);
         
         if (fs.existsSync(indexPath)) {
@@ -160,7 +127,7 @@ export function serveStatic(app: Express) {
                 <h1>Application Not Found</h1>
                 <p>The application files could not be found.</p>
                 <p>Dist path: ${distPath}</p>
-                <p>Current directory: ${cwd}</p>
+                <p>Current directory: ${process.cwd()}</p>
                 <p>Requested path: ${req.path}</p>
               </body>
             </html>
