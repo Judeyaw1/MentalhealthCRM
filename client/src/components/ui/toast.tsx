@@ -27,9 +27,9 @@ const toastVariants = cva(
   {
     variants: {
       variant: {
-        default: "border bg-background text-foreground",
+        default: "border border-gray-200 bg-white text-gray-900 shadow-lg",
         destructive:
-          "destructive group border-destructive bg-destructive text-destructive-foreground",
+          "border border-red-200 bg-red-50 text-red-900 shadow-lg",
       },
     },
     defaultVariants: {
@@ -42,13 +42,47 @@ const Toast = React.forwardRef<
   React.ElementRef<typeof ToastPrimitives.Root>,
   React.ComponentPropsWithoutRef<typeof ToastPrimitives.Root> &
     VariantProps<typeof toastVariants>
->(({ className, variant, ...props }, ref) => {
+>(({ className, variant, duration, ...props }, ref) => {
+  const [progress, setProgress] = React.useState(100);
+
+  React.useEffect(() => {
+    if (duration && duration > 0) {
+      const startTime = Date.now();
+      const endTime = startTime + duration;
+      
+      const updateProgress = () => {
+        const now = Date.now();
+        const remaining = Math.max(0, endTime - now);
+        const newProgress = (remaining / duration) * 100;
+        setProgress(newProgress);
+        
+        if (remaining > 0) {
+          requestAnimationFrame(updateProgress);
+        }
+      };
+      
+      requestAnimationFrame(updateProgress);
+    }
+  }, [duration]);
+
   return (
     <ToastPrimitives.Root
       ref={ref}
       className={cn(toastVariants({ variant }), className)}
       {...props}
-    />
+    >
+      <div className="flex-1">
+        {props.children}
+      </div>
+      {duration && duration > 0 && (
+        <div className="absolute bottom-0 left-0 h-1 bg-primary/20">
+          <div 
+            className="h-full bg-primary transition-all duration-100 ease-linear"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      )}
+    </ToastPrimitives.Root>
   );
 });
 Toast.displayName = ToastPrimitives.Root.displayName;
@@ -92,7 +126,7 @@ const ToastTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <ToastPrimitives.Title
     ref={ref}
-    className={cn("text-sm font-semibold", className)}
+    className={cn("text-sm font-semibold text-gray-900", className)}
     {...props}
   />
 ));
@@ -104,7 +138,7 @@ const ToastDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <ToastPrimitives.Description
     ref={ref}
-    className={cn("text-sm opacity-90", className)}
+    className={cn("text-sm text-gray-700", className)}
     {...props}
   />
 ));

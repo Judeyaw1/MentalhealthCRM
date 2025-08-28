@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { showFileUploadToast, showCRUDToast, showErrorToast } from "@/lib/toast-utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,7 +34,8 @@ import {
   Bell,
   CheckCircle,
   Clock,
-  AlertCircle
+  AlertCircle,
+  RefreshCw
 } from "lucide-react";
 import { format } from "date-fns";
 import type { PatientMiscellaneous } from "@/shared/types";
@@ -67,16 +69,62 @@ export default function PatientMiscellaneous({ patientId, patient }: PatientMisc
   console.log("🔍 PatientMiscellaneous - patient prop:", patient);
   console.log("🔍 PatientMiscellaneous - hasPatientEmergencyContact:", hasPatientEmergencyContact);
 
+  // Fetch patient data for insurance sync
+  const { data: patientData } = useQuery({
+    queryKey: ["patient", patientId],
+    queryFn: async () => {
+      const response = await fetch(`/api/patients/${patientId}`);
+      if (!response.ok) throw new Error("Failed to fetch patient data");
+      return response.json();
+    },
+    enabled: !!patientId,
+  });
+
   // Fetch miscellaneous data
   const { data: miscData, isLoading } = useQuery({
     queryKey: ["patient-miscellaneous", patientId],
     queryFn: async () => {
       const response = await fetch(`/api/patients/${patientId}/miscellaneous`);
       if (!response.ok) throw new Error("Failed to fetch miscellaneous data");
-      return response.json();
+      const data = await response.json();
+      console.log("🔍 Fetched miscellaneous data:", data);
+      if (data.uploadedFiles) {
+        console.log("🔍 Uploaded files:", data.uploadedFiles);
+        data.uploadedFiles.forEach((file: any, index: number) => {
+          console.log(`🔍 File ${index}:`, { 
+            name: file.originalName, 
+            description: file.description, 
+            category: file.category 
+          });
+        });
+      }
+      return data;
     },
     enabled: !!patientId,
   });
+
+  // Sync insurance data from patient registration
+  const syncInsuranceData = () => {
+    if (patientData?.insurance && !miscData?.insurance) {
+      // If patient has insurance data but miscellaneous doesn't, sync it
+      const insuranceData = {
+        provider: patientData.insurance.provider || "",
+        policyNumber: patientData.insurance.policyNumber || "",
+        groupNumber: patientData.insurance.groupNumber || "",
+        coverageLimits: patientData.insurance.coverageLimits || "",
+        notes: patientData.insurance.notes || "",
+      };
+      
+      updateMutation.mutate({ insurance: insuranceData });
+    }
+  };
+
+  // Auto-sync when patient data is available
+  useEffect(() => {
+    if (patientData && miscData) {
+      syncInsuranceData();
+    }
+  }, [patientData, miscData]);
 
   // Update mutation
   const updateMutation = useMutation({
@@ -91,7 +139,7 @@ export default function PatientMiscellaneous({ patientId, patient }: PatientMisc
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["patient-miscellaneous", patientId] });
-      toast({ title: "Updated successfully", description: "Miscellaneous data has been updated." });
+      showCRUDToast('update', 'miscellaneous data', true);
       setEditingSection(null);
       setEditData({});
     },
@@ -107,24 +155,36 @@ export default function PatientMiscellaneous({ patientId, patient }: PatientMisc
   // File upload mutation
   const uploadMutation = useMutation({
     mutationFn: async (formData: FormData) => {
+      console.log("🔍 Upload mutation started for patient:", patientId);
+      console.log("🔍 Sending request to:", `/api/patients/${patientId}/files`);
+      
       const response = await fetch(`/api/patients/${patientId}/files`, {
         method: "POST",
         body: formData,
       });
-      if (!response.ok) throw new Error("Failed to upload file");
-      return response.json();
+      
+      console.log("🔍 Upload response status:", response.status);
+      console.log("🔍 Upload response headers:", response.headers);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("❌ Upload failed:", errorText);
+        throw new Error(`Failed to upload file: ${response.status} ${errorText}`);
+      }
+      
+      const result = await response.json();
+      console.log("🔍 Upload successful:", result);
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["patient-miscellaneous", patientId] });
-      toast({ title: "File uploaded", description: "File has been uploaded successfully." });
+      showFileUploadToast(true);
       setUploading(false);
+      // Reset the form after successful upload
+      setFileUploadData({ category: 'general', description: '' });
     },
     onError: (error) => {
-      toast({ 
-        title: "Upload failed", 
-        description: error.message || "Failed to upload file.",
-        variant: "destructive"
-      });
+      showFileUploadToast(false);
       setUploading(false);
     },
   });
@@ -148,11 +208,19 @@ export default function PatientMiscellaneous({ patientId, patient }: PatientMisc
     const file = event.target.files?.[0];
     if (!file) return;
 
+    console.log("🔍 File upload started:", { file: file.name, size: file.size, type: file.type, category, description });
+
     setUploading(true);
     const formData = new FormData();
     formData.append("file", file);
     formData.append("category", category);
     formData.append("description", description);
+
+    console.log("🔍 FormData created:", formData);
+    console.log("🔍 FormData entries:");
+    for (let [key, value] of formData.entries()) {
+      console.log(`  ${key}:`, value);
+    }
 
     uploadMutation.mutate(formData);
   };
@@ -173,11 +241,7 @@ export default function PatientMiscellaneous({ patientId, patient }: PatientMisc
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (error) {
-      toast({ 
-        title: "Download failed", 
-        description: "Failed to download file.",
-        variant: "destructive"
-      });
+      showErrorToast("Download failed", "Failed to download file.");
     }
   };
 
@@ -192,13 +256,9 @@ export default function PatientMiscellaneous({ patientId, patient }: PatientMisc
       if (!response.ok) throw new Error("Failed to delete file");
       
       queryClient.invalidateQueries({ queryKey: ["patient-miscellaneous", patientId] });
-      toast({ title: "File deleted", description: "File has been deleted successfully." });
+      showCRUDToast('delete', 'file', true);
     } catch (error) {
-      toast({ 
-        title: "Deletion failed", 
-        description: "Failed to delete file.",
-        variant: "destructive"
-      });
+      showCRUDToast('delete', 'file', false);
     }
   };
 
@@ -318,15 +378,32 @@ export default function PatientMiscellaneous({ patientId, patient }: PatientMisc
               <CardTitle className="flex items-center space-x-2">
                 <CreditCard className="h-5 w-5" />
                 <span>Insurance Information</span>
+                {patientData?.insurance && (
+                  <Badge variant="outline" className="ml-2">
+                    {miscData?.insurance ? "Synced" : "Not Synced"}
+                  </Badge>
+                )}
               </CardTitle>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => startEditing("insurance", miscData?.insurance || {})}
-              >
-                <Edit className="w-4 h-4 mr-2" />
-                Edit
-              </Button>
+              <div className="flex space-x-2">
+                {patientData?.insurance && !miscData?.insurance && (
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={syncInsuranceData}
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Sync from Registration
+                  </Button>
+                )}
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => startEditing("insurance", miscData?.insurance || {})}
+                >
+                  <Edit className="w-4 h-4 mr-2" />
+                  Edit
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               {editingSection === "insurance" ? (
@@ -416,6 +493,39 @@ export default function PatientMiscellaneous({ patientId, patient }: PatientMisc
                     </>
                   ) : (
                     <p className="text-gray-500">No insurance information recorded</p>
+                  )}
+                  
+                  {/* Show patient registration insurance data for comparison */}
+                  {patientData?.insurance && (
+                    <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                      <h4 className="font-semibold text-blue-800 mb-2 flex items-center">
+                        <CreditCard className="w-4 h-4 mr-2" />
+                        Patient Registration Insurance Data
+                      </h4>
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="font-medium text-blue-700">Provider:</span> {patientData.insurance.provider || "Not specified"}
+                        </div>
+                        <div>
+                          <span className="font-medium text-blue-700">Policy Number:</span> {patientData.insurance.policyNumber || "Not specified"}
+                        </div>
+                        {patientData.insurance.groupNumber && (
+                          <div>
+                            <span className="font-medium text-blue-700">Group Number:</span> {patientData.insurance.groupNumber}
+                          </div>
+                        )}
+                        {patientData.insurance.coverageLimits && (
+                          <div>
+                            <span className="font-medium text-blue-700">Coverage Limits:</span> {patientData.insurance.coverageLimits}
+                          </div>
+                        )}
+                        {patientData.insurance.notes && (
+                          <div>
+                            <span className="font-medium text-blue-700">Notes:</span> {patientData.insurance.notes}
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   )}
                 </div>
               )}
@@ -1140,6 +1250,11 @@ export default function PatientMiscellaneous({ patientId, patient }: PatientMisc
                           <div className="text-sm text-gray-500">
                             {file.category} • {format(new Date(file.uploadedAt), "MMM d, yyyy")} • {(file.fileSize / 1024 / 1024).toFixed(2)} MB
                           </div>
+                          {file.description && (
+                            <div className="text-sm text-blue-600 mt-1">
+                              📝 {file.description}
+                            </div>
+                          )}
                         </div>
                       </div>
                       <div className="flex space-x-2">

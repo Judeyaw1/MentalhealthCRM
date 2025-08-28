@@ -1,7 +1,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,11 +21,26 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Check, ChevronsUpDown, User } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 // Custom schema for MongoDB appointments
 const insertAppointmentSchema = z.object({
   patientId: z.string().min(1, "Patient ID is required"),
-  therapistId: z.string().min(1, "Therapist ID is required"),
+  clinicalId: z.string().min(1, "Clinical ID is required"),
   appointmentDate: z
     .union([z.date(), z.string()])
     .transform((val) => (typeof val === "string" ? new Date(val) : val)),
@@ -42,10 +57,10 @@ interface AppointmentFormProps {
   onSubmit: (data: InsertAppointment) => void;
   isLoading?: boolean;
   submitLabel?: string;
-  patients?: { id: number; firstName: string; lastName: string }[];
-  therapists?: { id: string; firstName: string; lastName: string }[];
+  patients?: { id: string; firstName: string; lastName: string }[];
+  clinicals?: { id: string; firstName: string; lastName: string }[];
   isNewAppointment?: boolean;
-  patientHistory?: { [patientId: number]: boolean }; // true = has previous appointments
+  patientHistory?: { [patientId: string]: boolean }; // true = has previous appointments
 }
 
 export function AppointmentForm({
@@ -54,15 +69,17 @@ export function AppointmentForm({
   isLoading = false,
   submitLabel = "Schedule Appointment",
   patients = [],
-  therapists = [],
+  clinicals = [],
   isNewAppointment = false,
   patientHistory = {},
 }: AppointmentFormProps) {
+  const [patientSearchOpen, setPatientSearchOpen] = useState(false);
+  
   const form = useForm<InsertAppointment>({
     resolver: zodResolver(insertAppointmentSchema),
     defaultValues: {
       patientId: initialData?.patientId?.toString() || "",
-      therapistId: initialData?.therapistId || "",
+      clinicalId: initialData?.clinicalId || "",
       appointmentDate: initialData?.appointmentDate || new Date(),
       duration: initialData?.duration || 60,
       type: initialData?.type || "therapy",
@@ -73,8 +90,8 @@ export function AppointmentForm({
 
   // Watch for patient selection to auto-update appointment type
   const selectedPatientId = form.watch("patientId");
-  const selectedPatient = patients.find(p => p.id.toString() === selectedPatientId);
-  const isReturningPatient = selectedPatient ? patientHistory[selectedPatient.id] : false;
+  const selectedPatient = patients.find(p => (p.id || p._id).toString() === selectedPatientId);
+  const isReturningPatient = selectedPatient ? patientHistory[selectedPatient.id || selectedPatient._id] : false;
 
   // Auto-update appointment type based on patient history
   useEffect(() => {
@@ -116,30 +133,58 @@ export function AppointmentForm({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Patient *</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      value={field.value?.toString() || ""}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select patient" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {patients.map((patient) => (
-                          <SelectItem
-                            key={patient.id}
-                            value={patient.id.toString()}
+                    <Popover open={patientSearchOpen} onOpenChange={setPatientSearchOpen}>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={patientSearchOpen}
+                            className="w-full justify-between"
                           >
-                            {patient.firstName} {patient.lastName}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                            {field.value
+                              ? patients.find((patient) => (patient.id || patient._id).toString() === field.value)?.firstName + " " + 
+                                patients.find((patient) => (patient.id || patient._id).toString() === field.value)?.lastName
+                              : "Select patient..."}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0" align="start">
+                        <Command>
+                          <CommandInput placeholder="Search patients..." />
+                          <CommandList>
+                            <CommandEmpty>No patient found.</CommandEmpty>
+                            <CommandGroup>
+                              {patients.map((patient) => (
+                                <CommandItem
+                                  key={patient.id || patient._id}
+                                  value={`${patient.firstName} ${patient.lastName}`}
+                                  onSelect={() => {
+                                    field.onChange((patient.id || patient._id).toString());
+                                    setPatientSearchOpen(false);
+                                  }}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      field.value === (patient.id || patient._id).toString()
+                                        ? "opacity-100"
+                                        : "opacity-0"
+                                    )}
+                                  />
+                                  <User className="mr-2 h-4 w-4" />
+                                  {patient.firstName} {patient.lastName}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                     <FormMessage />
                     {field.value &&
-                      !isNaN(Number(field.value)) &&
-                      patients.some((p) => p.id === Number(field.value)) && (
+                      patients.some((p) => (p.id || p._id).toString() === field.value) && (
                         <a
                           href={`/patients/${field.value}`}
                           target="_blank"
@@ -155,7 +200,7 @@ export function AppointmentForm({
 
               <FormField
                 control={form.control}
-                name="therapistId"
+                name="clinicalId"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Clinical *</FormLabel>
@@ -166,9 +211,9 @@ export function AppointmentForm({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {Array.isArray(therapists) && therapists.map((therapist) => (
-                          <SelectItem key={therapist.id} value={therapist.id}>
-                            {therapist.firstName} {therapist.lastName}
+                        {Array.isArray(clinicals) && clinicals.map((clinical) => (
+                          <SelectItem key={clinical.id} value={clinical.id}>
+                            {clinical.firstName} {clinical.lastName}
                           </SelectItem>
                         ))}
                       </SelectContent>

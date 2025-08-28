@@ -51,7 +51,7 @@ const insertAppointmentSchema = z.object({
 });
 
 // Set up multer storage for uploads
-const uploadDir = path.join(path.dirname(new URL(import.meta.url).pathname), "../uploads");
+const uploadDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
 const storageEngine = multer.diskStorage({
   destination: (req: any, file: Express.Multer.File, cb: (error: Error | null, destination: string) => void) => {
@@ -2412,6 +2412,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error fetching unique logins:', error);
       res.status(500).json({ message: 'Failed to fetch unique logins' });
+    }
+  });
+
+  // Unique logins details endpoint
+  app.get('/api/audit-logs/unique-logins-details', isAuthenticated, async (req, res) => {
+    try {
+      const days = req.query.days ? parseInt(req.query.days) : 7;
+      const match: any = { action: 'login' };
+      if (days) {
+        const since = new Date();
+        since.setDate(since.getDate() - days);
+        match.timestamp = { $gte: since };
+      }
+      
+      // Get login logs with user details
+      const loginLogs = await storage.db.collection('auditLogs').find(match).toArray();
+      
+      // Get unique user IDs and their latest login time
+      const userLoginMap = new Map();
+      loginLogs.forEach((log: any) => {
+        if (!userLoginMap.has(log.userId) || new Date(log.timestamp) > new Date(userLoginMap.get(log.userId).timestamp)) {
+          userLoginMap.set(log.userId, {
+            userId: log.userId,
+            timestamp: log.timestamp,
+            ipAddress: log.ipAddress || 'Unknown'
+          });
+        }
+      });
+
+      // Get user details for each unique login
+      const users = await storage.getStaff();
+      const adminIds = users.filter((u: any) => u.role === 'admin').map((u: any) => u.id);
+      
+      const uniqueLogins = Array.from(userLoginMap.values())
+        .filter((login: any) => !adminIds.includes(login.userId))
+        .map((login: any) => {
+          const user = users.find((u: any) => u.id === login.userId);
+          return {
+            userId: login.userId,
+            firstName: user?.firstName || 'Unknown',
+            lastName: user?.lastName || 'Unknown',
+            email: user?.email || 'Unknown',
+            role: user?.role || 'Unknown',
+            lastLogin: login.timestamp,
+            ipAddress: login.ipAddress
+          };
+        })
+        .sort((a: any, b: any) => new Date(b.lastLogin).getTime() - new Date(a.lastLogin).getTime());
+
+      res.json({ users: uniqueLogins });
+    } catch (error) {
+      console.error('Error fetching unique logins details:', error);
+      res.status(500).json({ message: 'Failed to fetch unique logins details' });
     }
   });
 
@@ -5216,7 +5269,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.id;
       const { category, description, notes } = req.body;
       
+      console.log("🔍 File upload request:", { patientId, userId, category, description, notes });
+      console.log("🔍 Uploaded file:", req.file);
+      
       if (!req.file) {
+        console.log("❌ No file uploaded");
         return res.status(400).json({ error: "No file uploaded" });
       }
       
@@ -5232,6 +5289,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         mimeType: req.file.mimetype,
         notes: notes || ''
       };
+      
+      console.log("🔍 File data to save:", fileData);
       
       // Import the model here to avoid circular dependencies
       const { PatientMiscellaneous } = await import("./models/PatientMiscellaneous");
@@ -5427,6 +5486,349 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error bulk downloading files:", error);
       res.status(500).json({ error: "Failed to bulk download files" });
+    }
+  });
+
+  // ========================================
+  // PATIENT INQUIRIES MANAGEMENT
+  // ========================================
+
+  // Get all inquiries for a patient
+  app.get("/api/patients/:patientId/inquiries", isAuthenticated, async (req: any, res) => {
+    try {
+      const { patientId } = req.params;
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+
+      // Check if patient exists
+      const patient = await storage.getPatient(patientId);
+      if (!patient) {
+        return res.status(404).json({ message: "Patient not found" });
+      }
+
+      // Check access permissions
+      if (user?.role === "clinical" && patient.assignedClinicalId !== userId) {
+        return res.status(403).json({ message: "Access denied to patient inquiries" });
+      }
+
+      // Get inquiries from patient record
+      const patientWithInquiries = await Patient.findById(patientId).populate('inquiries.assignedTo', 'firstName lastName').populate('inquiries.createdBy', 'firstName lastName');
+      
+      if (!patientWithInquiries) {
+        return res.status(404).json({ message: "Patient not found" });
+      }
+
+      res.json({ inquiries: patientWithInquiries.inquiries || [] });
+    } catch (error) {
+      console.error("Error fetching patient inquiries:", error);
+      res.status(500).json({ message: "Failed to fetch inquiries" });
+    }
+  });
+
+  // Create a new inquiry for a patient
+  app.post("/api/patients/:patientId/inquiries", isAuthenticated, async (req: any, res) => {
+    try {
+      const { patientId } = req.params;
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+      const inquiryData = req.body;
+
+      // Check if patient exists
+      const patient = await storage.getPatient(patientId);
+      if (!patient) {
+        return res.status(404).json({ message: "Patient not found" });
+      }
+
+      // Validate inquiry data
+      if (!inquiryData.inquiryType || !inquiryData.notes || !inquiryData.contactMethod) {
+        return res.status(400).json({ message: "Missing required inquiry fields" });
+      }
+
+      // Create new inquiry
+      const newInquiry = {
+        inquiryType: inquiryData.inquiryType,
+        status: inquiryData.status || 'pending',
+        priority: inquiryData.priority || 'medium',
+        notes: inquiryData.notes,
+        assignedTo: inquiryData.assignedTo || null,
+        createdBy: userId,
+        contactMethod: inquiryData.contactMethod,
+        contactInfo: inquiryData.contactInfo || '',
+        followUpDate: inquiryData.followUpDate || null,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+
+      // Add inquiry to patient
+      const updatedPatient = await Patient.findByIdAndUpdate(
+        patientId,
+        { $push: { inquiries: newInquiry } },
+        { new: true }
+      ).populate('inquiries.assignedTo', 'firstName lastName').populate('inquiries.createdBy', 'firstName lastName');
+
+      if (!updatedPatient) {
+        return res.status(404).json({ message: "Patient not found" });
+      }
+
+      const createdInquiry = updatedPatient.inquiries[updatedPatient.inquiries.length - 1];
+
+      // Log the activity
+      await logActivity(userId, "created", "patient_inquiry", patientId, {
+        inquiryType: inquiryData.inquiryType,
+        priority: inquiryData.priority,
+        assignedTo: inquiryData.assignedTo
+      });
+
+      // Send notification if assigned to someone
+      if (inquiryData.assignedTo && inquiryData.assignedTo !== userId) {
+        try {
+          const { notificationService } = await import("./notificationService");
+          await notificationService.createNotification(
+            inquiryData.assignedTo,
+            "inquiry_assigned",
+            "New Inquiry Assigned",
+            `You have been assigned a new ${inquiryData.inquiryType} inquiry for patient ${patient.firstName} ${patient.lastName}`,
+            {
+              patientId,
+              inquiryId: createdInquiry._id,
+              inquiryType: inquiryData.inquiryType,
+              priority: inquiryData.priority
+            }
+          );
+        } catch (error) {
+          console.error("Failed to send inquiry assignment notification:", error);
+        }
+      }
+
+      res.status(201).json({ 
+        message: "Inquiry created successfully", 
+        inquiry: createdInquiry 
+      });
+    } catch (error) {
+      console.error("Error creating inquiry:", error);
+      res.status(500).json({ message: "Failed to create inquiry" });
+    }
+  });
+
+  // Update an inquiry
+  app.put("/api/patients/:patientId/inquiries/:inquiryId", isAuthenticated, async (req: any, res) => {
+    try {
+      const { patientId, inquiryId } = req.params;
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+      const updateData = req.body;
+
+      // Check if patient exists
+      const patient = await storage.getPatient(patientId);
+      if (!patient) {
+        return res.status(404).json({ message: "Patient not found" });
+      }
+
+      // Find and update the specific inquiry
+      const updatedPatient = await Patient.findOneAndUpdate(
+        { 
+          _id: patientId, 
+          'inquiries._id': inquiryId 
+        },
+        { 
+          $set: {
+            'inquiries.$.status': updateData.status,
+            'inquiries.$.priority': updateData.priority,
+            'inquiries.$.notes': updateData.notes,
+            'inquiries.$.assignedTo': updateData.assignedTo,
+            'inquiries.$.followUpDate': updateData.followUpDate,
+            'inquiries.$.updatedAt': new Date()
+          }
+        },
+        { new: true }
+      ).populate('inquiries.assignedTo', 'firstName lastName').populate('inquiries.createdBy', 'firstName lastName');
+
+      if (!updatedPatient) {
+        return res.status(404).json({ message: "Patient or inquiry not found" });
+      }
+
+      const updatedInquiry = updatedPatient.inquiries.find(inq => inq._id.toString() === inquiryId);
+
+      // Log the activity
+      await logActivity(userId, "updated", "patient_inquiry", patientId, {
+        inquiryId,
+        status: updateData.status,
+        priority: updateData.priority
+      });
+
+      // Send notification if reassigned
+      if (updateData.assignedTo && updateData.assignedTo !== userId) {
+        try {
+          const { notificationService } = await import("./notificationService");
+          await notificationService.createNotification(
+            updateData.assignedTo,
+            "inquiry_assigned",
+            "Inquiry Reassigned",
+            `You have been assigned a ${updatedInquiry?.inquiryType} inquiry for patient ${patient.firstName} ${patient.lastName}`,
+            {
+              patientId,
+              inquiryId,
+              inquiryType: updatedInquiry?.inquiryType,
+              priority: updateData.priority
+            }
+          );
+        } catch (error) {
+          console.error("Failed to send inquiry reassignment notification:", error);
+        }
+      }
+
+      res.json({ 
+        message: "Inquiry updated successfully", 
+        inquiry: updatedInquiry 
+      });
+    } catch (error) {
+      console.error("Error updating inquiry:", error);
+      res.status(500).json({ message: "Failed to update inquiry" });
+    }
+  });
+
+  // Resolve an inquiry
+  app.patch("/api/patients/:patientId/inquiries/:inquiryId/resolve", isAuthenticated, async (req: any, res) => {
+    try {
+      const { patientId, inquiryId } = req.params;
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+      const { resolutionNotes } = req.body;
+
+      // Check if patient exists
+      const patient = await storage.getPatient(patientId);
+      if (!patient) {
+        return res.status(404).json({ message: "Patient not found" });
+      }
+
+      // Find and resolve the specific inquiry
+      const updatedPatient = await Patient.findOneAndUpdate(
+        { 
+          _id: patientId, 
+          'inquiries._id': inquiryId 
+        },
+        { 
+          $set: {
+            'inquiries.$.status': 'completed',
+            'inquiries.$.notes': resolutionNotes ? `${updatedPatient?.inquiries.find(inq => inq._id.toString() === inquiryId)?.notes}\n\nResolution: ${resolutionNotes}` : updatedPatient?.inquiries.find(inq => inq._id.toString() === inquiryId)?.notes,
+            'inquiries.$.resolvedAt': new Date(),
+            'inquiries.$.updatedAt': new Date()
+          }
+        },
+        { new: true }
+      ).populate('inquiries.assignedTo', 'firstName lastName').populate('inquiries.createdBy', 'firstName lastName');
+
+      if (!updatedPatient) {
+        return res.status(404).json({ message: "Patient or inquiry not found" });
+      }
+
+      const resolvedInquiry = updatedPatient.inquiries.find(inq => inq._id.toString() === inquiryId);
+
+      // Log the activity
+      await logActivity(userId, "resolved", "patient_inquiry", patientId, {
+        inquiryId,
+        resolutionNotes
+      });
+
+      res.json({ 
+        message: "Inquiry resolved successfully", 
+        inquiry: resolvedInquiry 
+      });
+    } catch (error) {
+      console.error("Error resolving inquiry:", error);
+      res.status(500).json({ message: "Failed to resolve inquiry" });
+    }
+  });
+
+  // Delete an inquiry
+  app.delete("/api/patients/:patientId/inquiries/:inquiryId", isAuthenticated, async (req: any, res) => {
+    try {
+      const { patientId, inquiryId } = req.params;
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+
+      // Check if patient exists
+      const patient = await storage.getPatient(patientId);
+      if (!patient) {
+        return res.status(404).json({ message: "Patient not found" });
+      }
+
+      // Only admins and supervisors can delete inquiries
+      if (user?.role !== "admin" && user?.role !== "supervisor") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      // Remove the inquiry
+      const updatedPatient = await Patient.findByIdAndUpdate(
+        patientId,
+        { $pull: { inquiries: { _id: inquiryId } } },
+        { new: true }
+      );
+
+      if (!updatedPatient) {
+        return res.status(404).json({ message: "Patient not found" });
+      }
+
+      // Log the activity
+      await logActivity(userId, "deleted", "patient_inquiry", patientId, {
+        inquiryId
+      });
+
+      res.json({ message: "Inquiry deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting inquiry:", error);
+      res.status(500).json({ message: "Failed to delete inquiry" });
+    }
+  });
+
+  // Get all inquiries across all patients (for staff management)
+  app.get("/api/inquiries", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+      const { status, priority, assignedTo, inquiryType } = req.query;
+
+      // Build query based on user role and filters
+      let query: any = {};
+
+      // Role-based access control
+      if (user?.role === "clinical") {
+        // Clinical staff can only see inquiries for their assigned patients
+        const assignedPatients = await Patient.find({ assignedClinicalId: userId });
+        query._id = { $in: assignedPatients.map(p => p._id) };
+      } else if (user?.role === "staff") {
+        // Staff can see inquiries they're assigned to
+        query['inquiries.assignedTo'] = userId;
+      } else if (user?.role === "frontdesk") {
+        // Front desk can see inquiries they created
+        query['inquiries.createdBy'] = userId;
+      }
+      // Admin and supervisor can see all inquiries
+
+      // Apply filters
+      if (status) query['inquiries.status'] = status;
+      if (priority) query['inquiries.priority'] = priority;
+      if (assignedTo) query['inquiries.assignedTo'] = assignedTo;
+      if (inquiryType) query['inquiries.inquiryType'] = inquiryType;
+
+      const patients = await Patient.find(query)
+        .populate('inquiries.assignedTo', 'firstName lastName')
+        .populate('inquiries.createdBy', 'firstName lastName')
+        .select('firstName lastName inquiries');
+
+      // Flatten inquiries with patient info
+      const allInquiries = patients.flatMap(patient => 
+        patient.inquiries.map(inquiry => ({
+          ...inquiry.toObject(),
+          patientName: `${patient.firstName} ${patient.lastName}`,
+          patientId: patient._id
+        }))
+      );
+
+      res.json({ inquiries: allInquiries });
+    } catch (error) {
+      console.error("Error fetching all inquiries:", error);
+      res.status(500).json({ message: "Failed to fetch inquiries" });
     }
   });
 

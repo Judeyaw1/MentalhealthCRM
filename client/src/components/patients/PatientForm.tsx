@@ -52,7 +52,13 @@ const patientFormSchema = z.object({
     phone: z.string().optional(),
   }).optional(),
   address: z.string().min(1, "Address is required"),
-  insurance: z.string().optional(),
+  insurance: z.object({
+    provider: z.string().optional(),
+    policyNumber: z.string().optional(),
+    groupNumber: z.string().optional(),
+    coverageLimits: z.string().optional(),
+    notes: z.string().optional(),
+  }).optional(),
   ssn: z.string().optional(),
   reasonForVisit: z.string().optional(),
   status: z.enum(["active", "inactive", "discharged"]).default("active"),
@@ -75,7 +81,13 @@ type PatientFormValues = {
     phone?: string;
   };
   address: string;
-  insurance?: string;
+  insurance?: {
+    provider?: string;
+    policyNumber?: string;
+    groupNumber?: string;
+    coverageLimits?: string;
+    notes?: string;
+  };
   ssn?: string;
   reasonForVisit?: string;
   status: string;
@@ -93,9 +105,9 @@ export function PatientForm({
 }: PatientFormProps) {
   const { user } = useAuth();
   
-  // Fetch therapists for dropdown
-  const { data: therapists = [] } = useQuery<{ id: string; firstName: string; lastName: string }[]>({
-    queryKey: ["/api/therapists"],
+  // Fetch clinical staff for dropdown
+  const { data: clinicals = [] } = useQuery<{ id: string; firstName: string; lastName: string }[]>({
+    queryKey: ["/api/clinicals"],
     retry: false,
   });
 
@@ -157,7 +169,25 @@ export function PatientForm({
       phone: initialData?.phone || "",
       emergencyContact: initialData?.emergencyContact || undefined,
       address: initialData?.address || "",
-      insurance: initialData?.insurance || "",
+                  insurance: (() => {
+              if (typeof initialData?.insurance === 'string') {
+                // Handle legacy string format
+                return {
+                  provider: initialData.insurance,
+                  policyNumber: "",
+                  groupNumber: "",
+                  coverageLimits: "",
+                  notes: "",
+                };
+              }
+              return initialData?.insurance || {
+                provider: "",
+                policyNumber: "",
+                groupNumber: "",
+                coverageLimits: "",
+                notes: "",
+              };
+            })(),
       ssn: initialData?.ssn || "",
       reasonForVisit: initialData?.reasonForVisit || "",
       status: initialData?.status || "active",
@@ -254,34 +284,34 @@ export function PatientForm({
       ...(data.authNumber && { authNumber: data.authNumber }),
     };
 
-    // Handle assignedTherapistId - always include it for updates to preserve assignment
+    // Handle assignedClinicalId - always include it for updates to preserve assignment
     if (hasInitialData) {
-      // For updates, always include the assignedTherapistId to preserve assignment
-      if (data.assignedTherapistId) {
-        processedData.assignedTherapistId = data.assignedTherapistId;
-      } else if (initialData?.assignedTherapistId) {
+      // For updates, always include the assignedClinicalId to preserve assignment
+      if (data.assignedClinicalId) {
+        processedData.assignedClinicalId = data.assignedClinicalId;
+      } else if (initialData?.assignedClinicalId) {
         // If not explicitly changed, preserve existing assignment
-        const existingAssignment = typeof initialData.assignedTherapistId === 'object' 
-          ? (initialData.assignedTherapistId as any)?._id 
-          : initialData.assignedTherapistId;
+        const existingAssignment = typeof initialData.assignedClinicalId === 'object' 
+          ? (initialData.assignedClinicalId as any)?._id 
+          : initialData.assignedClinicalId;
         if (existingAssignment) {
-          processedData.assignedTherapistId = existingAssignment;
+          processedData.assignedClinicalId = existingAssignment;
         }
       }
     } else {
       // For new patients, only include if explicitly set
-      if (data.assignedTherapistId) {
-        processedData.assignedTherapistId = data.assignedTherapistId;
+      if (data.assignedClinicalId) {
+        processedData.assignedClinicalId = data.assignedClinicalId;
       }
     }
     
-    // ALWAYS include assignedTherapistId for updates to ensure permission check passes
-    if (hasInitialData && initialData?.assignedTherapistId) {
-      const existingAssignment = typeof initialData.assignedTherapistId === 'object' 
-        ? (initialData.assignedTherapistId as any)?._id 
-        : initialData.assignedTherapistId;
-      if (existingAssignment && !processedData.assignedTherapistId) {
-        processedData.assignedTherapistId = existingAssignment;
+    // ALWAYS include assignedClinicalId for updates to ensure permission check passes
+    if (hasInitialData && initialData?.assignedClinicalId) {
+      const existingAssignment = typeof initialData.assignedClinicalId === 'object' 
+        ? (initialData.assignedClinicalId as any)?._id 
+        : initialData.assignedClinicalId;
+      if (existingAssignment && !processedData.assignedClinicalId) {
+        processedData.assignedClinicalId = existingAssignment;
       }
     }
     
@@ -567,7 +597,7 @@ export function PatientForm({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="insurance"
+                name="insurance.provider"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Insurance Provider</FormLabel>
@@ -576,6 +606,79 @@ export function PatientForm({
                         {...field}
                         placeholder="Enter insurance provider"
                         value={field.value ?? ""}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="insurance.policyNumber"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Policy Number</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        placeholder="Enter policy number"
+                        value={field.value ?? ""}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="insurance.groupNumber"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Group Number</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        placeholder="Enter group number"
+                        value={field.value ?? ""}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="insurance.coverageLimits"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Coverage Limits</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        placeholder="Enter coverage limits"
+                        value={field.value ?? ""}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="insurance.notes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Insurance Notes</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        {...field}
+                        placeholder="Enter insurance notes"
+                        value={field.value ?? ""}
+                        rows={2}
                       />
                     </FormControl>
                     <FormMessage />
@@ -731,28 +834,28 @@ export function PatientForm({
 
         <Card>
           <CardHeader>
-            <CardTitle>Assign Therapist</CardTitle>
+            <CardTitle>Assign Clinical</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <FormField
               control={form.control}
-              name="assignedTherapistId"
+              name="assignedClinicalId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Assigned Therapist *</FormLabel>
+                  <FormLabel>Assigned Clinical *</FormLabel>
                   <Select
                     onValueChange={field.onChange}
                     defaultValue={field.value}
                   >
                     <FormControl>
-                      <SelectTrigger ref={fieldRefs.assignedTherapistId}>
+                      <SelectTrigger ref={fieldRefs.assignedClinicalId}>
                         <SelectValue placeholder="Select clinical" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {Array.isArray(therapists) && therapists.map((t) => (
-                        <SelectItem key={t.id} value={t.id}>
-                          {t.firstName} {t.lastName}
+                      {Array.isArray(clinicals) && clinicals.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.firstName} {c.lastName}
                         </SelectItem>
                       ))}
                     </SelectContent>

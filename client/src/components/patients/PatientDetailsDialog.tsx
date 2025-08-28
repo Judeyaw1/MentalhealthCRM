@@ -123,7 +123,7 @@ export function PatientDetailsDialog({ patientId, isOpen, onClose }: PatientDeta
                   <div><strong>Phone:</strong> {patient.phone}</div>
                   <div><strong>Address:</strong> {patient.address}</div>
                   <div><strong>Emergency Contact:</strong> {patient.emergencyContact ? `${patient.emergencyContact.name} (${patient.emergencyContact.relationship}) - ${patient.emergencyContact.phone}` : "Not provided"}</div>
-                  <div><strong>Insurance:</strong> {patient.insurance}</div>
+                  <div><strong>Insurance:</strong> {patient.insurance?.provider || "Not specified"}</div>
                 </div>
               </CardContent>
             </Card>
@@ -133,7 +133,7 @@ export function PatientDetailsDialog({ patientId, isOpen, onClose }: PatientDeta
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div><strong>Insurance:</strong> {patient.insurance}</div>
+                  <div><strong>Insurance:</strong> {patient.insurance?.provider || "Not specified"}</div>
                   <div><strong>Authorization Number:</strong> {patient.authNumber || '-'}</div>
                   <div><strong>Level of Care (LOC):</strong> {patient.loc || '-'}</div>
                   <div><strong>Reason for Visit:</strong> {patient.reasonForVisit}</div>

@@ -299,7 +299,7 @@ const PatientReport: React.FC<PatientReportProps> = ({ patientId, onClose }) => 
             <div>
               <h4 className="font-semibold text-gray-700 mb-2">Clinical Information</h4>
               <div className="space-y-2 text-sm">
-                <p><span className="font-medium">Insurance:</span> {patient.insurance}</p>
+                <p><span className="font-medium">Insurance:</span> {patient.insurance?.provider || "Not specified"}</p>
                 <p><span className="font-medium">Auth Number:</span> {patient.authNumber}</p>
                 <p><span className="font-medium">Level of Care:</span> {patient.loc}</p>
                 <p><span className="font-medium">Reason for Visit:</span> {patient.reasonForVisit}</p>

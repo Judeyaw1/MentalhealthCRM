@@ -88,7 +88,21 @@ const patientSchema = new mongoose.Schema({
     type: String,
   },
   insurance: {
-    type: String,
+    provider: {
+      type: String,
+    },
+    policyNumber: {
+      type: String,
+    },
+    groupNumber: {
+      type: String,
+    },
+    coverageLimits: {
+      type: String,
+    },
+    notes: {
+      type: String,
+    },
   },
   ssn: {
     type: String,

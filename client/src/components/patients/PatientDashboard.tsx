@@ -17,7 +17,7 @@ import {
   Filter,
 } from "lucide-react";
 import { Link } from "wouter";
-import type { PatientWithTherapist } from "@shared/types";
+import type { PatientWithClinical } from "@shared/types";
 
 interface PatientDashboardProps {
   patientCount?: number;
@@ -29,7 +29,7 @@ export function PatientDashboard({
   todayAppointments = 0,
 }: PatientDashboardProps) {
   const { toast } = useToast();
-  const { data: recentPatients = [] } = useQuery<PatientWithTherapist[]>({
+  const { data: recentPatients = [] } = useQuery<PatientWithClinical[]>({
     queryKey: ["/api/dashboard/recent-patients"],
     retry: false,
   });
@@ -105,7 +105,7 @@ export function PatientDashboard({
                 </p>
                 <p className="text-2xl font-bold text-gray-900">
                   {recentPatients?.filter(
-                    (p: PatientWithTherapist) => p.status === "active",
+                    (p: PatientWithClinical) => p.status === "active",
                   ).length || 0}
                 </p>
               </div>
@@ -204,7 +204,7 @@ export function PatientDashboard({
               {recentPatients && recentPatients.length > 0 ? (
                 recentPatients
                   .slice(0, 5)
-                  .map((patient: PatientWithTherapist) => (
+                  .map((patient: PatientWithClinical) => (
                     <div
                       key={patient.id}
                       className="flex items-center space-x-4 p-3 rounded-lg hover:bg-gray-50"
@@ -328,7 +328,7 @@ export function PatientDashboard({
               </div>
               <p className="text-2xl font-bold text-green-600">
                 {recentPatients?.filter(
-                  (p: PatientWithTherapist) => p.status === "active",
+                  (p: PatientWithClinical) => p.status === "active",
                 ).length || 0}
               </p>
               <p className="text-sm text-gray-600">Active Patients</p>
@@ -339,7 +339,7 @@ export function PatientDashboard({
               </div>
               <p className="text-2xl font-bold text-gray-600">
                 {recentPatients?.filter(
-                  (p: PatientWithTherapist) => p.status === "inactive",
+                  (p: PatientWithClinical) => p.status === "inactive",
                 ).length || 0}
               </p>
               <p className="text-sm text-gray-600">Inactive Patients</p>
@@ -350,7 +350,7 @@ export function PatientDashboard({
               </div>
               <p className="text-2xl font-bold text-red-600">
                 {recentPatients?.filter(
-                  (p: PatientWithTherapist) => p.status === "discharged",
+                  (p: PatientWithClinical) => p.status === "discharged",
                 ).length || 0}
               </p>
               <p className="text-sm text-gray-600">Discharged Patients</p>

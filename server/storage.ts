@@ -840,7 +840,7 @@ export class DatabaseStorage {
       const records = await TreatmentRecord.find(query)
         .sort({ sessionDate: -1 })
         .populate("patientId", "firstName lastName")
-        .populate("therapistId", "firstName lastName")
+        .populate("clinicalId", "firstName lastName")
         .lean();
       const transformedRecords = records.map((record: any) => ({
         ...record,
@@ -864,7 +864,7 @@ export class DatabaseStorage {
     const records = await TreatmentRecord.find({ patientId })
       .sort({ sessionDate: -1 })
       .populate("patientId", "firstName lastName")
-      .populate("therapistId", "firstName lastName")
+      .populate("clinicalId", "firstName lastName")
       .lean();
 
 
@@ -874,9 +874,9 @@ export class DatabaseStorage {
         ...record,
         id: record._id.toString(),
         patient: record.patientId,
-        therapist: record.therapistId,
+        clinical: record.clinicalId,
       };
-      console.log("Transformed record therapist:", transformed.therapist);
+      console.log("Transformed record clinical:", transformed.clinical);
       return transformed;
     });
 
@@ -887,7 +887,7 @@ export class DatabaseStorage {
   async getTreatmentRecord(id: string) {
     const record = await TreatmentRecord.findById(id)
       .populate("patientId", "firstName lastName")
-      .populate("therapistId", "firstName lastName")
+      .populate("clinicalId", "firstName lastName")
       .lean();
 
     if (!record) return null;
@@ -896,7 +896,7 @@ export class DatabaseStorage {
       ...record,
       id: record._id.toString(),
       patient: record.patientId,
-      therapist: record.therapistId,
+      clinical: record.clinicalId,
     };
   }
 
@@ -910,7 +910,7 @@ export class DatabaseStorage {
     // Fetch the record with populated data
     const populatedRecord = await TreatmentRecord.findById(newRecord._id)
       .populate("patientId", "firstName lastName")
-      .populate("therapistId", "firstName lastName")
+      .populate("clinicalId", "firstName lastName")
       .lean();
 
     if (!populatedRecord) {
@@ -937,7 +937,7 @@ export class DatabaseStorage {
       };
 
       await notificationService.createNotification(
-        populatedRecord.therapistId._id.toString(),
+        populatedRecord.clinicalId._id.toString(),
         "general",
         notificationTitle,
         notificationMessage,
@@ -951,7 +951,7 @@ export class DatabaseStorage {
       ...populatedRecord,
       id: populatedRecord._id.toString(),
       patient: populatedRecord.patientId,
-      therapist: populatedRecord.therapistId,
+      clinical: populatedRecord.clinicalId,
     };
 
     return obj;
@@ -968,7 +968,7 @@ export class DatabaseStorage {
       new: true,
     })
       .populate("patientId", "firstName lastName")
-      .populate("therapistId", "firstName lastName")
+      .populate("clinicalId", "firstName lastName")
       .lean();
 
     if (!updated) return null;
@@ -1810,7 +1810,7 @@ export class DatabaseStorage {
   async getPatientTreatmentRecords(patientId: string) {
     try {
       const records = await TreatmentRecord.find({ patientId })
-        .populate('therapistId', 'firstName lastName')
+        .populate('clinicalId', 'firstName lastName')
         .sort({ assessmentDate: -1 });
       return records;
     } catch (error) {
@@ -1821,10 +1821,11 @@ export class DatabaseStorage {
 
   async getPatientDischargeRequests(patientId: string) {
     try {
-      const requests = await DischargeRequest.find({ patientId })
-        .populate('requestedBy', 'firstName lastName')
-        .sort({ requestDate: -1 });
-      return requests;
+      const patient = await PatientModel.findById(patientId).lean();
+      if (!patient || !patient.dischargeRequests) {
+        return [];
+      }
+      return patient.dischargeRequests;
     } catch (error) {
       console.error("Error getting patient discharge requests:", error);
       throw error;

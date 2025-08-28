@@ -48,6 +48,7 @@ import PatientNotes from "@/components/patients/PatientNotes";
 import { DischargeRequestForm } from "@/components/patients/DischargeRequestForm";
 import { DischargeRequestsList } from "@/components/patients/DischargeRequestsList";
 import PatientMiscellaneous from "@/components/patients/PatientMiscellaneous";
+import { InquiryList } from "@/components/inquiries/InquiryList";
 
 export default function PatientDetail() {
   const params = useParams();
@@ -886,6 +887,7 @@ export default function PatientDetail() {
                   </TabsTrigger>
                 )}
                 <TabsTrigger value="miscellaneous">Miscellaneous</TabsTrigger>
+                <TabsTrigger value="inquiries">Inquiries</TabsTrigger>
                 {canPerformAssessments && (
                   <TabsTrigger value="assessment">Assessment</TabsTrigger>
                 )}
@@ -1063,7 +1065,7 @@ export default function PatientDetail() {
                             Insurance Provider
                           </label>
                           <p className="text-sm text-gray-900">
-                            {patient.insurance || "Not specified"}
+                            {patient.insurance?.provider || "Not specified"}
                           </p>
                         </div>
                         <div>
@@ -1438,6 +1440,13 @@ export default function PatientDetail() {
                     Track patient progress, symptom severity, and treatment goals over time.
                   </p>
                 </div>
+              </TabsContent>
+
+              <TabsContent value="inquiries">
+                <InquiryList 
+                  patientId={patientId} 
+                  patientName={`${patient.firstName} ${patient.lastName}`}
+                />
               </TabsContent>
             </Tabs>
           </div>

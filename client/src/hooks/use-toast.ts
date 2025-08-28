@@ -3,6 +3,7 @@ import * as React from "react";
 import type { ToastActionElement, ToastProps } from "@/components/ui/toast";
 
 const TOAST_LIMIT = 1;
+const DEFAULT_TOAST_DURATION = 4000; // 4 seconds default
 const TOAST_REMOVE_DELAY = 1000000;
 
 type ToasterToast = ToastProps & {
@@ -10,6 +11,7 @@ type ToasterToast = ToastProps & {
   title?: React.ReactNode;
   description?: React.ReactNode;
   action?: ToastActionElement;
+  duration?: number; // Auto-hide duration in milliseconds
 };
 
 const actionTypes = {
@@ -136,8 +138,18 @@ function dispatch(action: Action) {
 
 type Toast = Omit<ToasterToast, "id">;
 
-function toast({ ...props }: Toast) {
+function toast({ duration = DEFAULT_TOAST_DURATION, variant, ...props }: Toast) {
   const id = genId();
+
+  // Smart duration defaults based on variant
+  let autoHideDuration = duration;
+  if (duration === DEFAULT_TOAST_DURATION) {
+    if (variant === 'destructive') {
+      autoHideDuration = 6000; // 6 seconds for errors
+    } else {
+      autoHideDuration = 4000; // 4 seconds for success/info
+    }
+  }
 
   const update = (props: ToasterToast) =>
     dispatch({
@@ -152,11 +164,19 @@ function toast({ ...props }: Toast) {
       ...props,
       id,
       open: true,
+      duration: autoHideDuration,
       onOpenChange: (open) => {
         if (!open) dismiss();
       },
     },
   });
+
+  // Auto-hide the toast after the specified duration
+  if (autoHideDuration > 0) {
+    setTimeout(() => {
+      dismiss();
+    }, autoHideDuration);
+  }
 
   return {
     id: id,

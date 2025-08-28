@@ -151,14 +151,12 @@ export default function NewAppointment() {
   const defaultClinicalId = user?.role === "clinical" ? user.id : "";
 
   // Create patient history object
-  const patientHistory: { [patientId: number]: boolean } = {};
+  const patientHistory: { [patientId: string]: boolean } = {};
   if (appointments?.appointments && patients?.patients) {
     appointments.appointments.forEach((appointment: any) => {
       if (appointment.patientId && appointment.patientId._id) {
-        const patientId = Number(appointment.patientId._id);
-        if (!isNaN(patientId)) {
-          patientHistory[patientId] = true;
-        }
+        const patientId = appointment.patientId._id.toString();
+        patientHistory[patientId] = true;
       }
     });
   }

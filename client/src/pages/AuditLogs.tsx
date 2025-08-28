@@ -92,6 +92,9 @@ export default function AuditLogs() {
   const [uniqueLoginCount, setUniqueLoginCount] = useState<number | null>(null);
   const [showResetDialog, setShowResetDialog] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
+  const [showUserLoginsDialog, setShowUserLoginsDialog] = useState(false);
+  const [userLogins, setUserLogins] = useState<any[]>([]);
+  const [userLoginsLoading, setUserLoginsLoading] = useState(false);
 
   // Real-time socket connection for instant updates
   useSocket({
@@ -159,6 +162,34 @@ export default function AuditLogs() {
         .catch(() => setUniqueLoginCount(null));
     }
   }, [isAuthenticated, user]);
+
+  // Function to fetch user logins details
+  const fetchUserLoginsDetails = async () => {
+    if (!isAuthenticated || (user?.role !== "admin" && user?.role !== "supervisor")) return;
+    
+    setUserLoginsLoading(true);
+    try {
+      const response = await fetch(`/api/audit-logs/unique-logins-details?days=7`);
+      if (response.ok) {
+        const data = await response.json();
+        setUserLogins(data.users || []);
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to fetch user login details",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to fetch user login details",
+        variant: "destructive",
+      });
+    } finally {
+      setUserLoginsLoading(false);
+    }
+  };
 
   const getActionIcon = (action: string) => {
     switch (action) {
@@ -365,7 +396,15 @@ export default function AuditLogs() {
             {/* Unique Logins Card (admin and supervisor only, last 7 days) */}
             {(user?.role === "admin" || user?.role === "supervisor") && (
               <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                <Card className="flex flex-col gap-2 p-4">
+                <Card 
+                  className="flex flex-col gap-2 p-4 cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={() => {
+                    if (user?.role === "admin" || user?.role === "supervisor") {
+                      setShowUserLoginsDialog(true);
+                      fetchUserLoginsDetails();
+                    }
+                  }}
+                >
                   <div className="flex items-center gap-4">
                     <div className="bg-blue-100 rounded-full p-3">
                       <UserCheck className="h-6 w-6 text-blue-600" />
@@ -376,6 +415,9 @@ export default function AuditLogs() {
                       </div>
                       <div className="text-gray-600 text-sm">Users Logged In (Last 7 Days)</div>
                     </div>
+                  </div>
+                  <div className="text-xs text-blue-600 mt-2 text-center">
+                    Click to view details
                   </div>
                 </Card>
               </div>
@@ -736,6 +778,79 @@ export default function AuditLogs() {
             <Button variant="outline" onClick={() => setShowResetDialog(false)} disabled={resetLoading}>Cancel</Button>
             <Button variant="destructive" onClick={handleResetLogs} disabled={resetLoading}>
               {resetLoading ? "Resetting..." : "Reset Logs"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* User Logins Dialog */}
+      <Dialog open={showUserLoginsDialog} onOpenChange={setShowUserLoginsDialog}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserCheck className="h-5 w-5 text-blue-600" />
+              Users Logged In (Last 7 Days)
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4 overflow-hidden">
+            {userLoginsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <span className="ml-2 text-gray-600">Loading user details...</span>
+              </div>
+            ) : userLogins.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <UserCheck className="h-12 w-12 mx-auto text-gray-300 mb-4" />
+                <p>No users have logged in during the last 7 days.</p>
+              </div>
+            ) : (
+              <div className="overflow-auto max-h-[60vh]">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>User</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Last Login</TableHead>
+                      <TableHead>IP Address</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {userLogins.map((userLogin, index) => (
+                      <TableRow key={index}>
+                        <TableCell className="font-medium">
+                          {userLogin.firstName} {userLogin.lastName}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="capitalize">
+                            {userLogin.role}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="font-mono text-sm">
+                          {userLogin.email}
+                        </TableCell>
+                        <TableCell>
+                          {new Date(userLogin.lastLogin).toLocaleString("en-US", {
+                            year: "numeric",
+                            month: "short",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </TableCell>
+                        <TableCell className="font-mono text-sm">
+                          {userLogin.ipAddress}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowUserLoginsDialog(false)}>
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>

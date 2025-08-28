@@ -14,6 +14,22 @@ export interface User {
   updatedAt?: Date;
 }
 
+export interface Inquiry {
+  id?: string;
+  inquiryType: 'new_patient' | 'follow_up' | 'referral' | 'general' | 'emergency';
+  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  notes: string;
+  assignedTo?: string;
+  createdBy: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+  resolvedAt?: Date;
+  contactMethod: 'phone' | 'email' | 'in_person' | 'referral';
+  contactInfo?: string;
+  followUpDate?: Date;
+}
+
 export interface Patient {
   id: string;
   _id?: string;
@@ -29,7 +45,13 @@ export interface Patient {
     phone?: string;
   };
   address?: string;
-  insurance?: string;
+  insurance?: {
+    provider?: string;
+    policyNumber?: string;
+    groupNumber?: string;
+    coverageLimits?: string;
+    notes?: string;
+  };
   ssn?: string;
   insuranceCardUrl?: string;
   photoUrl?: string;
@@ -46,6 +68,7 @@ export interface Patient {
     dischargeReason?: string;
     dischargeDate?: Date;
   };
+  inquiries?: Inquiry[];
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -260,7 +283,13 @@ export interface InsertPatient {
     phone?: string;
   };
   address?: string;
-  insurance?: string;
+  insurance?: {
+    provider?: string;
+    policyNumber?: string;
+    groupNumber?: string;
+    coverageLimits?: string;
+    notes?: string;
+  };
   ssn?: string;
   insuranceCardUrl?: string;
   photoUrl?: string;
