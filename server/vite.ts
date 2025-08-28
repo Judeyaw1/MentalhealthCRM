@@ -23,7 +23,7 @@ export async function setupVite(app: Express, server: Server) {
   const serverOptions = {
     middlewareMode: true,
     hmr: { server },
-    allowedHosts: true,
+    allowedHosts: true as const,
   };
 
   const vite = await createViteServer({
@@ -58,8 +58,7 @@ export async function setupVite(app: Express, server: Server) {
 
     try {
       const clientTemplate = path.resolve(
-        import.meta.dirname,
-        "..",
+        process.cwd(),
         "client",
         "index.html",
       );
@@ -80,18 +79,120 @@ export async function setupVite(app: Express, server: Server) {
 }
 
 export function serveStatic(app: Express) {
-  const distPath = path.resolve(import.meta.dirname, "public");
+  // Completely safe production static serving
+  try {
+    console.log("Setting up static serving for production...");
+    console.log("Current working directory:", process.cwd());
+    
+    // Get the current working directory safely
+    const cwd = process.cwd();
+    if (!cwd || typeof cwd !== 'string') {
+      throw new Error(`Invalid working directory: ${cwd}`);
+    }
+    
+    console.log("Working directory is valid:", cwd);
+    
+    // For Railway, try to find the build output
+    let distPath: string | null = null;
+    
+    // Try multiple possible paths
+    const possiblePaths = [
+      cwd, // Current directory (Railway)
+      path.join(cwd, "dist", "public"), // Local build
+      "/app", // Railway alternative
+      "/app/dist/public" // Railway build
+    ];
+    
+    for (const testPath of possiblePaths) {
+      try {
+        if (fs.existsSync(testPath)) {
+          // Check if it contains index.html
+          const indexPath = path.join(testPath, "index.html");
+          if (fs.existsSync(indexPath)) {
+            distPath = testPath;
+            console.log("Found valid dist path:", distPath);
+            break;
+          }
+        }
+      } catch (e) {
+        console.log(`Could not check path ${testPath}:`, e);
+      }
+    }
+    
+    if (!distPath) {
+      console.error("Could not find valid dist directory. Available paths:", possiblePaths);
+      throw new Error("Build directory not found");
+    }
+    
+    console.log("Serving static files from:", distPath);
+    
+    // List directory contents for debugging
+    try {
+      const contents = fs.readdirSync(distPath);
+      console.log("Directory contents:", contents);
+    } catch (e) {
+      console.log("Could not read directory contents:", e);
+    }
+    
+    // Serve static files
+    app.use(express.static(distPath));
+    console.log("Static files middleware added");
 
-  if (!fs.existsSync(distPath)) {
-    throw new Error(
-      `Could not find the build directory: ${distPath}, make sure to build the client first`,
-    );
+    // Serve index.html for all non-API routes
+    app.use("*", (req, res) => {
+      // Skip API routes
+      if (req.path.startsWith('/api/')) {
+        return res.status(404).send("API endpoint not found");
+      }
+      
+      try {
+        const indexPath = path.join(distPath!, "index.html");
+        console.log("Looking for index.html at:", indexPath);
+        
+        if (fs.existsSync(indexPath)) {
+          console.log("Serving index.html");
+          res.sendFile(indexPath);
+        } else {
+          console.log("index.html not found, sending fallback");
+          res.status(404).send(`
+            <html>
+              <body>
+                <h1>Application Not Found</h1>
+                <p>The application files could not be found.</p>
+                <p>Dist path: ${distPath}</p>
+                <p>Current directory: ${cwd}</p>
+                <p>Requested path: ${req.path}</p>
+              </body>
+            </html>
+          `);
+        }
+      } catch (error) {
+        console.error("Error serving index.html:", error);
+        res.status(500).send(`
+          <html>
+            <body>
+              <h1>Server Error</h1>
+              <p>Error serving application: ${error}</p>
+            </body>
+          </html>
+        `);
+      }
+    });
+    
+    console.log("Static serving setup complete");
+  } catch (error) {
+    console.error("Error setting up static serving:", error);
+    // Fallback: just send a basic response
+    app.use("*", (_req, res) => {
+      res.status(500).send(`
+        <html>
+          <body>
+            <h1>Server Configuration Error</h1>
+            <p>Error: ${error}</p>
+            <p>Current directory: ${process.cwd()}</p>
+          </body>
+        </html>
+      `);
+    });
   }
-
-  app.use(express.static(distPath));
-
-  // fall through to index.html if the file doesn't exist
-  app.use("*", (_req, res) => {
-    res.sendFile(path.resolve(distPath, "index.html"));
-  });
 }

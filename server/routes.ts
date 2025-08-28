@@ -51,31 +51,62 @@ const insertAppointmentSchema = z.object({
 });
 
 // Set up multer storage for uploads
-const uploadDir = path.join(process.cwd(), "uploads");
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
-const storageEngine = multer.diskStorage({
-  destination: (req: any, file: Express.Multer.File, cb: (error: Error | null, destination: string) => void) => {
-    cb(null, uploadDir);
-  },
-  filename: (req: any, file: Express.Multer.File, cb: (error: Error | null, filename: string) => void) => {
-    const ext = path.extname(file.originalname);
-    const base = path.basename(file.originalname, ext);
-    cb(null, `${base}-${Date.now()}${ext}`);
-  },
-});
-const upload = multer({ storage: storageEngine });
+let uploadDir: string;
+let storageEngine: multer.StorageEngine;
+let upload: multer.Multer;
+
+// Initialize multer storage dynamically
+function initializeMulter() {
+  try {
+    // Get working directory safely
+    const cwd = process.cwd();
+    if (!cwd || typeof cwd !== 'string') {
+      throw new Error(`Invalid working directory: ${cwd}`);
+    }
+    
+    uploadDir = path.join(cwd, "uploads");
+    console.log("Upload directory:", uploadDir);
+    
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+      console.log("Created upload directory:", uploadDir);
+    }
+    
+    storageEngine = multer.diskStorage({
+      destination: (req: any, file: Express.Multer.File, cb: (error: Error | null, destination: string) => void) => {
+        cb(null, uploadDir);
+      },
+      filename: (req: any, file: Express.Multer.File, cb: (error: Error | null, filename: string) => void) => {
+        const ext = path.extname(file.originalname);
+        const base = path.basename(file.originalname, ext);
+        cb(null, `${base}-${Date.now()}${ext}`);
+      },
+    });
+    
+    upload = multer({ storage: storageEngine });
+    console.log("Multer storage initialized successfully");
+  } catch (error) {
+    console.error("Error initializing multer storage:", error);
+    // Fallback to memory storage
+    upload = multer({ storage: multer.memoryStorage() });
+    console.log("Using memory storage as fallback");
+  }
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Initialize multer storage
+  initializeMulter();
+  
   // Auth middleware
   await setupAuth(app);
 
-  // Serve static files (React app production build) - only in production
-  if (process.env.NODE_ENV === 'production') {
-    app.use(express.static(path.join(process.cwd(), 'dist/public')));
+  // Serve uploads dynamically
+  if (uploadDir) {
+    app.use('/uploads', express.static(uploadDir));
+    console.log("Serving uploads from:", uploadDir);
+  } else {
+    console.log("Upload directory not available, skipping uploads static serving");
   }
-  
-  // Serve uploads
-  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
   // Helper function for audit logging
   const logActivity = async (
@@ -3893,18 +3924,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Catch-all route to serve React app for all non-API routes - only in production
-  if (process.env.NODE_ENV === 'production') {
-    app.get('*', (req, res) => {
-      // Don't serve React app for API routes
-      if (req.path.startsWith('/api/')) {
-        return res.status(404).json({ message: 'API endpoint not found' });
-      }
-      
-      // Serve the React app's index.html for all other routes
-      res.sendFile(path.join(process.cwd(), 'dist/public/index.html'));
-    });
-  }
+
 
   // Get patient demographics for reports
   app.get("/api/reports/demographics", isAuthenticated, async (req: any, res) => {
