@@ -5724,7 +5724,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         { 
           $set: {
             'inquiries.$.status': 'completed',
-            'inquiries.$.notes': resolutionNotes ? `${updatedPatient?.inquiries.find(inq => inq._id.toString() === inquiryId)?.notes}\n\nResolution: ${resolutionNotes}` : updatedPatient?.inquiries.find(inq => inq._id.toString() === inquiryId)?.notes,
+            'inquiries.$.notes': resolutionNotes ? `${patient?.inquiries.find((inq: any) => inq._id.toString() === inquiryId)?.notes}\n\nResolution: ${resolutionNotes}` : patient?.inquiries.find((inq: any) => inq._id.toString() === inquiryId)?.notes,
             'inquiries.$.resolvedAt': new Date(),
             'inquiries.$.updatedAt': new Date()
           }
@@ -5736,7 +5736,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Patient or inquiry not found" });
       }
 
-      const resolvedInquiry = updatedPatient.inquiries.find(inq => inq._id.toString() === inquiryId);
+      const resolvedInquiry = updatedPatient.inquiries.find((inq: any) => inq._id.toString() === inquiryId);
 
       // Log the activity
       await logActivity(userId, "resolved", "patient_inquiry", patientId, {
@@ -5803,7 +5803,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { status, priority, assignedTo, inquiryType } = req.query;
 
       // Build query based on user role and filters
-      let query: any = {};
+      let query: Record<string, any> = {};
 
       // Role-based access control
       if (user?.role === "clinical") {
