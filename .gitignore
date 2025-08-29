@@ -122,3 +122,4 @@ firebase-debug.*.log
 # Replit
 .replit
 .replitignore
+.vercel

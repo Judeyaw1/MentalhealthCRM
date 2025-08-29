@@ -85,7 +85,7 @@ export function serveStatic(app: Express) {
     console.log("Current working directory:", process.cwd());
     
     // Standard dist path for production builds
-    const distPath = path.join(process.cwd(), "dist", "public");
+    const distPath = path.join(process.cwd(), "dist");
     console.log("Looking for static files in:", distPath);
     
     // Check if dist directory exists
