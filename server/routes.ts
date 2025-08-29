@@ -51,56 +51,31 @@ const insertAppointmentSchema = z.object({
 });
 
 // Set up multer storage for uploads
-let uploadDir: string;
-let storageEngine: multer.StorageEngine;
-let upload: multer.Multer;
-
-// Initialize multer storage
-function initializeMulter() {
-  try {
-    uploadDir = path.join(process.cwd(), "uploads");
-    console.log("Upload directory:", uploadDir);
-    
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-      console.log("Created upload directory:", uploadDir);
-    }
-    
-    storageEngine = multer.diskStorage({
-      destination: (req: any, file: Express.Multer.File, cb: (error: Error | null, destination: string) => void) => {
-        cb(null, uploadDir);
-      },
-      filename: (req: any, file: Express.Multer.File, cb: (error: Error | null, filename: string) => void) => {
-        const ext = path.extname(file.originalname);
-        const base = path.basename(file.originalname, ext);
-        cb(null, `${base}-${Date.now()}${ext}`);
-      },
-    });
-    
-    upload = multer({ storage: storageEngine });
-    console.log("Multer storage initialized successfully");
-  } catch (error) {
-    console.error("Error initializing multer storage:", error);
-    // Fallback to memory storage
-    upload = multer({ storage: multer.memoryStorage() });
-    console.log("Using memory storage as fallback");
-  }
-}
+const uploadDir = path.join(process.cwd(), "uploads");
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
+const storageEngine = multer.diskStorage({
+  destination: (req: any, file: Express.Multer.File, cb: (error: Error | null, destination: string) => void) => {
+    cb(null, uploadDir);
+  },
+  filename: (req: any, file: Express.Multer.File, cb: (error: Error | null, filename: string) => void) => {
+    const ext = path.extname(file.originalname);
+    const base = path.basename(file.originalname, ext);
+    cb(null, `${base}-${Date.now()}${ext}`);
+  },
+});
+const upload = multer({ storage: storageEngine });
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Initialize multer storage
-  initializeMulter();
-  
   // Auth middleware
   await setupAuth(app);
 
-  // Serve uploads dynamically
-  if (uploadDir) {
-    app.use('/uploads', express.static(uploadDir));
-    console.log("Serving uploads from:", uploadDir);
-  } else {
-    console.log("Upload directory not available, skipping uploads static serving");
+  // Serve static files (React app production build) - only in production
+  if (process.env.NODE_ENV === 'production') {
+    app.use(express.static(path.join(process.cwd(), 'dist/public')));
   }
+  
+  // Serve uploads
+  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
   // Helper function for audit logging
   const logActivity = async (
@@ -3918,7 +3893,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-
+  // Catch-all route to serve React app for all non-API routes - only in production
+  if (process.env.NODE_ENV === 'production') {
+    app.get('*', (req, res) => {
+      // Don't serve React app for API routes
+      if (req.path.startsWith('/api/')) {
+        return res.status(404).json({ message: 'API endpoint not found' });
+      }
+      
+      // Serve the React app's index.html for all other routes
+      res.sendFile(path.join(process.cwd(), 'dist/public/index.html'));
+    });
+  }
 
   // Get patient demographics for reports
   app.get("/api/reports/demographics", isAuthenticated, async (req: any, res) => {
@@ -5724,7 +5710,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         { 
           $set: {
             'inquiries.$.status': 'completed',
-            'inquiries.$.notes': resolutionNotes ? `${patient?.inquiries.find((inq: any) => inq._id.toString() === inquiryId)?.notes}\n\nResolution: ${resolutionNotes}` : patient?.inquiries.find((inq: any) => inq._id.toString() === inquiryId)?.notes,
+            'inquiries.$.notes': resolutionNotes ? `${updatedPatient?.inquiries.find(inq => inq._id.toString() === inquiryId)?.notes}\n\nResolution: ${resolutionNotes}` : updatedPatient?.inquiries.find(inq => inq._id.toString() === inquiryId)?.notes,
             'inquiries.$.resolvedAt': new Date(),
             'inquiries.$.updatedAt': new Date()
           }
@@ -5736,7 +5722,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Patient or inquiry not found" });
       }
 
-      const resolvedInquiry = updatedPatient.inquiries.find((inq: any) => inq._id.toString() === inquiryId);
+      const resolvedInquiry = updatedPatient.inquiries.find(inq => inq._id.toString() === inquiryId);
 
       // Log the activity
       await logActivity(userId, "resolved", "patient_inquiry", patientId, {
@@ -5803,7 +5789,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { status, priority, assignedTo, inquiryType } = req.query;
 
       // Build query based on user role and filters
-      let query: Record<string, any> = {};
+      let query: any = {};
 
       // Role-based access control
       if (user?.role === "clinical") {

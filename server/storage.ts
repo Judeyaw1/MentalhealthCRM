@@ -977,7 +977,7 @@ export class DatabaseStorage {
       ...updated,
       id: updated._id.toString(),
       patient: updated.patientId,
-      therapist: updated.clinicalId,
+      therapist: updated.therapistId,
     };
   }
 
@@ -2241,7 +2241,7 @@ export class DatabaseStorage {
 
       // Recent outcomes for detailed view
       const recentOutcomes = outcomes.slice(0, 20).map(outcome => ({
-        patientName: `Patient ${outcome.patientId || 'Unknown'}`,
+        patientName: `${outcome.patientId?.firstName || 'Unknown'} ${outcome.patientId?.lastName || 'Patient'}`,
         assessmentDate: outcome.assessmentDate,
         depressionScore: outcome.depressionScore || 0,
         anxietyScore: outcome.anxietyScore || 0,

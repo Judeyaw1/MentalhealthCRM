@@ -45,18 +45,18 @@ export class AppointmentStatusService {
             await storage.updateAppointmentStatus(appointment._id.toString(), newStatus);
             
             // Log the automatic status change
-            await AuditService.getInstance().logActivity({
-              userId: 'system',
-              action: 'update',
-              resourceType: 'appointment_status',
-              resourceId: appointment._id.toString(),
-              details: {
+            await AuditService.logActivity(
+              'system', // system user
+              'update',
+              'appointment_status',
+              appointment._id.toString(),
+              {
                 oldStatus: currentStatus,
                 newStatus: newStatus,
                 reason: statusReason,
                 automatic: true
               }
-            });
+            );
             
             updatedCount++;
             console.log(`✅ Updated appointment ${appointment._id} from ${currentStatus} to ${newStatus}: ${statusReason}`);

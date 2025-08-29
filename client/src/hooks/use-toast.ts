@@ -151,25 +151,29 @@ function toast({ duration = DEFAULT_TOAST_DURATION, variant, ...props }: Toast) 
     }
   }
 
-  const update = (props: ToasterToast) =>
-    dispatch({
-      type: "UPDATE_TOAST",
-      toast: { ...props, id },
-    });
-  const dismiss = () => dispatch({ type: "DISMISS_TOAST", toastId: id });
-
-  dispatch({
-    type: "ADD_TOAST",
-    toast: {
-      ...props,
-      id,
-      open: true,
-      duration: autoHideDuration,
-      onOpenChange: (open) => {
-        if (!open) dismiss();
-      },
+  const toastData = {
+    ...props,
+    id,
+    open: true,
+    duration: autoHideDuration,
+    onOpenChange: (open: boolean) => {
+      if (!open) {
+        // Dispatch dismiss event
+        window.dispatchEvent(new CustomEvent('dismiss-toast', { detail: { toastId: id } }));
+      }
     },
-  });
+  };
+
+  // Dispatch toast event to the Toaster component
+  window.dispatchEvent(new CustomEvent('show-toast', { detail: { toast: toastData } }));
+
+  const update = (props: ToasterToast) => {
+    window.dispatchEvent(new CustomEvent('update-toast', { detail: { toast: { ...props, id } } }));
+  };
+  
+  const dismiss = () => {
+    window.dispatchEvent(new CustomEvent('dismiss-toast', { detail: { toastId: id } }));
+  };
 
   // Auto-hide the toast after the specified duration
   if (autoHideDuration > 0) {

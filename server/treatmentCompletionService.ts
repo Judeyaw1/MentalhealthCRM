@@ -210,11 +210,10 @@ export class TreatmentCompletionService {
     }
 
     // Update the goal
-    const updatedGoal = {
-      ...patient.treatmentGoals[goalIndex].toObject(),
+    patient.treatmentGoals[goalIndex] = {
+      ...patient.treatmentGoals[goalIndex],
       ...updates
     };
-    patient.treatmentGoals.set(goalIndex, updatedGoal);
 
     await patient.save();
 
