@@ -12,7 +12,7 @@ import {
 import { useToast } from "../../hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { usePatientDialog } from "../contexts/PatientDialogContext";
+import { usePatientDialog } from "../../contexts/PatientDialogContext";
 
 interface Notification {
   id: string;
