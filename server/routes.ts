@@ -66,16 +66,55 @@ const storageEngine = multer.diskStorage({
 const upload = multer({ storage: storageEngine });
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Health check endpoint for Railway
+  app.get("/api/health", (req, res) => {
+    res.json({ 
+      status: "healthy", 
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || "development"
+    });
+  });
+
   // Auth middleware
   await setupAuth(app);
 
-  // Serve static files (React app production build) - only in production
-  if (process.env.NODE_ENV === 'production') {
-    app.use(express.static(path.join(process.cwd(), 'dist/public')));
-  }
+  // Static file serving is now handled in the main server file
   
   // Serve uploads
   app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+  
+  // Serve static files from dist/public in production
+  if (process.env.NODE_ENV === 'production') {
+    app.use(express.static(path.join(process.cwd(), 'dist', 'public')));
+  }
+  
+  // Serve logo directly to ensure it loads properly
+  app.get('/logo.png', (req, res) => {
+    // Try multiple possible paths for Railway deployment
+    const possiblePaths = [
+      path.join(process.cwd(), 'logo.png'),  // Root directory
+      path.join(process.cwd(), 'dist', 'public', 'logo.png'),  // Built directory
+      '/app/logo.png',  // Railway container root
+      '/app/dist/public/logo.png'  // Railway container built
+    ];
+    
+    for (const logoPath of possiblePaths) {
+      try {
+        const fs = require('fs');
+        if (fs.existsSync(logoPath)) {
+          return res.sendFile(logoPath);
+        }
+      } catch (error) {
+        // Continue to next path if this one fails
+        continue;
+      }
+    }
+    
+    // If no logo found, send a 404
+    res.status(404).send('Logo not found');
+  });
+  
+
 
   // Helper function for audit logging
   const logActivity = async (
@@ -1029,7 +1068,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         offset = 0,
         search,
         patientId,
-        therapistId,
+        clinicalId,
         sessionType,
         startDate,
         endDate,
@@ -3893,18 +3932,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Catch-all route to serve React app for all non-API routes - only in production
-  if (process.env.NODE_ENV === 'production') {
-    app.get('*', (req, res) => {
-      // Don't serve React app for API routes
-      if (req.path.startsWith('/api/')) {
-        return res.status(404).json({ message: 'API endpoint not found' });
-      }
-      
-      // Serve the React app's index.html for all other routes
-      res.sendFile(path.join(process.cwd(), 'dist/public/index.html'));
-    });
-  }
+
+
+  // Note: Catch-all route for SPA is now handled in the main server file
+  // to ensure proper static file serving order
 
   // Get patient demographics for reports
   app.get("/api/reports/demographics", isAuthenticated, async (req: any, res) => {
@@ -5167,14 +5198,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/treatment-outcomes/summary", isAuthenticated, async (req: any, res) => {
     try {
-      const { patientId, therapistId, startDate, endDate } = req.query;
+      const { patientId, clinicalId, startDate, endDate } = req.query;
       
       const start = startDate ? new Date(startDate as string) : undefined;
       const end = endDate ? new Date(endDate as string) : undefined;
       
       const summary = await storage.getTreatmentOutcomesSummary(
         patientId as string,
-        therapistId as string,
+        clinicalId as string,
         start,
         end
       );

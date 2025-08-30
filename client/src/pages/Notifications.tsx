@@ -1,17 +1,17 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Bell, Check, X, Clock, AlertTriangle, User, Calendar, FileText, ChevronRight, Filter, Search, UserCheck, Mail, Users, Lock, ClipboardCheck } from "lucide-react";
-import { useSocket } from "@/hooks/useSocket";
-import { useAuth } from "@/hooks/useAuth";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
+import { useSocket } from "../hooks/useSocket";
+import { useAuth } from "../hooks/useAuth";
+import { Button } from "../components/ui/button";
+import { Badge } from "../components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+import { Input } from "../components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
+import { useToast } from "../hooks/use-toast";
 import { useLocation } from "wouter";
 import { ArrowLeft } from "lucide-react";
-import { usePatientDialog } from "@/contexts/PatientDialogContext";
+import { usePatientDialog } from "../contexts/PatientDialogContext";
 
 interface Notification {
   id: string;
