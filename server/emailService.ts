@@ -40,7 +40,8 @@ export class EmailService {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASS ? "***" : undefined,
     });
-    // Always use SMTP config from environment variables
+    
+    // Enhanced SMTP configuration with better timeout handling for Railway
     this.transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
       port: parseInt(process.env.SMTP_PORT || '465'),
@@ -49,42 +50,142 @@ export class EmailService {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS,
       },
+      // Connection timeout settings for Railway
+      connectionTimeout: 60000, // 60 seconds
+      greetingTimeout: 30000,   // 30 seconds
+      socketTimeout: 60000,     // 60 seconds
+      // Pool settings for better connection management
+      pool: true,
+      maxConnections: 5,
+      maxMessages: 100,
+      // Rate limiting
+      rateLimit: 5, // max 5 emails per second
+      // TLS options
+      tls: {
+        rejectUnauthorized: false, // Allow self-signed certificates
+        ciphers: 'SSLv3'
+      }
     });
+
+    // Verify connection
+    try {
+      await this.transporter.verify();
+      console.log('✅ SMTP connection verified successfully');
+    } catch (error) {
+      console.error('❌ SMTP connection verification failed:', error);
+      // Don't throw here, let it try to send anyway
+    }
+  }
+
+  // Alternative transporter with different settings for Railway
+  private async createAlternativeTransporter(): Promise<nodemailer.Transporter> {
+    console.log('🔄 Creating alternative SMTP transporter for Railway...');
+    
+    const config: any = {
+      host: process.env.SMTP_HOST,
+      port: parseInt(process.env.SMTP_PORT || '587'), // Try port 587 instead of 465
+      secure: false, // Use STARTTLS instead of SSL
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+      // Shorter timeouts for Railway
+      connectionTimeout: 30000, // 30 seconds
+      greetingTimeout: 15000,   // 15 seconds
+      socketTimeout: 30000,     // 30 seconds
+      // No pooling for simpler connections
+      pool: false,
+      // TLS options
+      tls: {
+        rejectUnauthorized: false,
+        ciphers: 'SSLv3'
+      }
+    };
+    
+    return nodemailer.createTransport(config);
   }
 
   async sendEmail(emailData: EmailData): Promise<boolean> {
-    try {
-      if (!this.transporter) {
-        await this.initializeTransporter();
-      }
+    const maxRetries = 3;
+    let lastError: any;
 
-      if (!this.transporter) {
-        console.error('Email transporter not initialized');
-        return false;
-      }
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        if (!this.transporter) {
+          await this.initializeTransporter();
+        }
 
-      const mailOptions = {
-        from: process.env.SMTP_FROM || '"Mental Health Tracker" <noreply@mentalhealthtracker.com>',
-        to: emailData.to,
-        subject: emailData.template.subject,
-        html: emailData.template.html,
-        text: emailData.template.text,
-      };
+        if (!this.transporter) {
+          console.error('Email transporter not initialized');
+          return false;
+        }
 
-      const info = await this.transporter.sendMail(mailOptions);
-      
-      if (process.env.NODE_ENV === 'development') {
-        console.log('📧 Email sent:', {
-          messageId: info.messageId,
-          previewURL: nodemailer.getTestMessageUrl(info),
+        const mailOptions = {
+          from: process.env.SMTP_FROM || '"Mental Health Tracker" <noreply@mentalhealthtracker.com>',
+          to: emailData.to,
+          subject: emailData.template.subject,
+          html: emailData.template.html,
+          text: emailData.template.text,
+        };
+
+        console.log(`📧 Attempting to send email (attempt ${attempt}/${maxRetries}) to: ${emailData.to}`);
+
+        const info = await this.transporter.sendMail(mailOptions);
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log('📧 Email sent:', {
+            messageId: info.messageId,
+            previewURL: nodemailer.getTestMessageUrl(info),
+          });
+        } else {
+          console.log('📧 Email sent successfully:', {
+            messageId: info.messageId,
+            to: emailData.to,
+            subject: emailData.template.subject
+          });
+        }
+
+        return true;
+      } catch (error: any) {
+        lastError = error;
+        console.error(`❌ Email send attempt ${attempt}/${maxRetries} failed:`, {
+          error: error.message,
+          code: error.code,
+          command: error.command,
+          to: emailData.to
         });
-      }
 
-      return true;
-    } catch (error) {
-      console.error('Failed to send email:', error);
-      return false;
+        // If it's a connection timeout and we have more attempts, wait before retrying
+        if (attempt < maxRetries && (error.code === 'ETIMEDOUT' || error.code === 'ECONNECTION')) {
+          const waitTime = attempt * 2000; // Progressive backoff: 2s, 4s, 6s
+          console.log(`⏳ Waiting ${waitTime}ms before retry...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+          
+          // Try alternative transporter on retry
+          if (attempt === 2) {
+            console.log('🔄 Trying alternative SMTP configuration...');
+            this.transporter = await this.createAlternativeTransporter();
+          } else {
+            // Reinitialize transporter for next attempt
+            this.transporter = null;
+          }
+          continue;
+        }
+
+        // If we've exhausted retries or it's not a retryable error, break
+        break;
+      }
     }
+
+    // All retries failed
+    console.error('❌ All email send attempts failed for:', {
+      to: emailData.to,
+      subject: emailData.template.subject,
+      finalError: lastError?.message,
+      code: lastError?.code
+    });
+    
+    return false;
   }
 
   // Appointment reminder email

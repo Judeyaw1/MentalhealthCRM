@@ -47,10 +47,22 @@ Mental Health Tracker is a full-stack application with React frontend and Node.j
   7. **Attempt 7**: Moved static middleware registration - ❌ Still not found
   8. **Attempt 8**: Copied logo to project root and updated custom route - 🔄 IN PROGRESS
 
+### 6. Email Service Connection Timeout Issues on Railway
+- **Problem**: `Failed to send email: Error: Connection timeout` with SMTP connection failures
+- **Root Cause**: Railway network restrictions and Gmail SMTP connection timeouts
+- **Fix**: 
+  - Enhanced SMTP configuration with longer timeouts (60s connection, 30s greeting, 60s socket)
+  - Added connection pooling and rate limiting
+  - Implemented retry logic with 3 attempts and progressive backoff
+  - Added alternative SMTP transporter with port 587 (STARTTLS) as fallback
+  - Added connection verification and better error logging
+- **Status**: ✅ IMPLEMENTED - Ready for testing
+
 ## Current Status
 - **Local Development**: ✅ Working correctly
 - **Railway Deployment**: ✅ Application loads, but logo still not displaying
 - **Logo Issue**: 🔄 Latest fix in progress - logo copied to root directory with custom route
+- **Email Service**: ✅ Enhanced with retry logic and alternative configurations - ready for testing
 
 ## Files Modified
 
@@ -64,6 +76,7 @@ Mental Health Tracker is a full-stack application with React frontend and Node.j
 ### Backend Files (Server Configuration)
 - `server/index.ts` - Fixed Vite integration, improved static file serving, added SPA catch-all route
 - `server/routes.ts` - Removed conflicting routes, added custom logo route with multiple path checking
+- `server/emailService.ts` - Enhanced SMTP configuration with retry logic, timeouts, and alternative transporter
 - `.env` - Cleaned up conflicting MongoDB URIs
 - `.railwayignore` - Removed `dist/` exclusion to ensure built files are deployed
 
