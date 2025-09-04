@@ -4,9 +4,9 @@ import nodemailer from 'nodemailer';
 import { storage } from './storage';
 
 export interface EmailTemplate {
-  subject: string;
-  html: string;
-  text: string;
+    subject: string;
+    html: string;
+    text: string;
 }
 
 export interface EmailData {
@@ -125,19 +125,19 @@ export class EmailService {
             'api-key': this.apiKey,
           },
           body: JSON.stringify({
-            sender: {
+                    sender: {
               name: 'Mental Health Tracker',
-              email: 'noreply@mentalhealthtracker.com'
+              email: 'judeosafo111@gmail.com'
             },
-            to: [
-              {
+        to: [
+          {
                 email: emailData.to,
                 name: emailData.to.split('@')[0] // Use email prefix as name
-              }
-            ],
-            subject: emailData.template.subject,
-            htmlContent: emailData.template.html,
-            textContent: emailData.template.text,
+          }
+        ],
+        subject: emailData.template.subject,
+        htmlContent: emailData.template.html,
+        textContent: emailData.template.text,
           }),
         });
 
@@ -192,7 +192,7 @@ export class EmailService {
       code: lastError?.code
     });
     
-    return false;
+      return false;
   }
 
   // Appointment reminder email
