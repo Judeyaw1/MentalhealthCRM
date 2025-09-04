@@ -18,6 +18,8 @@ export interface EmailData {
 export class EmailService {
   private static instance: EmailService;
   private transporter: nodemailer.Transporter | null = null;
+  private apiKey: string;
+  private baseUrl: string;
 
   constructor() {
     // Brevo configuration - API key should be set in environment variables
@@ -113,39 +115,43 @@ export class EmailService {
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        if (!this.transporter) {
-          await this.initializeTransporter();
-        }
-
-        if (!this.transporter) {
-          console.error('Email transporter not initialized');
-          return false;
-        }
-
-        const mailOptions = {
-          from: process.env.SMTP_FROM || '"Mental Health Tracker" <noreply@mentalhealthtracker.com>',
-          to: emailData.to,
-          subject: emailData.template.subject,
-          html: emailData.template.html,
-          text: emailData.template.text,
-        };
-
         console.log(`📧 Attempting to send email (attempt ${attempt}/${maxRetries}) to: ${emailData.to}`);
 
-        const info = await this.transporter.sendMail(mailOptions);
-        
-        if (process.env.NODE_ENV === 'development') {
-          console.log('📧 Email sent:', {
-            messageId: info.messageId,
-            previewURL: nodemailer.getTestMessageUrl(info),
-          });
-        } else {
-          console.log('📧 Email sent successfully:', {
-            messageId: info.messageId,
-            to: emailData.to,
-            subject: emailData.template.subject
-          });
+        // Use Brevo API instead of SMTP
+        const response = await fetch(this.baseUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'api-key': this.apiKey,
+          },
+          body: JSON.stringify({
+            sender: {
+              name: 'Mental Health Tracker',
+              email: 'noreply@mentalhealthtracker.com'
+            },
+            to: [
+              {
+                email: emailData.to,
+                name: emailData.to.split('@')[0] // Use email prefix as name
+              }
+            ],
+            subject: emailData.template.subject,
+            htmlContent: emailData.template.html,
+            textContent: emailData.template.text,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Brevo API error: ${response.status} ${errorText}`);
         }
+
+        const result = await response.json();
+        console.log('📧 Email sent successfully via Brevo:', {
+          messageId: result.messageId,
+          to: emailData.to,
+          subject: emailData.template.subject
+        });
 
         return true;
       } catch (error: any) {
@@ -153,7 +159,6 @@ export class EmailService {
         console.error(`❌ Email send attempt ${attempt}/${maxRetries} failed:`, {
           error: error.message,
           code: error.code,
-          command: error.command,
           to: emailData.to
         });
 
