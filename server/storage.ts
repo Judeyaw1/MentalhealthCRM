@@ -1790,7 +1790,7 @@ export class DatabaseStorage {
         .limit(limit)
         .skip(offset)
         .populate([
-          { path: "therapistId", select: "firstName lastName" },
+          { path: "clinicalId", select: "firstName lastName" },
           { path: "createdBy", select: "firstName lastName" },
         ]);
 

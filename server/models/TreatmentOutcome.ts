@@ -126,7 +126,7 @@ const TreatmentOutcomeSchema = new mongoose.Schema(
 
 // Indexes for efficient querying
 TreatmentOutcomeSchema.index({ patientId: 1, assessmentDate: -1 });
-TreatmentOutcomeSchema.index({ therapistId: 1, assessmentDate: -1 });
+TreatmentOutcomeSchema.index({ clinicalId: 1, assessmentDate: -1 });
 TreatmentOutcomeSchema.index({ assessmentDate: -1 });
 
 export const TreatmentOutcome = mongoose.model(

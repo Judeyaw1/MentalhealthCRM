@@ -83,36 +83,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Serve uploads
   app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
   
-  // Serve static files from dist/public in production
-  if (process.env.NODE_ENV === 'production') {
-    app.use(express.static(path.join(process.cwd(), 'dist', 'public')));
-  }
+
   
-  // Serve logo directly to ensure it loads properly
-  app.get('/logo.png', (req, res) => {
-    // Try multiple possible paths for Railway deployment
-    const possiblePaths = [
-      path.join(process.cwd(), 'logo.png'),  // Root directory
-      path.join(process.cwd(), 'dist', 'public', 'logo.png'),  // Built directory
-      '/app/logo.png',  // Railway container root
-      '/app/dist/public/logo.png'  // Railway container built
-    ];
-    
-    for (const logoPath of possiblePaths) {
-      try {
-        const fs = require('fs');
-        if (fs.existsSync(logoPath)) {
-          return res.sendFile(logoPath);
-        }
-      } catch (error) {
-        // Continue to next path if this one fails
-        continue;
-      }
-    }
-    
-    // If no logo found, send a 404
-    res.status(404).send('Logo not found');
-  });
+
   
 
 
@@ -1907,8 +1880,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Send password reset email
         const emailSent = await emailService.sendAdminPasswordReset(
           user.email,
-          user.firstName,
-          user.lastName,
           defaultPassword
         );
 
@@ -4608,34 +4579,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage.getPatientNotes(id)
       ]);
 
-      // Extract outcomes array from the result object
-      const treatmentOutcomes = treatmentOutcomesResult.outcomes || [];
+      // Extract outcomes array from the result object with defensive programming
+      const treatmentOutcomes = (treatmentOutcomesResult && treatmentOutcomesResult.outcomes) || [];
+      
+      // Debug logging for data structure
+      console.log("🔍 Report data structure:", {
+        appointments: appointments?.length || 0,
+        treatmentRecords: treatmentRecords?.length || 0,
+        treatmentOutcomesResult: treatmentOutcomesResult ? 'exists' : 'null',
+        treatmentOutcomes: treatmentOutcomes?.length || 0,
+        patientNotes: patientNotes?.length || 0
+      });
 
-      // Calculate statistics
-      const totalSessions = appointments.length;
-      const completedSessions = appointments.filter(apt => apt.status === 'completed').length;
+      // Calculate statistics with defensive programming
+      const totalSessions = (appointments && appointments.length) || 0;
+      const completedSessions = appointments ? appointments.filter(apt => apt && apt.status === 'completed').length : 0;
       const attendanceRate = totalSessions > 0 ? Math.round((completedSessions / totalSessions) * 100) : 0;
 
-      // Calculate average scores from treatment outcomes
-      const averageMoodScore = treatmentOutcomes.length > 0 
-        ? Math.round(treatmentOutcomes.reduce((sum, outcome) => sum + (outcome.moodState === 'stable' ? 5 : outcome.moodState === 'elevated' ? 8 : outcome.moodState === 'low' ? 3 : outcome.moodState === 'depressed' ? 2 : outcome.moodState === 'anxious' ? 4 : 5), 0) / treatmentOutcomes.length * 10) / 10
+      // Calculate average scores from treatment outcomes with defensive programming
+      const averageMoodScore = treatmentOutcomes && treatmentOutcomes.length > 0 
+        ? Math.round(treatmentOutcomes.reduce((sum, outcome) => {
+            if (!outcome) return sum;
+            const score = outcome.moodState === 'stable' ? 5 : outcome.moodState === 'elevated' ? 8 : outcome.moodState === 'low' ? 3 : outcome.moodState === 'depressed' ? 2 : outcome.moodState === 'anxious' ? 4 : 5;
+            return sum + score;
+          }, 0) / treatmentOutcomes.length * 10) / 10
         : 0;
       
-      const averageAnxietyScore = treatmentOutcomes.length > 0 
-        ? Math.round(treatmentOutcomes.reduce((sum, outcome) => sum + (outcome.anxietyScore || 0), 0) / treatmentOutcomes.length * 10) / 10
+      const averageAnxietyScore = treatmentOutcomes && treatmentOutcomes.length > 0 
+        ? Math.round(treatmentOutcomes.reduce((sum, outcome) => sum + (outcome && outcome.anxietyScore ? outcome.anxietyScore : 0), 0) / treatmentOutcomes.length * 10) / 10
         : 0;
       
-      const averageDepressionScore = treatmentOutcomes.length > 0 
-        ? Math.round(treatmentOutcomes.reduce((sum, outcome) => sum + (outcome.depressionScore || 0), 0) / treatmentOutcomes.length * 10) / 10
+      const averageDepressionScore = treatmentOutcomes && treatmentOutcomes.length > 0 
+        ? Math.round(treatmentOutcomes.reduce((sum, outcome) => sum + (outcome && outcome.depressionScore ? outcome.depressionScore : 0), 0) / treatmentOutcomes.length * 10) / 10
         : 0;
 
-      // Calculate goal achievement and functional improvement rates
-      const goalAchievementRate = treatmentOutcomes.length > 0 
-        ? Math.round(treatmentOutcomes.reduce((sum, outcome) => sum + (outcome.goalProgress === 'achieved' ? 100 : outcome.goalProgress === 'exceeded' ? 120 : outcome.goalProgress === 'progressing' ? 75 : outcome.goalProgress === 'beginning' ? 25 : 0), 0) / treatmentOutcomes.length)
+      // Calculate goal achievement and functional improvement rates with defensive programming
+      const goalAchievementRate = treatmentOutcomes && treatmentOutcomes.length > 0 
+        ? Math.round(treatmentOutcomes.reduce((sum, outcome) => {
+            if (!outcome) return sum;
+            const score = outcome.goalProgress === 'achieved' ? 100 : outcome.goalProgress === 'exceeded' ? 120 : outcome.goalProgress === 'progressing' ? 75 : outcome.goalProgress === 'beginning' ? 25 : 0;
+            return sum + score;
+          }, 0) / treatmentOutcomes.length)
         : 0;
       
-      const functionalImprovementRate = treatmentOutcomes.length > 0 
-        ? Math.round(treatmentOutcomes.reduce((sum, outcome) => sum + (outcome.dailyFunctioning === 'excellent' ? 100 : outcome.dailyFunctioning === 'good' ? 80 : outcome.dailyFunctioning === 'fair' ? 60 : outcome.dailyFunctioning === 'poor' ? 40 : outcome.dailyFunctioning === 'severe' ? 20 : 0), 0) / treatmentOutcomes.length)
+      const functionalImprovementRate = treatmentOutcomes && treatmentOutcomes.length > 0 
+        ? Math.round(treatmentOutcomes.reduce((sum, outcome) => {
+            if (!outcome) return sum;
+            const score = outcome.dailyFunctioning === 'excellent' ? 100 : outcome.dailyFunctioning === 'good' ? 80 : outcome.dailyFunctioning === 'fair' ? 60 : outcome.dailyFunctioning === 'poor' ? 40 : outcome.dailyFunctioning === 'severe' ? 20 : 0;
+            return sum + score;
+          }, 0) / treatmentOutcomes.length)
         : 0;
 
       const reportData = {
@@ -4667,64 +4659,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
             email: patient.assignedClinicalId.email
           } : undefined
         },
-        appointments: appointments.map(apt => ({
-          id: apt.id,
-          date: apt.date,
-          time: apt.time,
-          status: apt.status,
-          notes: apt.notes,
+        appointments: (appointments || []).map(apt => ({
+          id: apt?.id || 'unknown',
+          date: apt?.date || '',
+          time: apt?.time || '',
+          status: apt?.status || 'unknown',
+          notes: apt?.notes || '',
           clinical: {
-            firstName: apt.clinical?.firstName || 'Unknown',
-            lastName: apt.clinical?.lastName || 'Clinical'
+            firstName: apt?.clinical?.firstName || 'Unknown',
+            lastName: apt?.clinical?.lastName || 'Clinical'
           }
         })),
-        treatmentRecords: treatmentRecords.map(record => ({
-          id: record._id?.toString() || record._id,
-          assessmentDate: record.sessionDate,
+        treatmentRecords: (treatmentRecords || []).map(record => ({
+          id: record?._id?.toString() || record?._id || 'unknown',
+          assessmentDate: record?.sessionDate || '',
           symptoms: [], // Not available in current model
           moodScore: 0, // Not available in current model
           anxietyScore: 0, // Not available in current model
           depressionScore: 0, // Not available in current model
           functionalScore: 0, // Not available in current model
           riskLevel: 'Unknown', // Not available in current model
-          notes: record.notes || '',
+          notes: record?.notes || '',
           clinical: {
-            firstName: record.clinicalId && typeof record.clinicalId === 'object' && 'firstName' in record.clinicalId ? record.clinicalId.firstName : 'Unknown',
-            lastName: record.clinicalId && typeof record.clinicalId === 'object' && 'lastName' in record.clinicalId ? record.clinicalId.lastName : 'Clinical'
+            firstName: record?.clinicalId && typeof record.clinicalId === 'object' && 'firstName' in record.clinicalId ? record.clinicalId.firstName : 'Unknown',
+            lastName: record?.clinicalId && typeof record.clinicalId === 'object' && 'lastName' in record.clinicalId ? record.clinicalId.lastName : 'Clinical'
           }
         })),
-        treatmentOutcomes: treatmentOutcomes.map(outcome => ({
-          id: outcome._id?.toString() || outcome._id,
-          assessmentDate: outcome.assessmentDate,
+        treatmentOutcomes: (treatmentOutcomes || []).map(outcome => ({
+          id: outcome?._id?.toString() || outcome?._id || 'unknown',
+          assessmentDate: outcome?.assessmentDate || '',
           symptomScores: {
-            anxiety: outcome.anxietyScore || 0,
-            depression: outcome.depressionScore || 0,
-            stress: outcome.stressScore || 0,
+            anxiety: outcome?.anxietyScore || 0,
+            depression: outcome?.depressionScore || 0,
+            stress: outcome?.stressScore || 0,
             sleep: 0, // Not available in current model
-            social: outcome.socialEngagement === 'very_active' ? 10 : outcome.socialEngagement === 'active' ? 8 : outcome.socialEngagement === 'moderate' ? 6 : outcome.socialEngagement === 'limited' ? 4 : outcome.socialEngagement === 'isolated' ? 2 : 0
+            social: outcome?.socialEngagement === 'very_active' ? 10 : outcome?.socialEngagement === 'active' ? 8 : outcome?.socialEngagement === 'moderate' ? 6 : outcome?.socialEngagement === 'limited' ? 4 : outcome?.socialEngagement === 'isolated' ? 2 : 0
           },
-          moodRating: outcome.moodState === 'stable' ? 5 : outcome.moodState === 'elevated' ? 8 : outcome.moodState === 'low' ? 3 : outcome.moodState === 'depressed' ? 2 : outcome.moodState === 'anxious' ? 4 : 5,
-          goalAchievement: outcome.goalProgress === 'achieved' ? 100 : outcome.goalProgress === 'exceeded' ? 120 : outcome.goalProgress === 'progressing' ? 75 : outcome.goalProgress === 'beginning' ? 25 : 0,
-          functionalImprovement: outcome.dailyFunctioning === 'excellent' ? 100 : outcome.dailyFunctioning === 'good' ? 80 : outcome.dailyFunctioning === 'fair' ? 60 : outcome.dailyFunctioning === 'poor' ? 40 : outcome.dailyFunctioning === 'severe' ? 20 : 0,
-          notes: outcome.clinicalNotes || ''
+          moodRating: outcome?.moodState === 'stable' ? 5 : outcome?.moodState === 'elevated' ? 8 : outcome?.moodState === 'low' ? 3 : outcome?.moodState === 'depressed' ? 2 : outcome?.moodState === 'anxious' ? 4 : 5,
+          goalAchievement: outcome?.goalProgress === 'achieved' ? 100 : outcome?.goalProgress === 'exceeded' ? 120 : outcome?.goalProgress === 'progressing' ? 75 : outcome?.goalProgress === 'beginning' ? 25 : 0,
+          functionalImprovement: outcome?.dailyFunctioning === 'excellent' ? 100 : outcome?.dailyFunctioning === 'good' ? 80 : outcome?.dailyFunctioning === 'fair' ? 60 : outcome?.dailyFunctioning === 'poor' ? 40 : outcome?.dailyFunctioning === 'severe' ? 20 : 0,
+          notes: outcome?.clinicalNotes || ''
         })),
         dischargeRequests: (patient.dischargeRequests || []).map(request => ({
-          id: request._id?.toString() || request._id,
-          requestDate: request.requestedAt,
-          status: request.status,
-          reason: request.reason,
+          id: request?._id?.toString() || request?._id || 'unknown',
+          requestDate: request?.requestedAt || '',
+          status: request?.status || 'unknown',
+          reason: request?.reason || '',
           requestedBy: {
-            firstName: request.requestedBy && typeof request.requestedBy === 'object' && 'firstName' in request.requestedBy ? request.requestedBy.firstName : 'Unknown',
-            lastName: request.requestedBy && typeof request.requestedBy === 'object' && 'lastName' in request.requestedBy ? request.requestedBy.lastName : 'Staff'
+            firstName: request?.requestedBy && typeof request.requestedBy === 'object' && 'firstName' in request.requestedBy ? request.requestedBy.firstName : 'Unknown',
+            lastName: request?.requestedBy && typeof request.requestedBy === 'object' && 'lastName' in request.requestedBy ? request.requestedBy.lastName : 'Staff'
           }
         })),
-        patientNotes: patientNotes.map(note => ({
-          id: note._id?.toString() || note._id,
-          date: note.createdAt,
-          note: note.content || '',
+        patientNotes: (patientNotes || []).map(note => ({
+          id: note?._id?.toString() || note?._id || 'unknown',
+          date: note?.createdAt || '',
+          note: note?.content || '',
           author: {
-            firstName: note.authorName ? note.authorName.split(' ')[0] : 'Unknown',
-            lastName: note.authorName ? note.authorName.split(' ').slice(1).join(' ') : 'Staff'
+            firstName: note?.authorName ? note.authorName.split(' ')[0] : 'Unknown',
+            lastName: note?.authorName ? note.authorName.split(' ').slice(1).join(' ') : 'Staff'
           },
           type: 'General' // Not available in current model
         })),
@@ -4742,7 +4734,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(reportData);
     } catch (error) {
       console.error("Error generating patient report:", error);
-      res.status(500).json({ error: "Failed to generate patient report" });
+      console.error("Error details:", {
+        message: error.message,
+        stack: error.stack,
+        patientId: req.params.id,
+        userId: req.user?.id
+      });
+      res.status(500).json({ 
+        error: "Failed to generate patient report",
+        details: error.message 
+      });
     }
   });
 

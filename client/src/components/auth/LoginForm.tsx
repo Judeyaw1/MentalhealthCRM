@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Brain, Eye, EyeOff, Loader2, LogIn } from "lucide-react";
+import { Eye, EyeOff, Loader2, LogIn } from "lucide-react";
+
+import { isUnauthorizedError } from "@/lib/authUtils";
 
 interface LoginFormProps {
   onSuccess?: () => void;
@@ -19,7 +19,7 @@ interface LoginData {
 
 export function LoginForm({ onSuccess }: LoginFormProps) {
   const { toast } = useToast();
-  const [, setLocation] = useLocation();
+  const queryClient = useQueryClient();
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState<LoginData>({
     email: "",
@@ -44,44 +44,39 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
       return response.json();
     },
     onSuccess: (data) => {
-      console.log("🔐 Login successful:", data);
-      
-      // Store authentication state in localStorage
-      localStorage.setItem("isLoggedIn", "true");
-      localStorage.setItem("user", JSON.stringify(data.user));
-      localStorage.setItem(
-        "forcePasswordChange",
-        data.forcePasswordChange ? "true" : "false",
-      );
+      if (data.success) {
+        // Store user data in localStorage
+        localStorage.setItem("isLoggedIn", "true");
+        localStorage.setItem("user", JSON.stringify(data.user));
+        
+        // Invalidate auth query to refetch session
+        queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+        
+        toast({
+          title: "Login Successful",
+          description: `Welcome back, ${data.user.firstName}!`,
+        });
 
-      console.log("🔐 localStorage updated:", {
-        isLoggedIn: localStorage.getItem("isLoggedIn"),
-        user: localStorage.getItem("user"),
-        forcePasswordChange: localStorage.getItem("forcePasswordChange")
-      });
-
-      // Don't clear patient changes refresh state on login - let it persist
-      // This allows users to see the same fresh data they requested before logout
-
-      toast({
-        title: "Login Successful",
-        description: `Welcome back, ${data.user.firstName}!`,
-      });
-
-      console.log("🔐 Redirecting to dashboard...");
-      // Reload the page to ensure authentication state is properly initialized
-      window.location.href = "/dashboard";
-
-      // Call success callback
-      onSuccess?.();
+        // Wait for auth state to update before calling success callback
+        setTimeout(() => {
+          onSuccess?.();
+        }, 200);
+      }
     },
     onError: (error: Error) => {
-      toast({
-        title: "Login Failed",
-        description:
-          error.message || "Invalid email or password. Please try again.",
-        variant: "destructive",
-      });
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Login Failed",
+          description: "Invalid email or password. Please try again.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Login Failed",
+          description: error.message || "An error occurred during login.",
+          variant: "destructive",
+        });
+      }
     },
   });
 
@@ -112,7 +107,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
     <Card className="w-full max-w-md mx-auto">
       <CardHeader className="text-center">
         <div className="mx-auto w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center mb-4">
-          <img src="/logo.png" alt="Logo" className="h-8 w-8 object-contain" />
+          <span className="text-3xl">🌱</span>
         </div>
         <CardTitle>Sign In to NewLife CRM</CardTitle>
         <p className="text-sm text-gray-600">
@@ -123,7 +118,9 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="email">Email Address</Label>
+            <label htmlFor="email" className="text-sm font-medium text-gray-700">
+              Email Address
+            </label>
             <Input
               id="email"
               type="email"
@@ -136,7 +133,9 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
+            <label htmlFor="password" className="text-sm font-medium text-gray-700">
+              Password
+            </label>
             <div className="relative">
               <Input
                 id="password"
@@ -183,11 +182,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
           </Button>
         </form>
 
-        <div className="mt-6 text-center">
-          <p className="text-xs text-gray-500">
-            For development: Any email and password combination will work
-          </p>
-        </div>
+
       </CardContent>
     </Card>
   );

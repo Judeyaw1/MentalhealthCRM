@@ -25,7 +25,9 @@ export function useAuth() {
   // Use backend session if available, fallback to localStorage
   const isAuthenticated = sessionUser ? true : localStorage.getItem("isLoggedIn") === "true";
   const user = sessionUser || (isAuthenticated ? JSON.parse(localStorage.getItem("user") || "null") : null);
-  const forcePasswordChange = user?.forcePasswordChange || localStorage.getItem("forcePasswordChange") === "true";
+  
+  // Prioritize backend user data over localStorage for forcePasswordChange
+  const forcePasswordChange = user?.forcePasswordChange === true;
 
   const logoutMutation = useMutation({
     mutationFn: async () => {

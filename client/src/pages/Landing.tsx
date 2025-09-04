@@ -1,51 +1,33 @@
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Brain,
-  Users,
-  Calendar,
-  Shield,
-  BarChart3,
-  FileText,
-} from "lucide-react";
+import { Shield, Users, Clock, FileText, BarChart3 } from "lucide-react";
+
 
 export default function Landing() {
   const features = [
     {
-      icon: Users,
+      icon: <Shield className="h-8 w-8 text-blue-600" />,
+      title: "Secure & Confidential",
+      description: "HIPAA-compliant platform ensuring patient privacy and data security.",
+    },
+    {
+      icon: <Users className="h-8 w-8 text-green-600" />,
       title: "Patient Management",
-      description:
-        "Comprehensive patient records and profile management with HIPAA compliance.",
+      description: "Comprehensive patient records, appointments, and treatment tracking.",
     },
     {
-      icon: Calendar,
+      icon: <Clock className="h-8 w-8 text-purple-600" />,
       title: "Appointment Scheduling",
-      description:
-        "Efficient scheduling system with calendar integration and automated reminders.",
+      description: "Efficient scheduling system with automated reminders and notifications.",
     },
     {
-      icon: FileText,
-      title: "Treatment Records",
-      description:
-        "Secure documentation of treatment notes and patient progress tracking.",
+      icon: <FileText className="h-8 w-8 text-orange-600" />,
+      title: "Treatment Plans",
+      description: "Detailed treatment planning and progress monitoring tools.",
     },
     {
-      icon: Shield,
-      title: "HIPAA Compliance",
-      description:
-        "Built-in security measures and audit logging for healthcare compliance.",
-    },
-    {
-      icon: BarChart3,
+      icon: <BarChart3 className="h-8 w-8 text-red-600" />,
       title: "Analytics & Reports",
-      description:
-        "Comprehensive reporting and analytics for practice management insights.",
-    },
-    {
-      icon: Brain,
-      title: "Mental Health Focus",
-      description:
-        "Specifically designed for mental health practices and therapy workflows.",
+      description: "Comprehensive reporting and analytics for better decision making.",
     },
   ];
 
@@ -57,16 +39,7 @@ export default function Landing() {
           <div className="flex justify-between items-center py-6">
             <div className="flex items-center space-x-3">
               <div className="w-10 h-10 bg-primary-500 rounded-lg flex items-center justify-center">
-                <img 
-                  src="/logo.png" 
-                  alt="Logo" 
-                  className="h-8 w-8 object-contain"
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                    e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                  }}
-                />
-                <span className="text-white font-bold text-sm hidden">NL</span>
+                <span className="text-xl">🌱</span>
               </div>
               <div>
                 <h1 className="text-xl font-semibold text-gray-900">
@@ -88,23 +61,22 @@ export default function Landing() {
       {/* Hero Section */}
       <section className="py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
-            Streamline Your
-            <span className="text-primary-500 block">
-              Mental Health Practice
-            </span>
+                      <div className="mx-auto w-24 h-24 bg-primary-500 rounded-full flex items-center justify-center mb-8">
+              <span className="text-6xl">🌱</span>
+            </div>
+          <h1 className="text-4xl font-bold text-gray-900 mb-6">
+            Mental Health Practice Management
           </h1>
           <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
-            A comprehensive CRM solution designed specifically for mental health
-            organizations to manage patients, appointments, and records with
-            HIPAA compliance.
+            Streamline your mental health practice with our comprehensive CRM solution. 
+            Manage patients, appointments, treatments, and more with ease.
           </p>
-          <Button
-            size="lg"
-            className="text-lg px-8 py-3"
+          <Button 
+            size="lg" 
             onClick={() => (window.location.href = "/login")}
+            className="text-lg px-8 py-3"
           >
-            Get Started Today
+            Get Started
           </Button>
         </div>
       </section>
@@ -114,79 +86,64 @@ export default function Landing() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl font-bold text-gray-900 mb-4">
-              Everything You Need to Manage Your Practice
+              Everything You Need to Run Your Practice
             </h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              Our platform provides all the tools necessary to run an efficient,
-              compliant mental health practice.
+            <p className="text-lg text-gray-600">
+              Comprehensive tools designed specifically for mental health professionals
             </p>
           </div>
-
+          
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {features.map((feature, index) => {
-              const Icon = feature.icon;
-              return (
-                <Card key={index} className="hover:shadow-lg transition-shadow">
-                  <CardHeader>
-                    <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center mb-4">
-                      <Icon className="h-6 w-6 text-primary-600" />
-                    </div>
-                    <CardTitle className="text-xl">{feature.title}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-gray-600">{feature.description}</p>
-                  </CardContent>
-                </Card>
-              );
-            })}
+            {features.map((feature, index) => (
+              <div key={index} className="text-center p-6 rounded-lg border border-gray-200 hover:shadow-lg transition-shadow">
+                <div className="mx-auto w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+                  {feature.icon}
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                  {feature.title}
+                </h3>
+                <p className="text-gray-600">
+                  {feature.description}
+                </p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 bg-primary-50">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">
+      <section className="py-20 bg-primary-500">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className="text-3xl font-bold text-white mb-4">
             Ready to Transform Your Practice?
           </h2>
-          <p className="text-lg text-gray-600 mb-8">
-            Join thousands of mental health professionals who trust NewLife CRM
-            to manage their practice efficiently and securely.
+          <p className="text-xl text-primary-100 mb-8">
+            Join mental health professionals who trust NewLife CRM
           </p>
-          <Button
-            size="lg"
-            className="text-lg px-8 py-3"
+          <Button 
+            size="lg" 
+            variant="secondary"
             onClick={() => (window.location.href = "/login")}
+            className="text-lg px-8 py-3"
           >
-            Start Your Free Trial
+            Start Today
           </Button>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="bg-gray-900 text-white py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
-                <img 
-                  src="/logo.png" 
-                  alt="Logo" 
-                  className="h-5 w-5 object-contain"
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                    e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                  }}
-                />
-                <span className="text-white font-bold text-xs hidden">NL</span>
-              </div>
-              <span className="text-lg font-semibold">NewLife CRM</span>
+      <footer className="bg-gray-900 py-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+                      <div className="w-12 h-12 bg-primary-500 rounded-lg flex items-center justify-center mx-auto mb-6">
+              <span className="text-2xl">🌱</span>
             </div>
-            <p className="text-gray-400">
-              © 2024 NewLife CRM. HIPAA Compliant Mental Health Practice
-              Management.
-            </p>
-          </div>
+          <h3 className="text-xl font-semibold text-white mb-2">NewLife CRM</h3>
+          <p className="text-gray-400 mb-6">
+            Empowering mental health professionals with modern practice management tools
+          </p>
+          <p className="text-gray-500 text-sm">
+            © 2024 NewLife CRM. All rights reserved.
+          </p>
         </div>
       </footer>
     </div>

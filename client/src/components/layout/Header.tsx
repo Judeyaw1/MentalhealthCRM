@@ -4,7 +4,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Bell,
   Search,
-  Brain,
   Users,
   Calendar,
   FileText,
@@ -15,6 +14,7 @@ import {
   Mail,
   Settings,
 } from "lucide-react";
+
 import { useAuth } from "@/hooks/useAuth";
 import { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "wouter";
@@ -135,7 +135,7 @@ export function Header({ onSearch }: HeaderProps) {
       type: "location",
       title: "Dashboard",
       subtitle: "Overview and quick stats",
-      icon: <Brain className="h-4 w-4" />,
+      icon: <span className="text-lg">🌱</span>,
       href: "/dashboard",
       keywords: ["dashboard", "home", "overview", "main"],
     },
@@ -352,17 +352,7 @@ export function Header({ onSearch }: HeaderProps) {
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 bg-primary-500 rounded-lg flex items-center justify-center">
-                  <img
-                    src="/logo.png"
-                    alt="Logo"
-                    className="h-8 w-8 object-contain"
-                    onError={(e) => {
-                      // Fallback to text if image fails to load
-                      e.currentTarget.style.display = 'none';
-                      e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                    }}
-                  />
-                  <span className="text-white font-bold text-sm hidden">NL</span>
+                  <span className="text-xl">🌱</span>
                 </div>
                 <div>
                   <h1 className="text-xl font-semibold text-gray-900">

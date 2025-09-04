@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChangePasswordForm } from "@/components/staff/ChangePasswordForm";
 import { PatientDialogProvider } from "@/contexts/PatientDialogContext";
 import { WebSocketProvider } from "@/contexts/WebSocketContext";
@@ -37,6 +37,7 @@ import PatientReports from "@/pages/PatientReports";
 function RouterComponent() {
   const { logout, isAuthenticated, user, forcePasswordChange } = useAuth();
   const [showPasswordChange, setShowPasswordChange] = useState(false);
+  const queryClient = useQueryClient();
 
   // Show password change dialog if required
   useEffect(() => {
@@ -49,8 +50,8 @@ function RouterComponent() {
     setShowPasswordChange(false);
     // Clear the force password change flag
     localStorage.removeItem("forcePasswordChange");
-    // Redirect to dashboard instead of reloading
-    window.location.href = "/dashboard";
+    // Invalidate user query to refresh data from backend
+    queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
   };
 
   return (

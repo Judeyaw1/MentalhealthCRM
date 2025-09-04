@@ -16,9 +16,9 @@ import {
   Heart,
   Users,
   Briefcase,
-  Brain,
   Shield
 } from 'lucide-react';
+
 import { apiRequest } from '@/lib/queryClient';
 
 interface TreatmentOutcomesData {
@@ -238,7 +238,7 @@ export function TreatmentOutcomes() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Depression Scores</CardTitle>
-            <Brain className="h-4 w-4 text-gray-600" />
+            <span className="text-lg">🌱</span>
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${getScoreColor(outcomes.averageDepressionScore, 27)}`}>

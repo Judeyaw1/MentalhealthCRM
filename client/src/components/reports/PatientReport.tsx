@@ -126,10 +126,16 @@ const PatientReport: React.FC<PatientReportProps> = ({ patientId, onClose }) => 
   const { data: reportData, isLoading, error } = useQuery({
     queryKey: [`/api/patients/${patientId}/report`],
     queryFn: async () => {
+      console.log('🔍 Fetching report for patient ID:', patientId);
       const response = await fetch(`/api/patients/${patientId}/report`, {
         credentials: 'include'
       });
-      if (!response.ok) throw new Error('Failed to fetch patient report');
+      console.log('🔍 Report API response status:', response.status);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('🔍 Report API error:', errorText);
+        throw new Error(`Failed to fetch patient report: ${response.status} ${errorText}`);
+      }
       return response.json() as Promise<PatientReportData>;
     },
     enabled: !!patientId,

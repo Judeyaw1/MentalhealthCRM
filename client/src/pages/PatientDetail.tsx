@@ -44,6 +44,7 @@ import { format, parseISO, isValid } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import PatientReport from "@/components/reports/PatientReport";
 
+
 import PatientNotes from "@/components/patients/PatientNotes";
 import { DischargeRequestForm } from "@/components/patients/DischargeRequestForm";
 import { DischargeRequestsList } from "@/components/patients/DischargeRequestsList";
@@ -329,18 +330,17 @@ export default function PatientDetail() {
   
   // Discharge request state
   const [showDischargeRequest, setShowDischargeRequest] = useState(false);
+  
+  // Report dialog state
   const [showReportDialog, setShowReportDialog] = useState(false);
 
-  // Debug: Monitor showReportDialog state changes
-  useEffect(() => {
-    console.log("🔍 showReportDialog state changed to:", showReportDialog);
-    console.log("🔍 Component re-rendering with showReportDialog:", showReportDialog);
-  }, [showReportDialog]);
+
+
 
   // Debug: Track component renders
   const renderCount = useRef(0);
   renderCount.current += 1;
-  console.log("🔍 PatientDetail component render #", renderCount.current, "showReportDialog:", showReportDialog);
+  console.log("🔍 PatientDetail component render #", renderCount.current);
   
   // Real-time socket connection for instant updates
   useSocket({
@@ -821,35 +821,22 @@ export default function PatientDetail() {
                     </Button>
                   )}
 
+
+
+
+
                   {/* Generate Report button */}
                   {user?.role !== "frontdesk" && (
                     <Button
                       variant="outline"
                       onClick={() => {
-                        console.log("🔍 Generate Report button clicked!");
-                        console.log("🔍 Current showReportDialog state:", showReportDialog);
-                        console.log("🔍 Patient data when button clicked:", { 
-                          patient, 
-                          patientLoading, 
-                          patientId: patient?.id,
-                          patientKeys: patient ? Object.keys(patient) : 'no patient',
-                          patientType: typeof patient,
-                          patientIsNull: patient === null,
-                          patientIsUndefined: patient === undefined
+                        console.log('🔍 Generate Report clicked for patient:', { 
+                          id: patient?.id, 
+                          _id: patient?._id, 
+                          firstName: patient?.firstName, 
+                          lastName: patient?.lastName 
                         });
-                        // Log the full patient object to see its structure
-                        if (patient) {
-                          console.log("🔍 Full patient object:", JSON.stringify(patient, null, 2));
-                          console.log("🔍 Patient ID field check:", {
-                            _id: patient._id,
-                            id: patient.id,
-                            patientId: patient.patientId,
-                            hasOwnProperty_id: patient.hasOwnProperty('_id'),
-                            hasOwnProperty_id2: patient.hasOwnProperty('id')
-                          });
-                        }
                         setShowReportDialog(true);
-                        console.log("🔍 Set showReportDialog to true");
                       }}
                       className="border-blue-200 text-blue-700 hover:bg-blue-50"
                     >
@@ -857,8 +844,6 @@ export default function PatientDetail() {
                       Generate Report
                     </Button>
                   )}
-
-
 
                   {/* Simple delete button */}
 
@@ -1471,18 +1456,10 @@ export default function PatientDetail() {
       </Dialog>
 
       {/* Patient Report Dialog */}
-      <Dialog open={showReportDialog} onOpenChange={(open) => {
-        console.log("🔍 Dialog onOpenChange called with:", open);
-        console.log("🔍 Current showReportDialog in Dialog:", showReportDialog);
-        console.log("🔍 Patient data in Dialog:", { patient, patientLoading, patientId: patient?._id });
-        // Only allow closing, not opening from external sources
-        if (!open) {
-          setShowReportDialog(false);
-        }
-      }}>
+      <Dialog open={showReportDialog} onOpenChange={setShowReportDialog}>
         <DialogContent className="max-w-7xl w-[95vw] max-h-[90vh] overflow-hidden p-0">
           <DialogHeader className="px-6 py-4 border-b">
-            <DialogTitle>Patient Report - Dialog State: {showReportDialog.toString()}</DialogTitle>
+            <DialogTitle>Patient Report</DialogTitle>
             <DialogDescription>
               Comprehensive treatment and progress report for {patient?.firstName} {patient?.lastName}
             </DialogDescription>
@@ -1495,10 +1472,13 @@ export default function PatientDetail() {
                   <p>Loading patient data...</p>
                 </div>
               </div>
-            ) : patient && patient.id ? (
+            ) : patient && (patient.id || patient._id) ? (
               <PatientReport 
-                patientId={patient.id} 
-                onClose={() => setShowReportDialog(false)}
+                patientId={patient._id || patient.id} 
+                onClose={() => {
+                  console.log('🔍 Closing report dialog for patient:', { id: patient.id, _id: patient._id });
+                  setShowReportDialog(false);
+                }}
               />
             ) : (
               <div className="flex items-center justify-center p-8">
@@ -1510,6 +1490,7 @@ export default function PatientDetail() {
           </div>
         </DialogContent>
       </Dialog>
+
     </div>
   );
 }

@@ -22,13 +22,13 @@ log = (message: string, source = "express") => {
   console.log(`${formattedTime} [${source}] ${message}`);
 };
 
-  serveStatic = (app: any) => {
-    // In production, the built files are in dist/public
-    const distPath = process.cwd() + "/dist/public";
-    
-    // Serve static files first - this must come before any catch-all routes
-    app.use(express.static(distPath));
-  };
+serveStatic = (app: any) => {
+  // In production, the built files are in dist/public
+  const distPath = process.cwd() + "/dist/public";
+  
+  // Serve static files first - this must come before any catch-all routes
+  app.use(express.static(distPath));
+};
 
 import { connectToMongo } from "./mongo";
 import mongoose from "mongoose";
@@ -70,107 +70,142 @@ app.use((req, res, next) => {
   next();
 });
 
-(async () => {
-  // Connect to MongoDB before starting the server
-  await connectToMongo();
-  storage.setDatabase(mongoose.connection.db);
+// Main startup function with error handling
+async function startServer() {
+  try {
+    console.log('🚀 Starting server...');
+    console.log('📁 Current working directory:', process.cwd());
+    console.log('🌍 Environment:', process.env.NODE_ENV);
+    
+    // Connect to MongoDB before starting the server
+    console.log('🔌 Connecting to MongoDB...');
+    await connectToMongo();
+    console.log('✅ MongoDB connected successfully');
+    
+    storage.setDatabase(mongoose.connection.db);
+    console.log('✅ Storage initialized');
 
-  // Register routes first
-  const server = await registerRoutes(app);
-  
-  // Setup static file serving AFTER routes but BEFORE the catch-all route
-  if (process.env.NODE_ENV === "development") {
-    // Import vite functions dynamically in development
-    const viteModule = await import("./vite");
-    await viteModule.setupVite(app, server);
-  } else {
-    // Add catch-all route for SPA in production (AFTER static file serving)
-    app.get('*', (req, res) => {
-      // Don't serve React app for API routes
-      if (req.path.startsWith('/api/')) {
-        return res.status(404).json({ message: 'API endpoint not found' });
+    // Register routes first
+    console.log('🛣️ Registering routes...');
+    const server = await registerRoutes(app);
+    console.log('✅ Routes registered successfully');
+    
+    // Setup static file serving AFTER routes but BEFORE the catch-all route
+    if (process.env.NODE_ENV === "development") {
+      // Import vite functions dynamically in development
+      console.log('⚡ Setting up Vite for development...');
+      const viteModule = await import("./vite");
+      await viteModule.setupVite(app, server);
+      console.log('✅ Vite setup complete');
+    } else {
+      // Serve static files from dist/public in production
+      console.log('📁 Setting up static file serving for production...');
+      const distPath = path.join(process.cwd(), 'dist', 'public');
+      console.log('📂 Static files path:', distPath);
+      
+      // Check if the directory exists
+      const fs = await import('fs');
+      if (fs.existsSync(distPath)) {
+        console.log('✅ Static files directory exists');
+        app.use(express.static(distPath));
+        console.log('✅ Static file middleware configured');
+      } else {
+        console.log('❌ Static files directory not found:', distPath);
       }
       
-      // Don't serve React app for static assets
-      if (req.path.startsWith('/public/') || req.path.startsWith('/uploads/') || req.path.match(/\.(png|jpg|jpeg|gif|svg|ico|css|js|woff|woff2|ttf|eot|html)$/)) {
-        return res.status(404).json({ message: 'Static asset not found' });
-      }
-      
-      // Serve the React app's index.html for SPA routes
-      res.sendFile(path.join(process.cwd(), 'dist/public/index.html'));
-    });
-  }
-  
-  // Setup WebSocket server
-  const io = setupSocketServer(server);
-  
-  // Make io available globally for routes
-  (global as any).io = io;
-
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-
-    res.status(status).json({ message });
-    throw err;
-  });
-
-  // Auto-cleanup function for old notes
-  const cleanupOldNotes = async () => {
-    try {
-      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000); // 24 hours ago
-      
-      const result = await PatientNote.deleteMany({
-        createdAt: { $lt: oneDayAgo }
+      // Add catch-all route for SPA in production (AFTER static file serving)
+      app.get('*', (req, res) => {
+        // Don't serve React app for API routes
+        if (req.path.startsWith('/api/')) {
+          return res.status(404).json({ message: 'API endpoint not found' });
+        }
+        
+        // Serve the React app's index.html for SPA routes
+        res.sendFile(path.join(process.cwd(), 'dist/public/index.html'));
       });
-
-      if (result.deletedCount > 0) {
-        log(`🧹 Auto-cleanup: Removed ${result.deletedCount} old notes (older than 24 hours)`);
-      }
-    } catch (error) {
-      log(`❌ Auto-cleanup error: ${error}`);
+      console.log('✅ SPA catch-all route configured');
     }
-  };
+    
+    // Setup WebSocket server
+    console.log('🔌 Setting up WebSocket server...');
+    const io = setupSocketServer(server);
+    console.log('✅ WebSocket server setup complete');
+    
+    // Make io available globally for routes
+    (global as any).io = io;
 
-  // Auto-update appointment statuses
-  const updateAppointmentStatuses = async () => {
-    try {
-      const { AppointmentStatusService } = await import('./appointmentStatusService');
-      const updatedCount = await AppointmentStatusService.updateAppointmentStatuses();
-      if (updatedCount > 0) {
-        log(`🔄 Auto-updated ${updatedCount} appointment statuses`);
+    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+      const status = err.status || err.statusCode || 500;
+      const message = err.message || "Internal Server Error";
+
+      res.status(status).json({ message });
+      throw err;
+    });
+
+    // Auto-cleanup function for old notes
+    const cleanupOldNotes = async () => {
+      try {
+        const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000); // 24 hours ago
+        
+        const result = await PatientNote.deleteMany({
+          createdAt: { $lt: oneDayAgo }
+        });
+
+        if (result.deletedCount > 0) {
+          log(`🧹 Auto-cleanup: Removed ${result.deletedCount} old notes (older than 24 hours)`);
+        }
+      } catch (error) {
+        log(`❌ Auto-cleanup error: ${error}`);
       }
-    } catch (error) {
-      log(`❌ Appointment status update error: ${error}`);
-    }
-  };
+    };
 
-  // Run cleanup every 6 hours
-  setInterval(cleanupOldNotes, 6 * 60 * 60 * 1000);
-  
-  // Run initial cleanup after 1 minute
-  setTimeout(cleanupOldNotes, 60 * 1000);
+    // Auto-update appointment statuses
+    const updateAppointmentStatuses = async () => {
+      try {
+        const { AppointmentStatusService } = await import('./appointmentStatusService');
+        const updatedCount = await AppointmentStatusService.updateAppointmentStatuses();
+        if (updatedCount > 0) {
+          log(`🔄 Auto-updated ${updatedCount} appointment statuses`);
+        }
+      } catch (error) {
+        log(`❌ Appointment status update error: ${error}`);
+      }
+    };
 
-  // Run appointment status updates every hour
-  setInterval(updateAppointmentStatuses, 60 * 60 * 1000);
-  
-  // Run initial appointment status update after 2 minutes
-  setTimeout(updateAppointmentStatuses, 2 * 60 * 1000);
+    // Run cleanup every 6 hours
+    setInterval(cleanupOldNotes, 6 * 60 * 60 * 1000);
+    
+    // Run initial cleanup after 1 minute
+    setTimeout(cleanupOldNotes, 60 * 1000);
 
-  // Serve the app on port 3000 for local development
-  const port = process.env.PORT || 3000;
-  
-  // For Railway, ensure we're accessible to the proxy
-  const host = process.env.RAILWAY_ENVIRONMENT ? "0.0.0.0" : "localhost";
-  
-  server.listen(
-    {
-      port,
-      host,
-    },
-    () => {
-      log(`serving on port ${port} on ${host}`);
-      log(`🧹 Auto-cleanup scheduled: every 6 hours, removes notes older than 24 hours`);
-    },
-  );
-})();
+    // Run appointment status updates every hour
+    setInterval(updateAppointmentStatuses, 60 * 60 * 1000);
+    
+    // Run initial appointment status update after 2 minutes
+    setTimeout(updateAppointmentStatuses, 2 * 60 * 1000);
+
+    // Serve the app on port 3000 for local development
+    const port = process.env.PORT || 3000;
+    
+    // For Railway, ensure we're accessible to the proxy
+    const host = process.env.RAILWAY_ENVIRONMENT ? "0.0.0.0" : "localhost";
+    
+    server.listen(
+      {
+        port,
+        host,
+      },
+      () => {
+        log(`serving on port ${port} on ${host}`);
+        log(`🧹 Auto-cleanup scheduled: every 6 hours, removes notes older than 24 hours`);
+        console.log('🎉 Server started successfully!');
+      },
+    );
+  } catch (error) {
+    console.error('❌ Server startup failed:', error);
+    process.exit(1);
+  }
+}
+
+// Start the server
+startServer();

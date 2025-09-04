@@ -78,6 +78,9 @@ export function ChangePasswordForm({
         confirmPassword: "",
       });
 
+      // Clear the force password change flag from localStorage
+      localStorage.removeItem("forcePasswordChange");
+
       // Close dialog
       onClose();
 

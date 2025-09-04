@@ -64,7 +64,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Textarea } from "@/components/ui/textarea";
 import { format } from "date-fns";
 import * as XLSX from "xlsx";
-import PatientReport from "@/components/reports/PatientReport";
+
 
 export default function Patients() {
   const { toast } = useToast();
@@ -100,8 +100,8 @@ export default function Patients() {
   const [importData, setImportData] = useState<any[]>([]);
   const [importLoading, setImportLoading] = useState(false);
   const [importResult, setImportResult] = useState<any>(null);
-  const [showReportDialog, setShowReportDialog] = useState(false);
-  const [selectedPatientForReport, setSelectedPatientForReport] = useState<PatientWithClinical | null>(null);
+
+
 
   // Redirect to home if not authenticated
   useEffect(() => {
@@ -752,10 +752,7 @@ export default function Patients() {
     }
   };
 
-  const handleGenerateReport = (patient: PatientWithClinical) => {
-    setSelectedPatientForReport(patient);
-    setShowReportDialog(true);
-  };
+
 
   const columns = [
     {
@@ -907,23 +904,7 @@ export default function Patients() {
             </Tooltip>
           </TooltipProvider>
 
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 w-8 p-0"
-                  onClick={() => handleGenerateReport(row)}
-                >
-                  <FileText className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Generate comprehensive report</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+
 
 
           {canPerformAssessments && (
@@ -1577,24 +1558,7 @@ export default function Patients() {
           </div>
         </DialogContent>
       </Dialog>
-      <Dialog open={showReportDialog} onOpenChange={setShowReportDialog}>
-        <DialogContent className="max-w-7xl w-[95vw] max-h-[90vh] overflow-hidden p-0">
-          <DialogHeader className="px-6 py-4 border-b">
-            <DialogTitle>Patient Report</DialogTitle>
-            <DialogDescription>
-              Comprehensive treatment and progress report for {selectedPatientForReport?.firstName} {selectedPatientForReport?.lastName}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="overflow-y-auto max-h-[calc(90vh-120px)]">
-            {selectedPatientForReport && (
-              <PatientReport 
-                patientId={selectedPatientForReport._id} 
-                onClose={() => setShowReportDialog(false)}
-              />
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+
 
 
     </div>
