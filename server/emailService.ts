@@ -19,8 +19,10 @@ export class EmailService {
   private static instance: EmailService;
   private transporter: nodemailer.Transporter | null = null;
 
-  private constructor() {
-    this.initializeTransporter();
+  constructor() {
+    // Brevo configuration - API key should be set in environment variables
+    this.apiKey = process.env.BREVO_API_KEY || 'your-brevo-api-key-here';
+    this.baseUrl = 'https://api.brevo.com/v3/smtp/email';
   }
 
   static getInstance(): EmailService {
