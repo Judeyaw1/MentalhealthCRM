@@ -1880,6 +1880,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Send password reset email
         const emailSent = await emailService.sendAdminPasswordReset(
           user.email,
+          user.firstName,
+          user.lastName,
           defaultPassword
         );
 
