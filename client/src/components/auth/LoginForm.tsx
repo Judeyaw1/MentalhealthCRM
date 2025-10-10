@@ -105,10 +105,10 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
 
   return (
     <Card className="w-full max-w-md mx-auto">
-      <CardHeader className="text-center">
-        <div className="mx-auto w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center mb-4">
-          <span className="text-3xl">🌱</span>
-        </div>
+              <CardHeader className="text-center">
+          <div className="mx-auto w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center mb-4">
+            <span className="text-3xl">🌱</span>
+          </div>
         <CardTitle>Sign In to NewLife CRM</CardTitle>
         <p className="text-sm text-gray-600">
           Enter your credentials to access your account

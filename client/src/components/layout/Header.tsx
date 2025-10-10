@@ -351,7 +351,7 @@ export function Header({ onSearch }: HeaderProps) {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-primary-500 rounded-lg flex items-center justify-center">
+                <div className="w-10 h-10 rounded-lg flex items-center justify-center">
                   <span className="text-xl">🌱</span>
                 </div>
                 <div>

@@ -71,8 +71,8 @@ export default function Landing() {
             Streamline your mental health practice with our comprehensive CRM solution. 
             Manage patients, appointments, treatments, and more with ease.
           </p>
-          <Button 
-            size="lg" 
+          <Button
+            size="lg"
             onClick={() => (window.location.href = "/login")}
             className="text-lg px-8 py-3"
           >
@@ -92,7 +92,7 @@ export default function Landing() {
               Comprehensive tools designed specifically for mental health professionals
             </p>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {features.map((feature, index) => (
               <div key={index} className="text-center p-6 rounded-lg border border-gray-200 hover:shadow-lg transition-shadow">
@@ -105,7 +105,7 @@ export default function Landing() {
                 <p className="text-gray-600">
                   {feature.description}
                 </p>
-              </div>
+                    </div>
             ))}
           </div>
         </div>
@@ -120,8 +120,8 @@ export default function Landing() {
           <p className="text-xl text-primary-100 mb-8">
             Join mental health professionals who trust NewLife CRM
           </p>
-          <Button 
-            size="lg" 
+          <Button
+            size="lg"
             variant="secondary"
             onClick={() => (window.location.href = "/login")}
             className="text-lg px-8 py-3"

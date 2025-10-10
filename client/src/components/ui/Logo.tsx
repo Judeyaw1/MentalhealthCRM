@@ -1,5 +1,4 @@
 import React from 'react';
-import logo from '../assets/logo.png';  // ✅ Import logo directly
 
 interface LogoProps {
   className?: string;
@@ -7,13 +6,14 @@ interface LogoProps {
 }
 
 export function Logo({ className = "", size = 24 }: LogoProps) {
+  const fontSize = Math.max(size * 0.8, 16); // Scale emoji size based on container size
+  
   return (
-    <img
-      src={logo}  // ✅ Use imported asset
-      alt="NewLife CRM Logo"
-      width={size}
-      height={size}
+    <span 
       className={className}
-    />
+      style={{ fontSize: `${fontSize}px` }}
+    >
+      🌱
+    </span>
   );
 }
