@@ -17,6 +17,7 @@ interface UseSocketOptions {
   onStaffCreated?: (data: any) => void;
   onStaffUpdated?: (data: any) => void;
   onStaffDeleted?: (data: any) => void;
+  onStaffInviteEmailStatus?: (data: any) => void;
   onDashboardStatsUpdated?: (data: any) => void;
   onNoteCreated?: (data: any) => void;
   onNoteUpdated?: (data: any) => void;
@@ -48,6 +49,7 @@ export function useSocket(options: UseSocketOptions = {}) {
     options.onStaffCreated,
     options.onStaffUpdated,
     options.onStaffDeleted,
+    options.onStaffInviteEmailStatus,
     options.onDashboardStatsUpdated,
     options.onNoteCreated,
     options.onNoteUpdated,
@@ -175,6 +177,9 @@ export function useSocket(options: UseSocketOptions = {}) {
     }
     if (memoizedOptions.onStaffDeleted) {
       socket.on('staff_deleted', memoizedOptions.onStaffDeleted);
+    }
+    if (memoizedOptions.onStaffInviteEmailStatus) {
+      socket.on('staff_invite_email_status', memoizedOptions.onStaffInviteEmailStatus);
     }
     if (memoizedOptions.onDashboardStatsUpdated) {
       socket.on('dashboard_stats_updated', memoizedOptions.onDashboardStatsUpdated);

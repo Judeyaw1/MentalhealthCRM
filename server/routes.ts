@@ -1739,6 +1739,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               `Failed to send invitation email to ${email}, but user was created`,
             );
           }
+          if (io) {
+            io.emit('staff_invite_email_status', { email, firstName, lastName, emailSent });
+          }
           return logActivity(userId, "invite", "staff", newUser.id.toString(), {
             email,
             firstName,

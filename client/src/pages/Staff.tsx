@@ -70,6 +70,15 @@ export default function Staff() {
     onStaffDeleted: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/staff'] });
     },
+    onStaffInviteEmailStatus: (data) => {
+      if (!data.emailSent) {
+        toast({
+          title: "Invitation email failed",
+          description: `The account for ${data.firstName} ${data.lastName} was created, but the invitation email to ${data.email} could not be sent.`,
+          variant: "destructive",
+        });
+      }
+    },
   });
 
   const getInitials = (firstName?: string | null, lastName?: string | null) => {
