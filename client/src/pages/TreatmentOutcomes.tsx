@@ -423,7 +423,7 @@ export default function TreatmentOutcomes() {
           {showForm && user?.id ? (
             <TreatmentOutcomeForm
               patientId={patientId}
-              clinicalId={user.id}
+              therapistId={user.id}
               initialData={editingOutcome}
               onSuccess={handleFormSuccess}
               onCancel={handleFormCancel}

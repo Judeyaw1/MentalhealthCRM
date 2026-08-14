@@ -451,24 +451,13 @@ export function TreatmentOutcomeForm({
                 Cancel
               </Button>
             )}
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               disabled={isSubmitting || !isValid}
-              onClick={() => {
-                console.log('Submit button clicked');
-                console.log('Form isValid:', isValid);
-                console.log('Form errors:', errors);
-                console.log('Form data:', watch());
-              }}
             >
               <Save className="h-4 w-4 mr-2" />
               {isSubmitting ? 'Saving...' : mode === 'create' ? 'Create Assessment' : 'Update Assessment'}
             </Button>
-          </div>
-          <div className="text-sm text-gray-600 mt-2">
-            Form valid: {isValid ? 'Yes' : 'No'} | 
-            Errors: {Object.keys(errors).length} | 
-            Submitting: {isSubmitting ? 'Yes' : 'No'}
           </div>
         </form>
       </CardContent>
