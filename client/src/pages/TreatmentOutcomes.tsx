@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useParams, useLocation } from 'wouter';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Plus, BarChart3, TrendingUp, AlertTriangle, User, Calendar } from 'lucide-react';
 import {
   AlertDialog,
@@ -29,6 +29,7 @@ export default function TreatmentOutcomes() {
   const [, navigate] = useLocation();
   const { user } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   
   const [activeTab, setActiveTab] = useState('overview');
   const [showForm, setShowForm] = useState(false);
@@ -115,6 +116,8 @@ export default function TreatmentOutcomes() {
     setShowForm(false);
     setEditingOutcome(null);
     setActiveTab('overview');
+    queryClient.invalidateQueries({ queryKey: [`/api/patients/${patientId}/treatment-outcomes`] });
+    queryClient.invalidateQueries({ queryKey: [`/api/treatment-outcomes/summary?patientId=${patientId}`] });
     toast({
       title: "Success",
       description: "Treatment outcome saved successfully",
