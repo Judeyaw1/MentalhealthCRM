@@ -324,7 +324,7 @@ export function TreatmentOutcomesList({
                             {format(new Date(outcome.assessmentDate), 'MMM dd, yyyy')}
                           </div>
                           <div className="text-sm text-gray-500">
-                            {outcome.therapistId?.firstName} {outcome.therapistId?.lastName}
+                            {outcome.clinicalId?.firstName} {outcome.clinicalId?.lastName}
                           </div>
                         </div>
                       </div>

@@ -1748,7 +1748,7 @@ export class DatabaseStorage {
       
       const populatedOutcome = await outcome.populate([
         { path: "patientId", select: "firstName lastName dateOfBirth" },
-        { path: "therapistId", select: "firstName lastName" },
+        { path: "clinicalId", select: "firstName lastName" },
         { path: "createdBy", select: "firstName lastName" },
       ]);
       
@@ -1768,7 +1768,7 @@ export class DatabaseStorage {
     try {
       const outcome = await TreatmentOutcome.findById(id).populate([
         { path: "patientId", select: "firstName lastName dateOfBirth" },
-        { path: "therapistId", select: "firstName lastName" },
+        { path: "clinicalId", select: "firstName lastName" },
         { path: "createdBy", select: "firstName lastName" },
         { path: "updatedBy", select: "firstName lastName" },
       ]);
@@ -1844,13 +1844,13 @@ export class DatabaseStorage {
     }
   }
 
-  async getTherapistTreatmentOutcomes(
-    therapistId: string,
+  async getClinicalTreatmentOutcomes(
+    clinicalId: string,
     limit: number = 50,
     offset: number = 0
   ) {
     try {
-      const outcomes = await TreatmentOutcome.find({ therapistId })
+      const outcomes = await TreatmentOutcome.find({ clinicalId })
         .sort({ assessmentDate: -1 })
         .limit(limit)
         .skip(offset)
@@ -1859,7 +1859,7 @@ export class DatabaseStorage {
           { path: "createdBy", select: "firstName lastName" },
         ]);
 
-      const total = await TreatmentOutcome.countDocuments({ therapistId });
+      const total = await TreatmentOutcome.countDocuments({ clinicalId });
 
       return {
         outcomes,
@@ -1867,7 +1867,7 @@ export class DatabaseStorage {
         hasMore: offset + outcomes.length < total,
       };
     } catch (error) {
-      console.error("Error getting therapist treatment outcomes:", error);
+      console.error("Error getting clinical treatment outcomes:", error);
       throw error;
     }
   }
@@ -1877,7 +1877,7 @@ export class DatabaseStorage {
     offset: number = 0,
     search?: string,
     patientId?: string,
-    therapistId?: string,
+    clinicalId?: string,
     startDate?: Date,
     endDate?: Date
   ) {
@@ -1885,7 +1885,7 @@ export class DatabaseStorage {
       const filter: any = {};
 
       if (patientId) filter.patientId = patientId;
-      if (therapistId) filter.therapistId = therapistId;
+      if (clinicalId) filter.clinicalId = clinicalId;
       if (startDate || endDate) {
         filter.assessmentDate = {};
         if (startDate) filter.assessmentDate.$gte = startDate;
@@ -1898,7 +1898,7 @@ export class DatabaseStorage {
         .skip(offset)
         .populate([
           { path: "patientId", select: "firstName lastName dateOfBirth" },
-          { path: "therapistId", select: "firstName lastName" },
+          { path: "clinicalId", select: "firstName lastName" },
           { path: "createdBy", select: "firstName lastName" },
         ]);
 
@@ -1927,7 +1927,7 @@ export class DatabaseStorage {
         { new: true, runValidators: true }
       ).populate([
         { path: "patientId", select: "firstName lastName dateOfBirth" },
-        { path: "therapistId", select: "firstName lastName" },
+        { path: "clinicalId", select: "firstName lastName" },
         { path: "createdBy", select: "firstName lastName" },
         { path: "updatedBy", select: "firstName lastName" },
       ]);
@@ -1958,13 +1958,13 @@ export class DatabaseStorage {
 
   async getTreatmentOutcomesSummary(
     patientId?: string,
-    therapistId?: string,
+    clinicalId?: string,
     startDate?: Date,
     endDate?: Date
   ) {
     try {
-      console.log("Storage: getTreatmentOutcomesSummary called with:", { patientId, therapistId, startDate, endDate });
-      
+      console.log("Storage: getTreatmentOutcomesSummary called with:", { patientId, clinicalId, startDate, endDate });
+
       const filter: any = {};
 
       if (patientId) {
@@ -1972,8 +1972,8 @@ export class DatabaseStorage {
         filter.patientId = new mongoose.Types.ObjectId(patientId);
         console.log("Storage: Converted patientId to ObjectId:", filter.patientId);
       }
-      if (therapistId) {
-        filter.therapistId = new mongoose.Types.ObjectId(therapistId);
+      if (clinicalId) {
+        filter.clinicalId = new mongoose.Types.ObjectId(clinicalId);
       }
       if (startDate || endDate) {
         filter.assessmentDate = {};
@@ -2112,7 +2112,7 @@ export class DatabaseStorage {
 
       const outcomes = await TreatmentOutcome.find(filter)
         .populate('patientId', 'firstName lastName')
-        .populate('therapistId', 'firstName lastName')
+        .populate('clinicalId', 'firstName lastName')
         .sort({ assessmentDate: -1 });
 
       if (outcomes.length === 0) {

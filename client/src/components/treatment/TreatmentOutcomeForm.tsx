@@ -18,7 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 
 const treatmentOutcomeSchema = z.object({
   patientId: z.string().min(1, "Patient is required"),
-  therapistId: z.string().min(1, "Therapist is required"),
+  clinicalId: z.string().min(1, "Clinician is required"),
   assessmentDate: z.date(),
   
   // Symptom Assessment Scores
@@ -54,7 +54,7 @@ type TreatmentOutcomeFormData = z.infer<typeof treatmentOutcomeSchema>;
 
 interface TreatmentOutcomeFormProps {
   patientId?: string;
-  therapistId?: string;
+  clinicalId?: string;
   initialData?: any;
   onSuccess?: () => void;
   onCancel?: () => void;
@@ -76,7 +76,7 @@ const riskFactorOptions = [
 
 export function TreatmentOutcomeForm({
   patientId,
-  therapistId,
+  clinicalId,
   initialData,
   onSuccess,
   onCancel,
@@ -98,7 +98,7 @@ export function TreatmentOutcomeForm({
     resolver: zodResolver(treatmentOutcomeSchema),
     defaultValues: {
       patientId: patientId || '',
-      therapistId: therapistId || '',
+      clinicalId: clinicalId || '',
       assessmentDate: new Date(),
       ...initialData,
     },
