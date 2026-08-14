@@ -142,7 +142,7 @@ export function TreatmentOutcomeForm({
           description: "Treatment outcome assessment created successfully",
         });
       } else {
-        const response = await apiRequest('PATCH', `/api/treatment-outcomes/${initialData.id}`, submitData);
+        const response = await apiRequest('PATCH', `/api/treatment-outcomes/${initialData._id || initialData.id}`, submitData);
         console.log('API response:', response);
         toast({
           title: "Success",
