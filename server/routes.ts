@@ -1702,49 +1702,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate invitation URL
       const inviteUrl = `${req.protocol}://${req.get("host")}/login`;
 
-      // Send invitation email
-      const emailSent = await emailService.sendStaffInvitation(
-        email,
-        firstName,
-        lastName,
-        role,
-        inviteUrl,
-        defaultPassword,
-        message
-      );
-
-      await logActivity(userId, "invite", "staff", newUser.id.toString(), {
-        email,
-        firstName,
-        lastName,
-        role,
-        emailSent,
-      });
-
       // Emit WebSocket event for real-time updates
       const io = (global as any).io;
       if (io && newUser) {
         io.emit('staff_created', newUser);
       }
 
-      if (!emailSent) {
-        // If email fails, still create the user but warn about it
-        console.warn(
-          `Failed to send invitation email to ${email}, but user was created`,
-        );
-        return res.status(201).json({
-          message: "User created, but invitation email failed.",
-          user: {
-            id: newUser.id,
-            email: newUser.email,
-            firstName: newUser.firstName,
-            lastName: newUser.lastName,
-            role: newUser.role,
-          },
-          emailSent: false,
-        });
-      }
-
+      // Respond immediately — SMTP delivery (with retries) can take a while
+      // and shouldn't block the invite flow from the user's perspective.
       res.status(201).json({
         message: "Staff invitation sent successfully",
         user: {
@@ -1756,6 +1721,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         emailSent: true,
       });
+
+      // Send the invitation email in the background
+      emailService
+        .sendStaffInvitation(
+          email,
+          firstName,
+          lastName,
+          role,
+          inviteUrl,
+          defaultPassword,
+          message
+        )
+        .then((emailSent) => {
+          if (!emailSent) {
+            console.warn(
+              `Failed to send invitation email to ${email}, but user was created`,
+            );
+          }
+          return logActivity(userId, "invite", "staff", newUser.id.toString(), {
+            email,
+            firstName,
+            lastName,
+            role,
+            emailSent,
+          });
+        })
+        .catch((err) => {
+          console.error(`Error sending invitation email to ${email}:`, err);
+        });
     } catch (error: any) {
       console.error("Error inviting staff:", error);
 
