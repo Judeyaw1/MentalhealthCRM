@@ -88,6 +88,23 @@ export function TreatmentOutcomeForm({
   );
   const { toast } = useToast();
 
+  // GET endpoints populate patientId/clinicalId into full objects and
+  // serialize assessmentDate as a JSON string; the form needs plain ID
+  // strings and a real Date, so normalize before using as defaultValues.
+  const extractId = (value: any): string =>
+    value && typeof value === 'object' ? value._id || value.id || '' : value || '';
+
+  const normalizedInitialData = initialData
+    ? {
+        ...initialData,
+        patientId: extractId(initialData.patientId),
+        clinicalId: extractId(initialData.clinicalId),
+        assessmentDate: initialData.assessmentDate
+          ? new Date(initialData.assessmentDate)
+          : new Date(),
+      }
+    : undefined;
+
   const {
     register,
     handleSubmit,
@@ -100,7 +117,7 @@ export function TreatmentOutcomeForm({
       patientId: patientId || '',
       clinicalId: clinicalId || '',
       assessmentDate: new Date(),
-      ...initialData,
+      ...normalizedInitialData,
     },
   });
 
